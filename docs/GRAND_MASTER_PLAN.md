@@ -53,7 +53,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 - [x] Input mapping (keyboard to Game Boy buttons)
 - [x] Walking physics: acceleration, max speed, friction (constants sourced from reference)
   - [ ] Verify walking constants against the emulator/disassembly (current values are provisional placeholders)
-- [ ] Gravity and ground collision against the tilemap
+- [x] Gravity and ground collision against the tilemap
 - [ ] Jump physics (initial velocity, variable height)
 - [ ] Animation states: idle, walk, jump
 - [ ] Tests: physics constants, collision cases, a scripted-input golden frame

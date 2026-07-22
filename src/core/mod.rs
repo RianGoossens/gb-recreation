@@ -10,6 +10,7 @@
 //! outermost shape, a stepping loop over an input snapshot.
 
 pub mod entity;
+pub mod level;
 pub mod physics;
 
 use crate::input::Buttons;

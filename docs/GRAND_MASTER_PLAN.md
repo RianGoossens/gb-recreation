@@ -39,7 +39,7 @@ Goal: run the app and see the Super Mario Land title screen, rendered by our cod
 - [x] Game Boy display model: 160x144 framebuffer, 4-shade palette, tile and tilemap rendering
 - [ ] Window + rendering frontend that draws the framebuffer to screen
 - [x] Headless screenshot command that renders a given state to PNG
-- [ ] Render the title screen from extracted assets
+- [x] Render the title screen from extracted assets
 - [ ] Golden-image test: title screen matches a committed reference PNG
 - [ ] Blog post: booting to the title screen
 

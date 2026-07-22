@@ -21,6 +21,7 @@ fn main() -> ExitCode {
         }
         Some("extract-tiles") => extract_tiles(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
+        Some("render-title") => render_title(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}");
             usage();
@@ -137,6 +138,49 @@ fn screenshot(args: &[String]) -> ExitCode {
     }
 }
 
+/// `render-title <out.png>` loads the extracted title-screen assets and renders
+/// them through our own pipeline to a PNG. The extracted assets are gitignored,
+/// so run `uv run tools/extract_title.py` first to produce them.
+fn render_title(args: &[String]) -> ExitCode {
+    let out = match args {
+        [out] => out,
+        _ => {
+            eprintln!("usage: sml render-title <out.png>");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let sheet = match sml::assets::TileSheet::load("assets/extracted/title.tiles") {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("could not load title tiles: {e}");
+            eprintln!("run: uv run tools/extract_title.py");
+            return ExitCode::FAILURE;
+        }
+    };
+    let map = match sml::assets::load_tilemap("assets/extracted/title.tmap") {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("could not load title map: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let mut fb = Framebuffer::new();
+    render_background(&mut fb, &map, &sheet.tiles, 0, 0, &Palette::new(sheet.palette));
+    let png = sml::png::encode_gray(sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT, &fb.to_gray());
+    match std::fs::write(out, png) {
+        Ok(()) => {
+            println!("rendered title screen to {out}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("could not write {out}: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 /// A placeholder frame: four solid shades arranged as diagonal bands, drawn
 /// through the real tilemap path so the whole render pipeline is exercised.
 fn demo_scene() -> Framebuffer {
@@ -163,4 +207,5 @@ fn usage() {
     println!("  sml verify-rom [path]                     verify the ROM hashes");
     println!("  sml extract-tiles <offset> <count> <out>  decode ROM tiles to an asset file");
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
+    println!("  sml render-title <out.png>                render the extracted title screen");
 }

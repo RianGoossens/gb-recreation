@@ -128,6 +128,28 @@ pub fn extract_tiles(
     Ok(TileSheet::new(tiles, DEFAULT_BGP))
 }
 
+const MAP_MAGIC: &[u8; 4] = b"SMLM";
+
+/// Load a tile map in our SMLM format: magic, version, u16 width, u16 height,
+/// then width*height tile indices. Produced by the extraction tool.
+pub fn load_tilemap(path: impl AsRef<Path>) -> Result<crate::render::TileMap, AssetError> {
+    let data = std::fs::read(path).map_err(AssetError::Io)?;
+    tilemap_from_bytes(&data)
+}
+
+fn tilemap_from_bytes(data: &[u8]) -> Result<crate::render::TileMap, AssetError> {
+    if data.len() < 9 || &data[0..4] != MAP_MAGIC || data[4] != FORMAT_VERSION {
+        return Err(AssetError::BadFormat);
+    }
+    let width = u16::from_le_bytes(data[5..7].try_into().unwrap()) as usize;
+    let height = u16::from_le_bytes(data[7..9].try_into().unwrap()) as usize;
+    let cells = &data[9..];
+    if cells.len() != width * height {
+        return Err(AssetError::BadFormat);
+    }
+    Ok(crate::render::TileMap::new(width, height, cells.to_vec()))
+}
+
 #[derive(Debug)]
 pub enum AssetError {
     Io(io::Error),
@@ -181,6 +203,30 @@ mod tests {
             TileSheet::from_bytes(b"nope and some more bytes here"),
             Err(AssetError::BadFormat)
         ));
+    }
+
+    #[test]
+    fn tilemap_bytes_parse() {
+        // SMLM: magic, version 1, width 2, height 1, cells [3, 7].
+        let mut bytes = b"SMLM".to_vec();
+        bytes.push(1);
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&[3, 7]);
+        let map = tilemap_from_bytes(&bytes).unwrap();
+        assert_eq!((map.width, map.height), (2, 1));
+        assert_eq!(map.cell(0, 0), 3);
+        assert_eq!(map.cell(1, 0), 7);
+    }
+
+    #[test]
+    fn tilemap_bad_size_is_rejected() {
+        let mut bytes = b"SMLM".to_vec();
+        bytes.push(1);
+        bytes.extend_from_slice(&4u16.to_le_bytes());
+        bytes.extend_from_slice(&4u16.to_le_bytes());
+        bytes.extend_from_slice(&[0, 1]); // too few cells
+        assert!(matches!(tilemap_from_bytes(&bytes), Err(AssetError::BadFormat)));
     }
 
     #[test]

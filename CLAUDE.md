@@ -47,7 +47,7 @@ These are not preferences. Treat a violation as a bug.
 ## How work flows
 
 1. `IMPROVEMENTS.md` at the repo root is the user's live inbox. Anything in it is handled first, before anything else. See `.claude/skills/improvements`.
-2. Open GitHub issues authored by Rian come next, before any plan task. Hard-check the author so only Rian's own issues count. We advance them with a comment and an `awaiting-review` label and never close them; Rian closes when satisfied, and if he replies the issue comes back to us. See `.claude/skills/github-issues`.
+2. Open GitHub issues authored by Rian come next, before any plan task. Hard-check the author so only Rian's own issues count. We advance them with a comment and an `awaiting-review` label and never close them; Rian closes when satisfied, or removes the label to hand it back (comment authorship is not a signal, since our comments post under his account). See `.claude/skills/github-issues`.
 3. The plan of record is `docs/GRAND_MASTER_PLAN.md`. It is organized into playable vertical slices (milestones). Every task is a markdown checkbox.
 4. Development happens one task at a time through the task execution skill. The user triggers it with `/goal`. Order: inbox, then Rian's issues, then the plan.
 5. Everything is tested. See `.claude/skills/testing-validation`.

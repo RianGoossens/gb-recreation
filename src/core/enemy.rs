@@ -157,6 +157,18 @@ mod tests {
     }
 
     #[test]
+    fn enemy_walks_forward_on_open_ground() {
+        let solids = floor();
+        let mut e = Enemy::goomba(80, 16, true); // walking left on a wide floor
+        let start = e.x;
+        for _ in 0..10 {
+            update_enemy(&mut e, &solids);
+        }
+        assert!(e.x < start, "should have walked left");
+        assert!(e.on_ground);
+    }
+
+    #[test]
     fn enemy_reverses_at_a_wall() {
         // Wall column at x 56..63 (tile 7), floor below.
         let mut rows = [

@@ -80,23 +80,27 @@ pub struct Level {
     /// Enemy spawn points, top-left pixel. Kind is decided by the caller; for
     /// now every marker is a Goomba.
     pub enemy_spawns: Vec<(i32, i32)>,
+    /// Coin positions, top-left pixel.
+    pub coins: Vec<(i32, i32)>,
 }
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `M` marks Mario's
-    /// spawn, `G` marks a Goomba spawn (both otherwise empty), anything else is
-    /// empty. Rows must be equal length. This is the human-editable format
-    /// levels are authored in.
+    /// spawn, `G` marks a Goomba spawn, `C` marks a coin (all otherwise empty),
+    /// anything else is empty. Rows must be equal length. This is the
+    /// human-editable format levels are authored in.
     pub fn from_rows(rows: &[&str]) -> Self {
         let solids = Solids::from_rows(rows);
         let mut spawn = (0, 0);
         let mut enemy_spawns = Vec::new();
+        let mut coins = Vec::new();
         for (ty, row) in rows.iter().enumerate() {
             for (tx, ch) in row.chars().enumerate() {
                 let px = (tx as i32 * TILE, ty as i32 * TILE);
                 match ch {
                     'M' => spawn = px,
                     'G' => enemy_spawns.push(px),
+                    'C' => coins.push(px),
                     _ => {}
                 }
             }
@@ -105,6 +109,7 @@ impl Level {
             solids,
             spawn,
             enemy_spawns,
+            coins,
         }
     }
 }

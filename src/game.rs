@@ -30,11 +30,28 @@ pub struct Game {
     pub animator: Animator,
     /// How many times Mario has died and respawned this session.
     pub deaths: u32,
+    /// Uncollected coins, top-left pixel.
+    pub coins: Vec<(i32, i32)>,
+    /// Coins collected (wraps every 100, which grants a life).
+    pub coins_collected: u32,
+    pub lives: u32,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
     mario_tile: Tile,
     enemy_tile: Tile,
+    coin_tile: Tile,
     palette: Palette,
+}
+
+/// A small dark mark on an otherwise empty tile, so coins read differently from
+/// Mario (solid black) and enemies (solid light).
+fn coin_tile() -> Tile {
+    let mut pixels = [[0u8; 8]; 8];
+    for row in pixels.iter_mut().take(6).skip(2) {
+        row[3] = 2;
+        row[4] = 2;
+    }
+    Tile { pixels }
 }
 
 fn spawn_enemies(level: &Level) -> Vec<Enemy> {
@@ -57,10 +74,14 @@ impl Game {
         }
         let mario = Mario::new(level.spawn.0, level.spawn.1);
         let enemies = spawn_enemies(&level);
+        let coins = level.coins.clone();
         Self {
             level,
             mario,
             enemies,
+            coins,
+            coins_collected: 0,
+            lives: 3,
             camera: Camera::new(),
             animator: Animator::new(),
             deaths: 0,
@@ -71,6 +92,7 @@ impl Game {
             // Enemies render as a light-gray block so they stand out from both
             // the white background and the dark terrain.
             enemy_tile: solid_tile(1),
+            coin_tile: coin_tile(),
             palette: Palette::new(0xE4),
         }
     }
@@ -118,6 +140,7 @@ impl Game {
             update_enemy(enemy, &self.level.solids);
         }
         self.resolve_interactions();
+        self.collect_coins();
         let (lw, lh) = self.level_size();
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
@@ -167,8 +190,40 @@ impl Game {
         }
     }
 
-    /// Put Mario back at the spawn and restore the enemies. The camera snaps back
-    /// on the next step via follow.
+    /// Collect any coins Mario overlaps. Every 100 coins grants a life.
+    fn collect_coins(&mut self) {
+        let (mw, mh) = self.mario.size();
+        let ml = self.mario.pixel_x();
+        let mt = self.mario.pixel_y();
+        let (mr, mb) = (ml + mw - 1, mt + mh - 1);
+
+        let mut got = 0u32;
+        self.coins.retain(|&(cx, cy)| {
+            let (cl, ct, cr, cb) = (cx, cy, cx + TILE - 1, cy + TILE - 1);
+            let overlap = ml <= cr && mr >= cl && mt <= cb && mb >= ct;
+            if overlap {
+                got += 1;
+                false
+            } else {
+                true
+            }
+        });
+        for _ in 0..got {
+            self.gain_coin();
+        }
+    }
+
+    fn gain_coin(&mut self) {
+        self.coins_collected += 1;
+        if self.coins_collected >= 100 {
+            self.coins_collected -= 100;
+            self.lives += 1;
+        }
+    }
+
+    /// Put Mario back at the spawn and restore the enemies. Collected coins,
+    /// lives, and the death count carry over. The camera snaps back on the next
+    /// step via follow.
     fn respawn(&mut self) {
         self.mario = Mario::new(self.level.spawn.0, self.level.spawn.1);
         self.enemies = spawn_enemies(&self.level);
@@ -186,6 +241,9 @@ impl Game {
             self.camera.y,
             &self.palette,
         );
+        for &(cx, cy) in &self.coins {
+            fb.draw_tile(&self.coin_tile, cx - self.camera.x, cy - self.camera.y, &self.palette);
+        }
         for enemy in &self.enemies {
             if enemy.alive {
                 fb.draw_tile(
@@ -307,6 +365,35 @@ mod tests {
         // After respawn Mario is alive again, back near the spawn.
         assert!(game.mario.alive);
         assert!(game.mario.pixel_x() <= 8, "should be back at the spawn");
+    }
+
+    #[test]
+    fn mario_collects_a_coin_he_touches() {
+        use crate::core::level::Level;
+        // A coin sitting right where Mario spawns.
+        let level = Level::from_rows(&["MC..", "####"]);
+        let mut game = Game::new(level);
+        assert_eq!(game.coins.len(), 1);
+        // Walk right into the coin.
+        for _ in 0..30 {
+            game.step(held(Button::Right));
+            if game.coins.is_empty() {
+                break;
+            }
+        }
+        assert!(game.coins.is_empty(), "the coin should be collected");
+        assert_eq!(game.coins_collected, 1);
+    }
+
+    #[test]
+    fn one_hundred_coins_grants_a_life() {
+        let mut game = Game::new(Game::demo_level());
+        let lives_before = game.lives;
+        for _ in 0..100 {
+            game.gain_coin();
+        }
+        assert_eq!(game.lives, lives_before + 1);
+        assert_eq!(game.coins_collected, 0, "counter wraps after 100");
     }
 
     #[test]

@@ -78,7 +78,7 @@ Goal: full solid-world collision, a Goomba-equivalent enemy that walks and can b
 Goal: question blocks, coins, the power-up flow, score and coin counters.
 
 - [ ] Interactive blocks (question, brick): bump, spawn contents
-- [ ] Coins: collect, counter, 100-coin life
+- [x] Coins: collect, counter, 100-coin life
 - [ ] Power-up (mushroom equivalent): spawn, movement, pickup, size/state change
 - [ ] HUD: score, coins, lives, timer
 - [ ] Timer countdown and time-out death

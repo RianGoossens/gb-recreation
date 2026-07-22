@@ -18,6 +18,7 @@ pub mod input;
 pub mod png;
 pub mod render;
 pub mod rom;
+pub mod scene;
 pub mod tiles;
 
 /// The Game Boy display is 160x144 pixels.

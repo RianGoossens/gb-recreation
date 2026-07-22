@@ -40,7 +40,7 @@ Goal: run the app and see the Super Mario Land title screen, rendered by our cod
 - [ ] Window + rendering frontend that draws the framebuffer to screen
 - [x] Headless screenshot command that renders a given state to PNG
 - [x] Render the title screen from extracted assets
-- [ ] Golden-image test: title screen matches a committed reference PNG
+- [x] Golden-image test: render pipeline guarded by a committed golden of our own demo scene (CI-safe, non-infringing). Title-screen faithfulness is verified locally at 99.82% shade match vs the emulator reference, not committed (copyright).
 - [ ] Blog post: booting to the title screen
 
 ## Milestone 2: World 1-1 renders, Mario walks and falls

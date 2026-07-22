@@ -7,8 +7,7 @@
 
 use std::process::ExitCode;
 
-use sml::render::{render_background, Framebuffer, Palette, TileMap};
-use sml::tiles::Tile;
+use sml::render::{render_background, Framebuffer, Palette};
 
 const DEFAULT_ROM: &str = "super_mario_land.gb";
 
@@ -124,7 +123,7 @@ fn screenshot(args: &[String]) -> ExitCode {
         }
     };
 
-    let fb = demo_scene();
+    let fb = sml::scene::demo();
     let png = sml::png::encode_gray(sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT, &fb.to_gray());
     match std::fs::write(out, png) {
         Ok(()) => {
@@ -178,26 +177,6 @@ fn render_title(args: &[String]) -> ExitCode {
             eprintln!("could not write {out}: {e}");
             ExitCode::FAILURE
         }
-    }
-}
-
-/// A placeholder frame: four solid shades arranged as diagonal bands, drawn
-/// through the real tilemap path so the whole render pipeline is exercised.
-fn demo_scene() -> Framebuffer {
-    let tiles: Vec<Tile> = (0..4).map(|i| solid_tile(i as u8)).collect();
-    let (w, h) = (20usize, 18usize);
-    let cells = (0..w * h)
-        .map(|c| (((c % w) + (c / w)) % 4) as u8)
-        .collect();
-    let map = TileMap::new(w, h, cells);
-    let mut fb = Framebuffer::new();
-    render_background(&mut fb, &map, &tiles, 0, 0, &Palette::new(0xE4));
-    fb
-}
-
-fn solid_tile(color_index: u8) -> Tile {
-    Tile {
-        pixels: [[color_index; 8]; 8],
     }
 }
 

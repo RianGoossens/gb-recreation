@@ -1,5 +1,11 @@
 [
   {
+    "title": "Enemies, stomps, and dying",
+    "date": "2026-07-23",
+    "slug": "2026-07-23-enemies-stomps-and-dying",
+    "summary": "An enemy that patrols and turns at ledges, a stomp that hinges on who was moving down, and death with a respawn. All tested without ever opening a window."
+  },
+  {
     "title": "Booting to the title screen",
     "date": "2026-07-22",
     "slug": "2026-07-22-booting-to-the-title-screen",

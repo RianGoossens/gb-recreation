@@ -9,6 +9,7 @@
 //! items), physics, and collision all live here. For now this defines the
 //! outermost shape, a stepping loop over an input snapshot.
 
+pub mod animation;
 pub mod entity;
 pub mod level;
 pub mod physics;

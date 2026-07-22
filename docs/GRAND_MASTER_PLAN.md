@@ -55,7 +55,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
   - [ ] Verify walking constants against the emulator/disassembly (current values are provisional placeholders)
 - [x] Gravity and ground collision against the tilemap
 - [x] Jump physics (initial velocity, variable height)
-- [ ] Animation states: idle, walk, jump
+- [x] Animation states: idle, walk, jump
 - [ ] Tests: physics constants, collision cases, a scripted-input golden frame
 - [ ] Blog post: World 1-1 and the physics of walking
 

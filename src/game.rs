@@ -8,10 +8,10 @@
 
 use crate::camera::Camera;
 use crate::core::animation::Animator;
-use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy};
+use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
 use crate::core::entity::Mario;
 use crate::core::level::{Level, TILE};
-use crate::core::physics::step_motion;
+use crate::core::physics::{step_motion, STOMP_BOUNCE};
 use crate::input::Buttons;
 use crate::render::{render_background, Framebuffer, Palette, TileMap};
 use crate::tiles::Tile;
@@ -111,10 +111,39 @@ impl Game {
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
         }
+        self.resolve_stomps();
         let (lw, lh) = self.level_size();
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
         despawn_offscreen(&mut self.enemies, self.camera.x);
+    }
+
+    /// When Mario comes down onto an enemy, the enemy dies and Mario bounces.
+    /// Side or bottom contact is left to the damage logic (added separately).
+    fn resolve_stomps(&mut self) {
+        let (mw, mh) = self.mario.size();
+        let ml = self.mario.pixel_x();
+        let mt = self.mario.pixel_y();
+        let (mr, mb) = (ml + mw - 1, mt + mh - 1);
+        let descending = self.mario.vy > 0;
+
+        let mut stomped = false;
+        for enemy in &mut self.enemies {
+            if !enemy.alive {
+                continue;
+            }
+            let (el, et, er, eb) = enemy.edges();
+            let overlap = ml <= er && mr >= el && mt <= eb && mb >= et;
+            // A stomp is landing on the enemy's upper half while moving down.
+            if overlap && descending && mb <= et + ENEMY_SIZE / 2 {
+                enemy.alive = false;
+                stomped = true;
+            }
+        }
+        if stomped {
+            self.mario.vy = -STOMP_BOUNCE;
+            self.mario.on_ground = false;
+        }
     }
 
     /// Render the current frame.
@@ -202,6 +231,27 @@ mod tests {
             game.step(Buttons::default());
         }
         assert!(game.enemies[0].x != start, "the goomba should have walked");
+    }
+
+    #[test]
+    fn falling_onto_a_goomba_stomps_it_and_bounces_mario() {
+        use crate::core::level::Level;
+        // Mario above a Goomba, both over a floor.
+        let level = Level::from_rows(&[".M..", "....", "....", ".G..", "####"]);
+        let mut game = Game::new(level);
+        game.enemies[0].vx = 0; // keep the goomba under Mario for a clean drop
+
+        let mut bounced = false;
+        for _ in 0..120 {
+            game.step(Buttons::default());
+            if game.enemies.is_empty() {
+                // The goomba was stomped (dead enemies are despawned).
+                bounced = game.mario.vy < 0;
+                break;
+            }
+        }
+        assert!(game.enemies.is_empty(), "the goomba should have been stomped");
+        assert!(bounced, "Mario should bounce up off the stomp");
     }
 
     #[test]

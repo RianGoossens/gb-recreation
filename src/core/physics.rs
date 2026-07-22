@@ -27,6 +27,8 @@ pub const JUMP_VELOCITY: i32 = 700;
 /// Releasing the jump button early clamps any remaining rise to this, giving
 /// short hops when tapped and full jumps when held.
 pub const JUMP_CUT: i32 = 200;
+/// Upward speed Mario gets from stomping an enemy.
+pub const STOMP_BOUNCE: i32 = 500;
 
 /// Update horizontal velocity and facing from the held buttons, without moving.
 fn walk_velocity(mario: &mut Mario, buttons: Buttons) {
@@ -232,6 +234,7 @@ mod tests {
         assert_eq!(MAX_FALL_SPEED, 640);
         assert_eq!(JUMP_VELOCITY, 700);
         assert_eq!(JUMP_CUT, 200);
+        assert_eq!(STOMP_BOUNCE, 500);
     }
 
     // Gravity and collision.

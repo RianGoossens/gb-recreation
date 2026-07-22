@@ -28,11 +28,21 @@ pub struct Game {
     pub enemies: Vec<Enemy>,
     pub camera: Camera,
     pub animator: Animator,
+    /// How many times Mario has died and respawned this session.
+    pub deaths: u32,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
     mario_tile: Tile,
     enemy_tile: Tile,
     palette: Palette,
+}
+
+fn spawn_enemies(level: &Level) -> Vec<Enemy> {
+    level
+        .enemy_spawns
+        .iter()
+        .map(|&(px, py)| Enemy::goomba(px, py, true))
+        .collect()
 }
 
 impl Game {
@@ -46,18 +56,14 @@ impl Game {
             }
         }
         let mario = Mario::new(level.spawn.0, level.spawn.1);
-        // Every enemy marker is a Goomba for now, walking left to start.
-        let enemies = level
-            .enemy_spawns
-            .iter()
-            .map(|&(px, py)| Enemy::goomba(px, py, true))
-            .collect();
+        let enemies = spawn_enemies(&level);
         Self {
             level,
             mario,
             enemies,
             camera: Camera::new(),
             animator: Animator::new(),
+            deaths: 0,
             bg_map: TileMap::new(w, h, cells),
             // Empty tiles render white, solid tiles dark, Mario a black block.
             bg_tiles: vec![solid_tile(0), solid_tile(2)],
@@ -111,16 +117,22 @@ impl Game {
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
         }
-        self.resolve_stomps();
+        self.resolve_interactions();
         let (lw, lh) = self.level_size();
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
         despawn_offscreen(&mut self.enemies, self.camera.x);
+
+        if !self.mario.alive {
+            self.deaths += 1;
+            self.respawn();
+        }
     }
 
-    /// When Mario comes down onto an enemy, the enemy dies and Mario bounces.
-    /// Side or bottom contact is left to the damage logic (added separately).
-    fn resolve_stomps(&mut self) {
+    /// Resolve Mario touching enemies. Coming down onto an enemy's upper half is
+    /// a stomp: the enemy dies and Mario bounces. Any other contact is a fatal
+    /// hit (Mario is small; power-ups come later).
+    fn resolve_interactions(&mut self) {
         let (mw, mh) = self.mario.size();
         let ml = self.mario.pixel_x();
         let mt = self.mario.pixel_y();
@@ -128,22 +140,39 @@ impl Game {
         let descending = self.mario.vy > 0;
 
         let mut stomped = false;
+        let mut hit = false;
         for enemy in &mut self.enemies {
             if !enemy.alive {
                 continue;
             }
             let (el, et, er, eb) = enemy.edges();
             let overlap = ml <= er && mr >= el && mt <= eb && mb >= et;
-            // A stomp is landing on the enemy's upper half while moving down.
-            if overlap && descending && mb <= et + ENEMY_SIZE / 2 {
+            if !overlap {
+                continue;
+            }
+            if descending && mb <= et + ENEMY_SIZE / 2 {
                 enemy.alive = false;
                 stomped = true;
+            } else {
+                hit = true;
             }
         }
         if stomped {
             self.mario.vy = -STOMP_BOUNCE;
             self.mario.on_ground = false;
         }
+        // A stomp in the same frame saves Mario from a simultaneous side hit.
+        if hit && !stomped {
+            self.mario.alive = false;
+        }
+    }
+
+    /// Put Mario back at the spawn and restore the enemies. The camera snaps back
+    /// on the next step via follow.
+    fn respawn(&mut self) {
+        self.mario = Mario::new(self.level.spawn.0, self.level.spawn.1);
+        self.enemies = spawn_enemies(&self.level);
+        self.animator = Animator::new();
     }
 
     /// Render the current frame.
@@ -211,7 +240,14 @@ mod tests {
 
     #[test]
     fn walking_right_moves_mario_and_eventually_scrolls() {
-        let mut game = Game::new(Game::demo_level());
+        use crate::core::level::Level;
+        // A wide, enemy-free lane so this isolates scrolling from any collision.
+        let top = format!("M{}", ".".repeat(39));
+        let empty = ".".repeat(40);
+        let floor = "#".repeat(40);
+        let level = Level::from_rows(&[&top, &empty, &empty, &floor]);
+        let mut game = Game::new(level);
+
         let start_x = game.mario.pixel_x();
         for _ in 0..120 {
             game.step(held(Button::Right));
@@ -252,6 +288,25 @@ mod tests {
         }
         assert!(game.enemies.is_empty(), "the goomba should have been stomped");
         assert!(bounced, "Mario should bounce up off the stomp");
+    }
+
+    #[test]
+    fn walking_into_a_goomba_from_the_side_kills_and_respawns_mario() {
+        use crate::core::level::Level;
+        // Mario and a Goomba on the same flat floor, a gap apart.
+        let level = Level::from_rows(&["M...G", "#####"]);
+        let mut game = Game::new(level);
+
+        for _ in 0..200 {
+            game.step(held(Button::Right));
+            if game.deaths > 0 {
+                break;
+            }
+        }
+        assert!(game.deaths > 0, "side contact with the goomba should kill Mario");
+        // After respawn Mario is alive again, back near the spawn.
+        assert!(game.mario.alive);
+        assert!(game.mario.pixel_x() <= 8, "should be back at the spawn");
     }
 
     #[test]

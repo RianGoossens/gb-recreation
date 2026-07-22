@@ -41,6 +41,9 @@ pub struct Mario {
     /// True while the jump button is held after a jump started, so holding it
     /// does not trigger a second jump. Cleared when the button is released.
     pub jump_latched: bool,
+    /// Cleared when Mario takes a fatal hit. The game turns this back on when it
+    /// respawns him.
+    pub alive: bool,
 }
 
 impl Mario {
@@ -55,6 +58,7 @@ impl Mario {
             on_ground: false,
             power: Power::Small,
             jump_latched: false,
+            alive: true,
         }
     }
 

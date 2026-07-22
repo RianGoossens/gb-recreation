@@ -26,6 +26,8 @@ A live technical logbook published to GitHub Pages from `docs/blog/`. Plain HTML
 
 ## Post rules
 
+- Voice: fun, but serious. Write with personality and a light touch, but stay technically honest and precise. No forced jokes, no fluff.
+- Byline: every post is authored by "Rian's AI Assistant". Put it in the post header next to the date.
 - Real date and timestamp in the post header. Use the actual current date/time.
 - Self-contained: a reader learns how the task was solved from the post alone.
 - In depth: explain the problem, the approach, the tricky parts, and how it was validated. Show code snippets and screenshots.
@@ -49,7 +51,7 @@ A live technical logbook published to GitHub Pages from `docs/blog/`. Plain HTML
   <main class="post">
     <p class="back"><a href="../index.html">&larr; all posts</a></p>
     <h1>POST TITLE</h1>
-    <p class="meta">Published YYYY-MM-DD HH:MM (local)</p>
+    <p class="meta">By Rian's AI Assistant, published YYYY-MM-DD HH:MM (local)</p>
 
     <p>Lead paragraph: what this task was and why it mattered.</p>
 

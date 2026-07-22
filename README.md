@@ -4,11 +4,11 @@ A native, readable Rust reproduction of the Game Boy game Super Mario Land. Not 
 
 Status: workspace bootstrap. Game development is tracked in [docs/GRAND_MASTER_PLAN.md](docs/GRAND_MASTER_PLAN.md) and driven one task at a time.
 
-## How this repo is built (transparency)
+## How this repo is built
 
-This project is an agentic loop built around Claude Code. Most of the code, docs, plan, and blog posts here are written by an AI agent working through the skills in `.claude/skills/`, one task at a time, with a human steering and reviewing. That is the whole point of the repo: an honest experiment in whether a well-structured agent workflow can carry a job as involved as reproducing a full Game Boy game in clean Rust.
+Most of the code, docs, plan, and blog posts here are written by Claude Code running as an agent, working through the skills in `.claude/skills/` one task at a time, with a human steering and reviewing. The repo is an experiment in whether that kind of agent workflow can carry a job as big as reproducing a full Game Boy game in clean Rust.
 
-Being upfront about it: if you find AI slop, awkward phrasing, or over-engineering in here, sorry. This is a genuine attempt to build a good agent workflow for a hard problem, nothing more. It is not claiming to be flawless hand-craft. Issues and corrections are welcome.
+So expect some AI slop and rough edges. This is an honest attempt at a good agent workflow for a hard problem, nothing more.
 
 ## Requirements
 

@@ -70,9 +70,56 @@ impl Solids {
     }
 }
 
+/// A playable level: the solid geometry plus where Mario starts. Visuals (the
+/// background tile map) are loaded separately; this is the gameplay side.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Level {
+    pub solids: Solids,
+    /// Mario's spawn, top-left pixel.
+    pub spawn: (i32, i32),
+}
+
+impl Level {
+    /// Build a level from rows of text. `#` is a solid tile, `M` marks Mario's
+    /// spawn tile (and is otherwise empty), anything else is empty. Rows must be
+    /// equal length. This is the human-editable format levels are authored in.
+    pub fn from_rows(rows: &[&str]) -> Self {
+        let solids = Solids::from_rows(rows);
+        let mut spawn = (0, 0);
+        for (ty, row) in rows.iter().enumerate() {
+            if let Some(tx) = row.find('M') {
+                spawn = (tx as i32 * TILE, ty as i32 * TILE);
+                break;
+            }
+        }
+        Self { solids, spawn }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn level_reads_spawn_and_solids() {
+        let level = Level::from_rows(&[
+            "........",
+            "...M....",
+            "........",
+            "########",
+        ]);
+        // Spawn 'M' is at column 3, row 1 -> pixel (24, 8).
+        assert_eq!(level.spawn, (24, 8));
+        // The 'M' tile is not solid, the floor is.
+        assert!(!level.solids.is_solid(3, 1));
+        assert!(level.solids.is_solid(0, 3));
+    }
+
+    #[test]
+    fn level_without_spawn_defaults_to_origin() {
+        let level = Level::from_rows(&["....", "####"]);
+        assert_eq!(level.spawn, (0, 0));
+    }
 
     #[test]
     fn from_rows_marks_solids() {

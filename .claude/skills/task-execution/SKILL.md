@@ -10,7 +10,7 @@ One invocation completes exactly one concrete task from `docs/GRAND_MASTER_PLAN.
 ## Procedure
 
 0. Drain the improvements inbox first. Check `IMPROVEMENTS.md` at the repo root (see the improvements skill). If it has any unchecked item, handle the topmost one this run instead of a plan task, mark it `[x]`, and stop there. The plan waits until the inbox is empty.
-0b. Then check open GitHub issues authored by Rian (see the github-issues skill). Hard-check the author: only Rian's own issues count. If any are open, resolve the oldest one this run instead of a plan task, and stop there. Issues rank above the plan and below the inbox.
+0b. Then check GitHub issues authored by Rian (see the github-issues skill). Hard-check the author: only Rian's own issues count. An issue needs attention when it is fresh (no `awaiting-review` label) or Rian has replied on it. If one does, handle the oldest this run instead of a plan task: do the work, comment what you did, add the `awaiting-review` label, and stop. Never close issues yourself; Rian closes them when satisfied. Issues rank above the plan and below the inbox.
 1. Read `docs/GRAND_MASTER_PLAN.md`. Pick whichever unblocked task makes the most sense to do next, judged by dependencies and value. Tasks are not strictly ordered, so list position does not decide this. Prefer finishing an in-progress `[~]` task over starting a new one.
 2. If the chosen task is too big for one run, split it in the plan and take the first subtask instead.
 3. Mark the task `[~]`.

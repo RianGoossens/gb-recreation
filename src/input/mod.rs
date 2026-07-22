@@ -1,9 +1,13 @@
 //! Input: the Game Boy's eight buttons.
 //!
+//! See [`mapping`] for turning keyboard keys into a button snapshot.
+//!
 //! A frontend (keyboard, gamepad) maps physical keys onto these buttons and
 //! hands a [`Buttons`] snapshot to [`crate::core::GameState::step`] each frame.
 //! The core only ever sees this snapshot, so gameplay does not care where the
 //! input came from. That also lets tests drive the game with scripted input.
+
+pub mod mapping;
 
 /// The eight Game Boy buttons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

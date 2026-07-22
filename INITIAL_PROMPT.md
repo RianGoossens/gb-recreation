@@ -35,7 +35,7 @@ Understand these parameters for the actual development phase:
     *   **MD5:** `b259feb41811c7e4e1dc200167985c84`
     *   **CRC32:** `2c27ec70`
 *   **The Goal:** We are building a full native Rust reproduction, NOT an emulator. The final codebase must be clean, readable, and easily modifiable so users can create custom Mario levels or mechanics. It must not be a literal, messy translation of assembly.
-*   **Tooling, Assets & The Disassembly:** You must carefully consider any external tooling or asset extraction pipelines. If a tool requires specific workflows, write dedicated skills to interface with it. **Important:** You are strongly encouraged to reference the `kaspermeerts/supermarioland` GitHub repository as your primary manual for understanding the original assembly logic, physics calculations, and memory maps. Do not blindly disassemble the ROM from scratch when `kaspermeerts` already maps the logic. Reimplement this mapped logic bit by bit in Rust.
+*   **Tooling, Assets & The Disassembly:** You must carefully consider any external tooling or asset extraction pipelines. If a tool requires specific workflows, write dedicated skills to interface with it. Build clean Rust from observed behavior and emulator comparison. Lean on any existing disassembly as little as possible, only to settle a specific number or mechanic you cannot pin down otherwise, and reimplement it bit by bit in Rust.
 *   **Visual Testing:** The Rust program must include built-in ways to easily generate screenshots so you can visually test outputs, compare them against emulators, and embed them in your live dev blog.
 
 **Immediate Action Required:**

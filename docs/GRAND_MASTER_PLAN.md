@@ -23,7 +23,7 @@ Goal: the repo builds, tests run, CI is green, the blog deploys.
 - [x] GitHub Pages workflow deploying the blog on push
 - [x] Scaffold the Rust crate: `cargo` project that builds and has one passing test
 - [x] Define the module layout (core logic, rendering, input, assets) as empty documented modules
-- [ ] First blog post: the workspace and how it is driven
+- [x] First blog post: the workspace and how it is driven
 - [ ] Push to GitHub, confirm both workflows pass
 
 ## Milestone 1: Boot to title screen

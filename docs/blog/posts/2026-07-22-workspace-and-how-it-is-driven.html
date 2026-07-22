@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The workspace and how it is driven: SML in Rust devlog</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <main class="post">
+    <p class="back"><a href="../index.html">&larr; all posts</a></p>
+    <h1>The workspace and how it is driven</h1>
+    <p class="meta">Published 2026-07-22 23:08 CEST</p>
+
+    <p>Before writing a single line of game code, we spent the first sitting building the workshop. This post is the logbook entry for that: what the repo is, how work moves through it, and why it is shaped this way. If you are here for Mario physics, that starts in the next milestone. This one is about the machine that produces the machine.</p>
+
+    <h2>What this project is</h2>
+    <p>A native Rust reproduction of the Game Boy game Super Mario Land. Not an emulator. We reimplement the game's logic, physics, and rendering as clean Rust that a person can read and change to build custom levels or mechanics. The original assembly is a reference we consult sparingly, not a template we translate opcode for opcode.</p>
+    <p>It is also an experiment: most of the code, docs, plan, and these posts are written by Claude Code running as an agent, one task at a time, with a human steering and reviewing. So the second job of this repo is to find out whether a well-structured agent workflow can carry something as involved as a full game reproduction.</p>
+
+    <h2>The loop</h2>
+    <p>Everything runs through one loop. A living plan lists the work. A task engine takes exactly one item, does it, tests it, commits it, and updates the plan. When something notable lands, a post like this one gets written. Then it repeats.</p>
+
+    <figure>
+      <svg viewBox="0 0 720 200" role="img" aria-label="Workflow loop: plan to task to test to commit to blog and back">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#9aa0a6"></path>
+          </marker>
+          <style>
+            .box { fill: #171a1f; stroke: #262b31; }
+            .lbl { fill: #e6e6e6; font: 13px system-ui, sans-serif; text-anchor: middle; }
+            .flow { stroke: #9aa0a6; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+          </style>
+        </defs>
+        <rect class="box" x="10" y="80" width="110" height="40" rx="8"></rect>
+        <text class="lbl" x="65" y="105">Master Plan</text>
+        <rect class="box" x="170" y="80" width="120" height="40" rx="8"></rect>
+        <text class="lbl" x="230" y="105">Task engine</text>
+        <rect class="box" x="340" y="80" width="90" height="40" rx="8"></rect>
+        <text class="lbl" x="385" y="105">Tests</text>
+        <rect class="box" x="480" y="80" width="100" height="40" rx="8"></rect>
+        <text class="lbl" x="530" y="105">Commit</text>
+        <rect class="box" x="630" y="80" width="80" height="40" rx="8"></rect>
+        <text class="lbl" x="670" y="105">Blog</text>
+        <path class="flow" d="M120,100 L168,100"></path>
+        <path class="flow" d="M290,100 L338,100"></path>
+        <path class="flow" d="M430,100 L478,100"></path>
+        <path class="flow" d="M580,100 L628,100"></path>
+        <path class="flow" d="M670,80 C670,30 65,30 65,78"></path>
+      </svg>
+      <figcaption>One task per pass: pull from the plan, do the work with tests, commit, occasionally write it up, then back to the plan.</figcaption>
+    </figure>
+
+    <p>Concretely, the pieces are:</p>
+    <ul>
+      <li><strong>The Grand Master Plan</strong>: a single markdown file of checkboxes, organized into playable vertical slices. Boot to title, then walk in World 1-1, then stomp an enemy, and so on. Finishing every box is the definition of a finished project.</li>
+      <li><strong>The task engine</strong>: one run picks the topmost unblocked task, does it, and leaves the tree clean. It is chained with the <code>/goal</code> command, so a person can ask for five passes and walk away.</li>
+      <li><strong>Testing</strong>: everything with testable behavior gets a test. The game core is deterministic on purpose, which is what makes both tests and screenshots reliable.</li>
+      <li><strong>This blog</strong>: plain HTML, CSS, and a little JS, no frameworks, deployed to GitHub Pages on push.</li>
+    </ul>
+
+    <h2>The shape of the code</h2>
+    <p>The crate is split along four boundaries, with a one-way dependency into the core so the simulation stays pure:</p>
+    <pre><code>core    deterministic game state and rules. no rendering, no I/O.
+render  turns a game state into a 160x144 framebuffer of GB shades.
+input   the eight Game Boy buttons, as a per-frame snapshot.
+assets  loads tiles, palettes, and levels (extracted from the ROM).</code></pre>
+    <p>The reason for the split is testability. Because <code>core</code> never reaches for the screen or the filesystem, we can step it with scripted input and assert on the result, or render any state headlessly to a PNG and compare it against a reference image. The windowed frontend becomes a thin consumer of a framebuffer rather than the place where game logic hides.</p>
+
+    <h2>Guardrails</h2>
+    <p>A few rules are baked into the repo's guidelines so the agent and its sub-agents stay consistent. The ones that shape the writing: no em-dashes anywhere, no filler vocabulary, keep it simple, and comment only when the "why" is not obvious. The ones that shape the engineering: Rust with stable cargo, no Node anywhere, and the original ROM never gets committed. That last one matters. The ROM and any extracted assets are gitignored, and a hash check gates any tool that reads the ROM so we always know we are working from the right dump.</p>
+
+    <h2>Validation</h2>
+    <p>The bootstrap is green. The crate builds, the module layout is in place, and the current test suite passes:</p>
+    <pre><code>running 6 tests
+test core::tests::stepping_is_deterministic ... ok
+test input::tests::default_holds_nothing ... ok
+test input::tests::set_toggles_one_button_only ... ok
+test render::tests::new_framebuffer_is_all_white ... ok
+test render::tests::set_then_get_round_trips ... ok
+test tests::screen_dimensions_are_game_boy_native ... ok</code></pre>
+    <p>Continuous integration runs the same tests on every push, and this post reaches you through the Pages workflow that deploys the blog on push. Both are green, which is the whole point of doing the plumbing first.</p>
+
+    <h2>What is next</h2>
+    <p>Milestone 1: boot to the title screen. That means a real <code>verify-rom</code> command, a first look at how the Game Boy stores tiles, an extraction step that pulls the title graphics out of the verified ROM into our own format, and enough of a renderer to draw them. The next post should have an actual picture of Mario's name on a screen we drew ourselves.</p>
+  </main>
+</body>
+</html>

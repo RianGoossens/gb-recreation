@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "title": "The workspace and how it is driven",
+    "date": "2026-07-22",
+    "slug": "2026-07-22-workspace-and-how-it-is-driven",
+    "summary": "What the repo is, the one-task-at-a-time loop that drives it, and the four-module shape of the code."
+  }
+]

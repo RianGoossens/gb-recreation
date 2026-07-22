@@ -67,7 +67,7 @@ Goal: full solid-world collision, a Goomba-equivalent enemy that walks and can b
 
 - [ ] Full tile collision (walls, floors, ceilings, slopes if present)
 - [x] Enemy framework (spawn, update, despawn offscreen)
-- [ ] The 1-1 first enemy (Goomba equivalent): walk, turn at edges/walls
+- [x] The 1-1 first enemy (Goomba equivalent): walk, turn at edges/walls
 - [ ] Stomp interaction: kill enemy, bounce Mario
 - [ ] Damage/death: Mario loses on contact, death animation, respawn/reset
 - [ ] Tests: enemy movement, stomp vs. side-contact outcomes

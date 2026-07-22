@@ -8,6 +8,7 @@
 
 use crate::camera::Camera;
 use crate::core::animation::Animator;
+use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy};
 use crate::core::entity::Mario;
 use crate::core::level::{Level, TILE};
 use crate::core::physics::step_motion;
@@ -24,11 +25,13 @@ fn solid_tile(color_index: u8) -> Tile {
 pub struct Game {
     pub level: Level,
     pub mario: Mario,
+    pub enemies: Vec<Enemy>,
     pub camera: Camera,
     pub animator: Animator,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
     mario_tile: Tile,
+    enemy_tile: Tile,
     palette: Palette,
 }
 
@@ -43,15 +46,25 @@ impl Game {
             }
         }
         let mario = Mario::new(level.spawn.0, level.spawn.1);
+        // Every enemy marker is a Goomba for now, walking left to start.
+        let enemies = level
+            .enemy_spawns
+            .iter()
+            .map(|&(px, py)| Enemy::goomba(px, py, true))
+            .collect();
         Self {
             level,
             mario,
+            enemies,
             camera: Camera::new(),
             animator: Animator::new(),
             bg_map: TileMap::new(w, h, cells),
             // Empty tiles render white, solid tiles dark, Mario a black block.
             bg_tiles: vec![solid_tile(0), solid_tile(2)],
             mario_tile: solid_tile(3),
+            // Enemies render as a light-gray block so they stand out from both
+            // the white background and the dark terrain.
+            enemy_tile: solid_tile(1),
             palette: Palette::new(0xE4),
         }
     }
@@ -71,6 +84,8 @@ impl Game {
                     '#'
                 } else if x == 2 && y == h - 3 {
                     'M'
+                } else if x == 16 && y == h - 3 {
+                    'G'
                 } else {
                     '.'
                 };
@@ -93,9 +108,13 @@ impl Game {
     pub fn step(&mut self, buttons: Buttons) {
         step_motion(&mut self.mario, buttons, &self.level.solids);
         self.animator.update(&self.mario);
+        for enemy in &mut self.enemies {
+            update_enemy(enemy, &self.level.solids);
+        }
         let (lw, lh) = self.level_size();
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
+        despawn_offscreen(&mut self.enemies, self.camera.x);
     }
 
     /// Render the current frame.
@@ -109,6 +128,16 @@ impl Game {
             self.camera.y,
             &self.palette,
         );
+        for enemy in &self.enemies {
+            if enemy.alive {
+                fb.draw_tile(
+                    &self.enemy_tile,
+                    enemy.pixel_x() - self.camera.x,
+                    enemy.pixel_y() - self.camera.y,
+                    &self.palette,
+                );
+            }
+        }
         fb.draw_tile(
             &self.mario_tile,
             self.mario.pixel_x() - self.camera.x,
@@ -162,6 +191,17 @@ mod tests {
         assert!(game.mario.on_ground, "should stay on the floor");
         // Far enough right that the camera has left the left edge.
         assert!(game.camera.x > 0, "camera should have scrolled");
+    }
+
+    #[test]
+    fn demo_level_has_a_goomba_that_moves() {
+        let mut game = Game::new(Game::demo_level());
+        assert_eq!(game.enemies.len(), 1);
+        let start = game.enemies[0].x;
+        for _ in 0..30 {
+            game.step(Buttons::default());
+        }
+        assert!(game.enemies[0].x != start, "the goomba should have walked");
     }
 
     #[test]

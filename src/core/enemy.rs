@@ -73,6 +73,16 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
         return;
     }
 
+    // A Goomba turns at a ledge instead of walking off. When grounded, probe the
+    // ground just past its leading foot; if nothing is there, reverse first.
+    if enemy.on_ground && enemy.kind == EnemyKind::Goomba && enemy.vx != 0 {
+        let (l, _t, r, b) = enemy.edges();
+        let ahead = if enemy.vx > 0 { r + 1 } else { l - 1 };
+        if !solids.rect_hits_solid(ahead, b + 1, ahead, b + 1) {
+            enemy.vx = -enemy.vx;
+        }
+    }
+
     enemy.x += enemy.vx;
     let (l, t, r, b) = enemy.edges();
     if enemy.vx > 0 && solids.rect_hits_solid(r, t, r, b) {
@@ -163,11 +173,39 @@ mod tests {
 
         let mut e = Enemy::goomba(40, 16, false); // walking right toward the wall
         assert!(e.vx > 0);
+        let mut reversed = false;
         for _ in 0..200 {
             update_enemy(&mut e, &solids);
+            if e.vx < 0 {
+                reversed = true;
+            }
+            assert!(e.pixel_x() <= 48, "should never pass the wall at x=56");
         }
-        assert!(e.vx < 0, "should have turned around at the wall");
-        assert!(e.pixel_x() <= 48, "should not pass the wall at x=56");
+        assert!(reversed, "should have turned around at the wall");
+    }
+
+    #[test]
+    fn goomba_turns_at_a_ledge_instead_of_walking_off() {
+        // A short platform (tiles 5..9 on the floor row) with empty space beyond.
+        // Rows are 20 wide, 4 tall; the platform is on the bottom row.
+        let mut floor_row = ".".repeat(20);
+        floor_row.replace_range(5..10, "#####");
+        let solids = Solids::from_rows(&[
+            &".".repeat(20),
+            &".".repeat(20),
+            &".".repeat(20),
+            &floor_row,
+        ]);
+
+        // Goomba standing on the platform (tile 6, pixel x 48, y 16), walking right.
+        let mut e = Enemy::goomba(48, 16, false);
+        e.on_ground = true;
+        for _ in 0..300 {
+            update_enemy(&mut e, &solids);
+        }
+        // It never leaves the platform: its feet stay over solid tiles 5..9.
+        let (l, _t, r, b) = e.edges();
+        assert!(solids.rect_hits_solid(l, b + 1, r, b + 1), "should still be on the platform");
     }
 
     #[test]

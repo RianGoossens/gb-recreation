@@ -44,9 +44,9 @@ cargo run --release -- screenshot --state title --out shot.png
 
 Before any tool consumes the ROM it must match Super Mario Land (World) v1.0:
 
-- SHA-1 `b8449c25608d538e124707dc8e5d0b49cb376e19`
-- MD5 `2e16d41584c205ba8fcd07fb3b22b644`
-- CRC32 `B81DF11A`
+- SHA-1 `418203621b887caa090215d97e3f509b79affd3e`
+- MD5 `b259feb41811c7e4e1dc200167985c84`
+- CRC32 `2c27ec70`
 
 Check it:
 

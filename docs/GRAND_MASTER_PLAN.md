@@ -114,6 +114,6 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 
 ## Backlog and notes
 
-- The ROM currently in the tree fails the hash check. Milestone 1 is blocked on a verified dump.
+- The ROM in the tree passes the hash check (verified 2026-07-22). Milestone 1 is unblocked.
 - Keep physics constants cited to the reference so behavior is defensible.
 - Revisit module boundaries at the end of each milestone during self-improvement.

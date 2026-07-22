@@ -39,10 +39,10 @@ These are not preferences. Treat a violation as a bug.
 
 - `super_mario_land.gb` and any extracted assets are gitignored. Never commit them.
 - The ROM must pass a hash check before any tool consumes it. Expected Super Mario Land (World) v1.0:
-  - SHA-1 `b8449c25608d538e124707dc8e5d0b49cb376e19`
-  - MD5 `2e16d41584c205ba8fcd07fb3b22b644`
-  - CRC32 `B81DF11A`
-- The file currently in the tree does NOT match these hashes. Do not extract from it until it is replaced with a verified dump. The verification task lives in the Grand Master Plan.
+  - SHA-1 `418203621b887caa090215d97e3f509b79affd3e`
+  - MD5 `b259feb41811c7e4e1dc200167985c84`
+  - CRC32 `2c27ec70`
+- The file currently in the tree matches these hashes (verified 2026-07-22). The `verify-rom` command must still enforce them before any extraction, so a swapped file is caught.
 
 ## How work flows
 

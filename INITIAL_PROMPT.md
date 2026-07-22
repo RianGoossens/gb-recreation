@@ -30,12 +30,12 @@ You must write and configure the following skills in your skills directory. Ensu
 
 **Phase 3: The Project Rules (Rust SML)**
 Understand these parameters for the actual development phase:
-*   **The ROM & Validation:** A `super_mario_land.gb` file will be placed in the directory. You MUST immediately add `*.gb` and any extracted asset folders to `.gitignore`. Before doing anything with this file, you must verify its hashes to ensure we are working with the standard Super Mario Land (World) v1.0 release. The expected hashes are:
-    *   **SHA-1:** `b8449c25608d538e124707dc8e5d0b49cb376e19`
-    *   **MD5:** `2e16d41584c205ba8fcd07fb3b22b644`
-    *   **CRC32:** `B81DF11A`
+*   **The ROM & Validation:** A `super_mario_land.gb` file will be placed in the directory. You MUST immediately add `*.gb` and any extracted asset folders to `.gitignore`. Before doing anything with this file, you must verify its hashes to ensure we are working with the standard **Super Mario Land (World) (Rev 1)** release. The expected hashes are:
+    *   **SHA-1:** `418203621b887caa090215d97e3f509b79affd3e`
+    *   **MD5:** `b259feb41811c7e4e1dc200167985c84`
+    *   **CRC32:** `2c27ec70`
 *   **The Goal:** We are building a full native Rust reproduction, NOT an emulator. The final codebase must be clean, readable, and easily modifiable so users can create custom Mario levels or mechanics. It must not be a literal, messy translation of assembly.
-*   **Tooling, Assets & The Disassembly:** You must carefully consider any external tooling or asset extraction pipelines. If a tool requires specific workflows, write dedicated skills to interface with it. **Important:** You are strongly encouraged to reference the `10yard/supermarioland` GitHub repository as your primary manual for understanding the original assembly logic, physics calculations, and memory maps. Do not blindly disassemble the ROM from scratch when `10yard` already maps the logic. Reimplement this mapped logic bit by bit in Rust.
+*   **Tooling, Assets & The Disassembly:** You must carefully consider any external tooling or asset extraction pipelines. If a tool requires specific workflows, write dedicated skills to interface with it. **Important:** You are strongly encouraged to reference the `kaspermeerts/supermarioland` GitHub repository as your primary manual for understanding the original assembly logic, physics calculations, and memory maps. Do not blindly disassemble the ROM from scratch when `kaspermeerts` already maps the logic. Reimplement this mapped logic bit by bit in Rust.
 *   **Visual Testing:** The Rust program must include built-in ways to easily generate screenshots so you can visually test outputs, compare them against emulators, and embed them in your live dev blog.
 
 **Immediate Action Required:**

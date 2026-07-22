@@ -35,6 +35,11 @@ pub struct Game {
     /// Coins collected (wraps every 100, which grants a life).
     pub coins_collected: u32,
     pub lives: u32,
+    pub score: u32,
+    /// Countdown shown on the HUD. Ticks down over time; running out is handled
+    /// by the timer task, not here.
+    pub timer: u32,
+    timer_ticks: u32,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
     mario_tile: Tile,
@@ -82,6 +87,9 @@ impl Game {
             coins,
             coins_collected: 0,
             lives: 3,
+            score: 0,
+            timer: 400,
+            timer_ticks: 0,
             camera: Camera::new(),
             animator: Animator::new(),
             deaths: 0,
@@ -141,6 +149,7 @@ impl Game {
         }
         self.resolve_interactions();
         self.collect_coins();
+        self.tick_timer();
         let (lw, lh) = self.level_size();
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
@@ -183,6 +192,7 @@ impl Game {
         if stomped {
             self.mario.vy = -STOMP_BOUNCE;
             self.mario.on_ground = false;
+            self.score += 100;
         }
         // A stomp in the same frame saves Mario from a simultaneous side hit.
         if hit && !stomped {
@@ -215,9 +225,19 @@ impl Game {
 
     fn gain_coin(&mut self) {
         self.coins_collected += 1;
+        self.score += 100;
         if self.coins_collected >= 100 {
             self.coins_collected -= 100;
             self.lives += 1;
+        }
+    }
+
+    /// Count down the level timer, one unit roughly every 24 frames.
+    fn tick_timer(&mut self) {
+        self.timer_ticks += 1;
+        if self.timer_ticks >= 24 {
+            self.timer_ticks = 0;
+            self.timer = self.timer.saturating_sub(1);
         }
     }
 
@@ -260,7 +280,25 @@ impl Game {
             self.mario.pixel_y() - self.camera.y,
             &self.palette,
         );
+        self.draw_hud(&mut fb);
         fb
+    }
+
+    /// Draw the HUD along the top: a coin icon and count, a Mario icon and life
+    /// count, the score, and the timer. Numbers use the small digit font.
+    fn draw_hud(&self, fb: &mut Framebuffer) {
+        use crate::font::draw_number;
+        use crate::render::Shade;
+
+        // Coin icon + count.
+        fb.draw_tile(&self.coin_tile, 2, 1, &self.palette);
+        draw_number(fb, 11, 2, self.coins_collected, Shade::Black);
+        // Mario icon + lives.
+        fb.draw_tile(&self.mario_tile, 40, 1, &self.palette);
+        draw_number(fb, 49, 2, self.lives, Shade::Black);
+        // Score and timer as plain numbers.
+        draw_number(fb, 78, 2, self.score, Shade::Black);
+        draw_number(fb, 135, 2, self.timer, Shade::Black);
     }
 }
 
@@ -383,6 +421,30 @@ mod tests {
         }
         assert!(game.coins.is_empty(), "the coin should be collected");
         assert_eq!(game.coins_collected, 1);
+    }
+
+    #[test]
+    fn timer_counts_down_over_time() {
+        let mut game = Game::new(Game::demo_level());
+        let start = game.timer;
+        for _ in 0..24 {
+            game.step(Buttons::default());
+        }
+        assert_eq!(game.timer, start - 1);
+    }
+
+    #[test]
+    fn collecting_a_coin_adds_score() {
+        use crate::core::level::Level;
+        let level = Level::from_rows(&["MC..", "####"]);
+        let mut game = Game::new(level);
+        for _ in 0..30 {
+            game.step(held(Button::Right));
+            if game.coins.is_empty() {
+                break;
+            }
+        }
+        assert_eq!(game.score, 100);
     }
 
     #[test]

@@ -46,14 +46,16 @@ These are not preferences. Treat a violation as a bug.
 
 ## How work flows
 
-1. The plan of record is `docs/GRAND_MASTER_PLAN.md`. It is organized into playable vertical slices (milestones). Every task is a markdown checkbox.
-2. Development happens one task at a time through the task execution skill. The user triggers it with `/goal`.
-3. Everything is tested. See `.claude/skills/testing-validation`.
-4. When a milestone or major task lands, publish a dev blog post. See `.claude/skills/dev-blog`.
-5. Periodically run the self-improvement skill to keep this file and the skills current.
+1. `IMPROVEMENTS.md` at the repo root is the user's live inbox. Anything in it is handled first, before any plan task. See `.claude/skills/improvements`.
+2. The plan of record is `docs/GRAND_MASTER_PLAN.md`. It is organized into playable vertical slices (milestones). Every task is a markdown checkbox.
+3. Development happens one task at a time through the task execution skill. The user triggers it with `/goal`.
+4. Everything is tested. See `.claude/skills/testing-validation`.
+5. When a milestone or major task lands, publish a dev blog post. See `.claude/skills/dev-blog`.
+6. Periodically run the self-improvement skill to keep this file and the skills current.
 
 ## Skills index
 
+- `improvements` drain the user's `IMPROVEMENTS.md` inbox; handled before any plan task.
 - `git-github` version control workflow with the `gh` CLI.
 - `grand-master-plan` maintain the living plan of vertical slices.
 - `task-execution` pick one task, complete it, update the plan. Chained via `/goal`.

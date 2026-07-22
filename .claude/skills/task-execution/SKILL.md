@@ -9,6 +9,7 @@ One invocation completes exactly one concrete task from `docs/GRAND_MASTER_PLAN.
 
 ## Procedure
 
+0. Drain the improvements inbox first. Check `IMPROVEMENTS.md` at the repo root (see the improvements skill). If it has any unchecked item, handle the topmost one this run instead of a plan task, mark it `[x]`, and stop there. The plan waits until the inbox is empty.
 1. Read `docs/GRAND_MASTER_PLAN.md`. Pick the topmost unchecked task that is not blocked. Prefer finishing an in-progress `[~]` task over starting a new one.
 2. If the chosen task is too big for one run, split it in the plan and take the first subtask instead.
 3. Mark the task `[~]`.

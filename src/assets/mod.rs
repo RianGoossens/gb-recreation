@@ -89,14 +89,15 @@ impl TileSheet {
         let rows = self.tiles.len().div_ceil(cols);
         let w = cols * 8;
         let h = rows * 8;
+        let palette = crate::render::Palette::new(self.palette);
         let mut pixels = vec![0xFFu8; w * h];
         for (i, tile) in self.tiles.iter().enumerate() {
             let tx = (i % cols) * 8;
             let ty = (i / cols) * 8;
             for y in 0..8 {
                 for x in 0..8 {
-                    let shade = shade_of(tile.pixels[y][x], self.palette);
-                    pixels[(ty + y) * w + (tx + x)] = 255 - shade * 85;
+                    pixels[(ty + y) * w + (tx + x)] =
+                        palette.shade(tile.pixels[y][x]).to_gray();
                 }
             }
         }
@@ -104,11 +105,6 @@ impl TileSheet {
         out.extend_from_slice(&pixels);
         out
     }
-}
-
-/// Resolve a 0..=3 color index to a 0..=3 shade through a BGP palette byte.
-pub fn shade_of(index: u8, bgp: u8) -> u8 {
-    (bgp >> (index * 2)) & 0b11
 }
 
 /// Extract `count` tiles starting at `offset` in the ROM at `rom_path`, after
@@ -185,14 +181,6 @@ mod tests {
             TileSheet::from_bytes(b"nope and some more bytes here"),
             Err(AssetError::BadFormat)
         ));
-    }
-
-    #[test]
-    fn default_palette_is_identity() {
-        // BGP 0xE4 maps index i to shade i.
-        for i in 0..4 {
-            assert_eq!(shade_of(i, DEFAULT_BGP), i);
-        }
     }
 
     #[test]

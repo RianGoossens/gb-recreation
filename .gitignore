@@ -1,0 +1,22 @@
+# ROM and any extracted assets never get committed
+*.gb
+*.gbc
+*.sav
+assets/extracted/
+assets/rom/
+extracted/
+
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock.orig
+
+# Screenshots are generated; keep only curated ones under docs/blog/media
+/screenshots/
+*.tmp.png
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

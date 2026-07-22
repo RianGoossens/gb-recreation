@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Super Mario Land in Rust: devlog</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site">
+    <h1>Super Mario Land, in Rust</h1>
+    <p>A logbook of reproducing the Game Boy game as readable native Rust. Not an emulator.</p>
+  </header>
+  <main>
+    <ul class="posts" id="posts"></ul>
+  </main>
+  <footer>
+    Built by hand: HTML, CSS, and a little JS. No frameworks.
+  </footer>
+
+  <script>
+    fetch("posts.json")
+      .then(function (r) { return r.json(); })
+      .then(function (posts) {
+        var list = document.getElementById("posts");
+        if (!posts.length) {
+          list.innerHTML = "<li><p class='summary'>No posts yet. The first one lands with Milestone 0.</p></li>";
+          return;
+        }
+        posts.forEach(function (p) {
+          var li = document.createElement("li");
+          var href = "posts/" + p.slug + ".html";
+          li.innerHTML =
+            "<span class='date'>" + p.date + "</span>" +
+            "<h2><a href='" + href + "'>" + p.title + "</a></h2>" +
+            "<p class='summary'>" + p.summary + "</p>";
+          list.appendChild(li);
+        });
+      })
+      .catch(function () {
+        document.getElementById("posts").innerHTML =
+          "<li><p class='summary'>Could not load posts.json.</p></li>";
+      });
+  </script>
+</body>
+</html>

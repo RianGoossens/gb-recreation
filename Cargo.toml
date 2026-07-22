@@ -1,0 +1,17 @@
+[package]
+name = "sml"
+version = "0.0.1"
+edition = "2021"
+description = "A native, readable Rust reproduction of Super Mario Land. Not an emulator."
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "sml"
+path = "src/main.rs"
+
+[lib]
+name = "sml"
+path = "src/lib.rs"
+
+[dependencies]

@@ -37,7 +37,7 @@ Goal: run the app and see the Super Mario Land title screen, rendered by our cod
   - [x] Tile decoder (2bpp), asset format (save/load + PGM preview), and a ROM-gated `extract-tiles` command that decodes a byte range reproducibly
   - [x] Pin the exact title-screen tile and tilemap source addresses (observe emulator VRAM) and extract them specifically, plus the BGP palette (tools/extract_title.py via PyBoy: signed addressing, map 0x9800, BGP 0xE4)
 - [x] Game Boy display model: 160x144 framebuffer, 4-shade palette, tile and tilemap rendering
-- [ ] Window + rendering frontend that draws the framebuffer to screen
+- [x] Window + rendering frontend that draws the framebuffer to screen (behind the gui feature; building blocks tested, window loop not run in this headless env)
 - [x] Headless screenshot command that renders a given state to PNG
 - [x] Render the title screen from extracted assets
 - [x] Golden-image test: render pipeline guarded by a committed golden of our own demo scene (CI-safe, non-infringing). Title-screen faithfulness is verified locally at 99.82% shade match vs the emulator reference, not committed (copyright).

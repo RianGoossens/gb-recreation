@@ -21,6 +21,7 @@ fn main() -> ExitCode {
         Some("extract-tiles") => extract_tiles(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
+        Some("run") => run_game(),
         Some(other) => {
             eprintln!("unknown command: {other}");
             usage();
@@ -180,6 +181,107 @@ fn render_title(args: &[String]) -> ExitCode {
     }
 }
 
+/// Open a window and play a small test level: Mario on solid ground with a
+/// scrolling camera, driven by the keyboard. Only built with `--features gui`.
+#[cfg(feature = "gui")]
+fn run_game() -> ExitCode {
+    use minifb::{Key, Window, WindowOptions};
+    use sml::camera::Camera;
+    use sml::core::level::{Level, TILE};
+    use sml::core::physics::step_motion;
+    use sml::input::mapping::{buttons_from_held, Key as GbKey};
+    use sml::render::{render_background, TileMap};
+    use sml::tiles::Tile;
+
+    const SCALE: usize = 4;
+
+    let solid = |i: u8| Tile { pixels: [[i; 8]; 8] };
+
+    // Build a wide test level: a floor, a couple of platforms, Mario near the left.
+    let (w, h) = (40usize, 18usize);
+    let mut rows: Vec<String> = Vec::new();
+    for y in 0..h {
+        let mut row = String::new();
+        for x in 0..w {
+            let floor = y >= h - 2;
+            let platform =
+                (y == h - 5 && (10..14).contains(&x)) || (y == h - 8 && (20..26).contains(&x));
+            let c = if floor || platform {
+                '#'
+            } else if x == 2 && y == h - 3 {
+                'M'
+            } else {
+                '.'
+            };
+            row.push(c);
+        }
+        rows.push(row);
+    }
+    let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
+    let level = Level::from_rows(&refs);
+
+    // Visuals: empty tiles white, solid tiles dark; Mario a black block.
+    let bg_tiles = [solid(0), solid(2)];
+    let mut bg_cells = Vec::with_capacity(w * h);
+    for ty in 0..h {
+        for tx in 0..w {
+            bg_cells.push(if level.solids.is_solid(tx as i32, ty as i32) { 1 } else { 0 });
+        }
+    }
+    let bg_map = TileMap::new(w, h, bg_cells);
+    let mario_tile = solid(3);
+    let palette = Palette::new(0xE4);
+
+    let level_w = (w as i32) * TILE;
+    let level_h = (h as i32) * TILE;
+
+    let mut mario = sml::core::entity::Mario::new(level.spawn.0, level.spawn.1);
+    let mut camera = Camera::new();
+
+    let (win_w, win_h) = sml::frontend::scaled_size(SCALE);
+    let mut window = match Window::new("Super Mario Land in Rust", win_w, win_h, WindowOptions::default()) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("could not open window: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    window.set_target_fps(60);
+
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        let mut held = Vec::new();
+        if window.is_key_down(Key::Left) { held.push(GbKey::Left); }
+        if window.is_key_down(Key::Right) { held.push(GbKey::Right); }
+        if window.is_key_down(Key::Up) { held.push(GbKey::Up); }
+        if window.is_key_down(Key::Down) { held.push(GbKey::Down); }
+        if window.is_key_down(Key::Z) { held.push(GbKey::Z); }
+        if window.is_key_down(Key::X) { held.push(GbKey::X); }
+        if window.is_key_down(Key::Enter) { held.push(GbKey::Enter); }
+        let buttons = buttons_from_held(held);
+
+        step_motion(&mut mario, buttons, &level.solids);
+        camera.follow(mario.pixel_x() + 4, mario.pixel_y() + 4, level_w, level_h);
+
+        let mut fb = Framebuffer::new();
+        render_background(&mut fb, &bg_map, &bg_tiles, camera.x, camera.y, &palette);
+        fb.draw_tile(&mario_tile, mario.pixel_x() - camera.x, mario.pixel_y() - camera.y, &palette);
+
+        let argb = sml::frontend::to_argb(&fb, SCALE);
+        if let Err(e) = window.update_with_buffer(&argb, win_w, win_h) {
+            eprintln!("window update failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+#[cfg(not(feature = "gui"))]
+fn run_game() -> ExitCode {
+    eprintln!("this build has no window support.");
+    eprintln!("rebuild with the gui feature: cargo run --features gui -- run");
+    ExitCode::FAILURE
+}
+
 fn usage() {
     println!("\nusage:");
     println!("  sml                                       print status");
@@ -187,4 +289,5 @@ fn usage() {
     println!("  sml extract-tiles <offset> <count> <out>  decode ROM tiles to an asset file");
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
+    println!("  sml run                                   play in a window (needs --features gui)");
 }

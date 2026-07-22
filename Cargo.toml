@@ -14,4 +14,10 @@ path = "src/main.rs"
 name = "sml"
 path = "src/lib.rs"
 
+[features]
+# The windowed frontend is opt-in so default builds and CI stay dependency-free
+# and headless. Build it with: cargo run --features gui -- run
+gui = ["dep:minifb"]
+
 [dependencies]
+minifb = { version = "0.27", optional = true }

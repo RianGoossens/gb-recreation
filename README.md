@@ -24,9 +24,18 @@ The original ROM (`super_mario_land.gb`) is NOT included and is gitignored. You 
 
 ## Running the game
 
+The windowed frontend is behind the `gui` feature, so the default build stays
+headless and dependency-free. To play the current test level:
+
 ```sh
-cargo run --release
+cargo run --release --features gui -- run
 ```
+
+Controls: arrow keys move, X jumps (Z is the B button), Escape quits.
+
+Without the feature, the binary still offers the headless commands below
+(`verify-rom`, `extract-tiles`, `screenshot`, `render-title`). See `sml` with
+no arguments for the list.
 
 ## Running the tests
 

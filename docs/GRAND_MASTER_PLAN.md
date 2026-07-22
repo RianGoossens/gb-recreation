@@ -50,7 +50,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 - [~] Level data model and 1-1 tilemap extracted from the reference/ROM
   - [x] Level data model: solids plus Mario spawn, with a human-editable ASCII loader
   - [ ] Extract the scrolling World 1-1 tilemap from the ROM/emulator into level data
-- [ ] Scrolling camera that follows Mario
+- [x] Scrolling camera that follows Mario
 - [x] Mario entity: position, velocity, facing, sprite
 - [x] Input mapping (keyboard to Game Boy buttons)
 - [x] Walking physics: acceleration, max speed, friction (constants sourced from reference)

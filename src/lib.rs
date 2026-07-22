@@ -13,6 +13,7 @@
 //! simulation deterministic and testable in isolation.
 
 pub mod assets;
+pub mod camera;
 pub mod core;
 pub mod input;
 pub mod png;

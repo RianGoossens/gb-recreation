@@ -31,6 +31,7 @@ A live technical logbook published to GitHub Pages from `docs/blog/`. Plain HTML
 - In depth: explain the problem, the approach, the tricky parts, and how it was validated. Show code snippets and screenshots.
 - No references to local line numbers ("see line 15"). Refer to files, functions, and concepts by name.
 - No em-dashes. No filler words. Direct, technical writing.
+- Not self-referential. Write about the game and the engineering, never about the blog's own construction (no notes on frameworks, HTML/CSS, "built by hand", and so on). The reader does not care how the page was made.
 - Include before/after or emulator-vs-ours screenshots when relevant.
 
 ## Post template

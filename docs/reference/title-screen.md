@@ -49,8 +49,25 @@ Plan, to confirm by observation:
 
 Output goes into our gitignored asset format by a reproducible command, never committed as ROM data. The exact source addresses for the title tiles and map are the first thing to nail down in the extraction task; record them here once observed.
 
-## Open questions to resolve next
+## Observed at the title screen (from a headless PyBoy run)
 
-- Exact VRAM tile block used by the title screen (LCDC bit 4: 0x8000 unsigned addressing or 0x8800 signed).
-- Which of the two tile maps holds the title layout.
-- Where in the ROM banks the title tiles and map are stored, and whether they are copied verbatim or unpacked by code.
+Read live from VRAM after booting ~600 frames (see `tools/extract_title.py`):
+
+| Thing | Value | Meaning |
+|-------|-------|---------|
+| LCDC | 0xC3 | background on, tile addressing signed, map at 0x9800 |
+| Tile addressing | signed (0x8800 method) | map index is signed, tile 0 lives at 0x9000 |
+| Background map base | 0x9800 | the title layout is here |
+| BGP | 0xE4 | standard palette, index 0 lightest to 3 darkest |
+| SCX, SCY | 0, 0 | no scroll, the visible 20x18 is the top-left of the map |
+| Unique tiles | 110 of 360 cells | the 20x18 screen reuses 110 distinct tiles |
+
+This resolves the open questions below. The extraction tool reads the visible
+grid, decodes each tile from VRAM with the signed addressing above, deduplicates
+them, and writes our tile-sheet and tile-map assets (gitignored).
+
+## Earlier open questions (now answered above)
+
+- Exact VRAM tile block used by the title screen (LCDC bit 4: 0x8000 unsigned addressing or 0x8800 signed). Answer: signed.
+- Which of the two tile maps holds the title layout. Answer: 0x9800.
+- Where in the ROM banks the title tiles and map are stored. Not needed: we take the tiles from VRAM as the game draws them, rather than chasing ROM offsets.

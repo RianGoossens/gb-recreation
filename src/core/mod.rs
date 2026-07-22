@@ -9,6 +9,8 @@
 //! items), physics, and collision all live here. For now this defines the
 //! outermost shape, a stepping loop over an input snapshot.
 
+pub mod entity;
+
 use crate::input::Buttons;
 
 /// The whole game state at one instant. Grows as systems are added.

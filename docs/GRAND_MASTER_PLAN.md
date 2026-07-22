@@ -49,7 +49,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 
 - [ ] Level data model and 1-1 tilemap extracted from the reference/ROM
 - [ ] Scrolling camera that follows Mario
-- [ ] Mario entity: position, velocity, facing, sprite
+- [x] Mario entity: position, velocity, facing, sprite
 - [ ] Input mapping (keyboard to Game Boy buttons)
 - [ ] Walking physics: acceleration, max speed, friction (constants sourced from reference)
 - [ ] Gravity and ground collision against the tilemap
@@ -117,6 +117,7 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 
 ## Backlog and notes
 
-- The ROM in the tree passes the hash check (verified 2026-07-22). Milestone 1 is unblocked.
+- COPYRIGHT DECISION NEEDED (blocks the rest of Milestone 1): rendering the real title screen, committing a golden PNG of it, and posting game screenshots to the public blog all distribute Nintendo's copyrighted artwork. The asset stance keeps ROM-derived data gitignored, and a faithful title render is exactly that. Options for the user: keep game imagery local-only (golden tests gitignored, CI skips them; blog uses diagrams and description), make the repo private, or restrict to clearly non-infringing composites. Until decided, these tasks stay parked and logic-only work continues.
+- The ROM in the tree passes the hash check (verified 2026-07-22). Milestone 1 asset extraction is unblocked technically but parked on the copyright decision above.
 - Keep physics constants cited to the reference so behavior is defensible.
 - Revisit module boundaries at the end of each milestone during self-improvement.

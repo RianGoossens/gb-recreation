@@ -220,6 +220,20 @@ mod tests {
         assert_eq!(a, b);
     }
 
+    #[test]
+    fn physics_constants_are_pinned() {
+        // These are provisional placeholders. This test is a tripwire: if a
+        // constant changes, it is a deliberate act, not an accident. Update the
+        // expected values here in the same commit that retunes them.
+        assert_eq!(WALK_ACCEL, 24);
+        assert_eq!(FRICTION, 16);
+        assert_eq!(MAX_WALK_SPEED, 320);
+        assert_eq!(GRAVITY, 40);
+        assert_eq!(MAX_FALL_SPEED, 640);
+        assert_eq!(JUMP_VELOCITY, 700);
+        assert_eq!(JUMP_CUT, 200);
+    }
+
     // Gravity and collision.
     use crate::core::level::Solids;
 

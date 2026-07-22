@@ -58,7 +58,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 - [x] Gravity and ground collision against the tilemap
 - [x] Jump physics (initial velocity, variable height)
 - [x] Animation states: idle, walk, jump
-- [ ] Tests: physics constants, collision cases, a scripted-input golden frame
+- [x] Tests: physics constants, collision cases, a scripted-input golden frame (constants pinned; collision floor/wall/ceiling covered; game_walk_right golden)
 - [ ] Blog post: World 1-1 and the physics of walking
 
 ## Milestone 3: Collision, enemies, and death

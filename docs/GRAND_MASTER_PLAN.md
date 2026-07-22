@@ -31,7 +31,7 @@ Goal: the repo builds, tests run, CI is green, the blog deploys.
 Goal: run the app and see the Super Mario Land title screen, rendered by our code.
 
 - [x] Replace the ROM with a hash-verified dump; add a `verify-rom` command that checks SHA-1, MD5, CRC32 and refuses to proceed on mismatch
-- [ ] Study the title screen logic and tile data (mainly by observing a real emulator; consult the `kaspermeerts/supermarioland` disassembly only where needed); write down the memory map notes in `docs/reference/`
+- [x] Study the title screen logic and tile data (mainly by observing a real emulator; consult the `kaspermeerts/supermarioland` disassembly only where needed); write down the memory map notes in `docs/reference/`
 - [ ] Asset pipeline: extract the title screen tiles and palette from the verified ROM into our asset format (gitignored output, reproducible command)
 - [ ] Game Boy display model: 160x144 framebuffer, 4-shade palette, tile and tilemap rendering
 - [ ] Window + rendering frontend that draws the framebuffer to screen

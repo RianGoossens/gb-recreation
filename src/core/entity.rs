@@ -38,6 +38,9 @@ pub struct Mario {
     pub facing: Facing,
     pub on_ground: bool,
     pub power: Power,
+    /// True while the jump button is held after a jump started, so holding it
+    /// does not trigger a second jump. Cleared when the button is released.
+    pub jump_latched: bool,
 }
 
 impl Mario {
@@ -51,6 +54,7 @@ impl Mario {
             facing: Facing::Right,
             on_ground: false,
             power: Power::Small,
+            jump_latched: false,
         }
     }
 

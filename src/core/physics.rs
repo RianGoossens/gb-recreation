@@ -22,6 +22,11 @@ pub const MAX_WALK_SPEED: i32 = 320;
 pub const GRAVITY: i32 = 40;
 /// Cap on downward speed, so falling does not tunnel through thin floors.
 pub const MAX_FALL_SPEED: i32 = 640;
+/// Upward speed given at the start of a jump.
+pub const JUMP_VELOCITY: i32 = 700;
+/// Releasing the jump button early clamps any remaining rise to this, giving
+/// short hops when tapped and full jumps when held.
+pub const JUMP_CUT: i32 = 200;
 
 /// Update horizontal velocity and facing from the held buttons, without moving.
 fn walk_velocity(mario: &mut Mario, buttons: Buttons) {
@@ -53,6 +58,8 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids) {
     mario.x += mario.vx;
     resolve_horizontal(mario, solids);
 
+    apply_jump(mario, buttons);
+
     // Gravity only builds up while airborne. Resting on a solid keeps vy at 0,
     // so Mario sits still instead of nudging into the floor every frame.
     if !mario.on_ground {
@@ -64,6 +71,25 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids) {
     mario.on_ground = grounded(mario, solids);
     if mario.on_ground && mario.vy > 0 {
         mario.vy = 0;
+    }
+}
+
+/// Start a jump on the frame the jump button is pressed while grounded. Holding
+/// the button does not re-jump (a latch guards that). Releasing early while
+/// still rising cuts the jump short, which gives variable jump height.
+fn apply_jump(mario: &mut Mario, buttons: Buttons) {
+    let jump = buttons.is_held(Button::A);
+
+    if mario.on_ground && jump && !mario.jump_latched {
+        mario.vy = -JUMP_VELOCITY;
+        mario.on_ground = false;
+        mario.jump_latched = true;
+    }
+    if !jump {
+        mario.jump_latched = false;
+        if mario.vy < -JUMP_CUT {
+            mario.vy = -JUMP_CUT;
+        }
     }
 }
 
@@ -249,6 +275,63 @@ mod tests {
         let mut m = Mario::new(8, 0);
         step_motion(&mut m, Buttons::default(), &solids);
         assert!(!m.on_ground);
+    }
+
+    /// Settle Mario onto the floor so he starts grounded.
+    fn resting_on_floor() -> (Mario, Solids) {
+        let solids = floor_level();
+        let mut m = Mario::new(8, 0);
+        for _ in 0..200 {
+            step_motion(&mut m, Buttons::default(), &solids);
+        }
+        assert!(m.on_ground);
+        (m, solids)
+    }
+
+    #[test]
+    fn pressing_jump_from_the_ground_launches_up() {
+        let (mut m, solids) = resting_on_floor();
+        let top = m.pixel_y();
+        step_motion(&mut m, held(Button::A), &solids);
+        assert!(m.vy < 0, "should be moving up");
+        assert!(!m.on_ground);
+        // A few frames in, he is above where he started.
+        for _ in 0..5 {
+            step_motion(&mut m, held(Button::A), &solids);
+        }
+        assert!(m.pixel_y() < top);
+    }
+
+    #[test]
+    fn cannot_jump_again_while_airborne() {
+        let (mut m, solids) = resting_on_floor();
+        step_motion(&mut m, held(Button::A), &solids);
+        let vy_after_first = m.vy;
+        // Still holding A in the air must not relaunch.
+        step_motion(&mut m, held(Button::A), &solids);
+        assert!(m.vy > vy_after_first, "gravity should reduce upward speed, not reset it");
+    }
+
+    #[test]
+    fn holding_jump_goes_higher_than_tapping() {
+        // Tapped jump: pressed one frame, released after.
+        let (mut tap, solids) = resting_on_floor();
+        step_motion(&mut tap, held(Button::A), &solids);
+        let mut tap_apex = tap.pixel_y();
+        for _ in 0..40 {
+            step_motion(&mut tap, Buttons::default(), &solids);
+            tap_apex = tap_apex.min(tap.pixel_y());
+        }
+
+        // Held jump: A down the whole way up.
+        let (mut hold, solids) = resting_on_floor();
+        let mut hold_apex = hold.pixel_y();
+        for _ in 0..40 {
+            step_motion(&mut hold, held(Button::A), &solids);
+            hold_apex = hold_apex.min(hold.pixel_y());
+        }
+
+        assert!(hold_apex < tap_apex, "holding should reach a higher apex");
     }
 
     #[test]

@@ -4,6 +4,8 @@ A native, readable Rust reproduction of the Game Boy game Super Mario Land. Not 
 
 Status: workspace bootstrap. Game development is tracked in [docs/GRAND_MASTER_PLAN.md](docs/GRAND_MASTER_PLAN.md) and driven one task at a time.
 
+Live dev blog: https://riangoossens.github.io/gb-recreation/
+
 ## How this repo is built
 
 Most of the code, docs, plan, and blog posts here are written by Claude Code running as an agent, working through the skills in `.claude/skills/` one task at a time, with a human steering and reviewing. The repo is an experiment in whether that kind of agent workflow can carry a job as big as reproducing a full Game Boy game in clean Rust.
@@ -73,6 +75,8 @@ md5sum super_mario_land.gb
 ## The dev blog
 
 Progress is logged as a live technical blog published to GitHub Pages from `docs/blog/`. Plain HTML, CSS, and JS, no frameworks. It deploys automatically on push (see [.github/workflows/pages.yml](.github/workflows/pages.yml)).
+
+Read it here: https://riangoossens.github.io/gb-recreation/
 
 ## How this repo is driven
 

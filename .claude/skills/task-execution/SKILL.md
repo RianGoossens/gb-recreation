@@ -10,7 +10,7 @@ One invocation completes exactly one concrete task from `docs/GRAND_MASTER_PLAN.
 ## Procedure
 
 0. Drain the improvements inbox first. Check `IMPROVEMENTS.md` at the repo root (see the improvements skill). If it has any unchecked item, handle the topmost one this run instead of a plan task, mark it `[x]`, and stop there. The plan waits until the inbox is empty.
-1. Read `docs/GRAND_MASTER_PLAN.md`. Pick the topmost unchecked task that is not blocked. Prefer finishing an in-progress `[~]` task over starting a new one.
+1. Read `docs/GRAND_MASTER_PLAN.md`. Pick whichever unblocked task makes the most sense to do next, judged by dependencies and value. Tasks are not strictly ordered, so list position does not decide this. Prefer finishing an in-progress `[~]` task over starting a new one.
 2. If the chosen task is too big for one run, split it in the plan and take the first subtask instead.
 3. Mark the task `[~]`.
 4. Do the work:
@@ -24,8 +24,9 @@ One invocation completes exactly one concrete task from `docs/GRAND_MASTER_PLAN.
 
 ## Picking a task well
 
-- Respect milestone order. Do not start Milestone 3 work while Milestone 1 is unfinished, unless the earlier work is genuinely blocked (for example the ROM hash check).
-- If everything in the current milestone is blocked, say so plainly and pick the smallest unblocking task, or surface the blocker to the user.
+- Task order is a guide, not a rule. Milestones are grouped so earlier slices unlock later ones, which usually makes earlier work the higher-value pick, but nothing stops you taking a later task when it is unblocked and sensible.
+- What actually gates a task is real dependencies (it needs another task's output) and blockers, not its position in the list. Skip blocked tasks and take the next workable one.
+- If the sensible next work is genuinely blocked, say so plainly and either pick the smallest unblocking task or surface the blocker to the user.
 
 ## Definition of done for one run
 

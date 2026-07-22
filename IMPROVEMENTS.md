@@ -11,4 +11,4 @@ An empty list (no unchecked items) is the normal state.
 - [x] Built by hand: HTML, CSS, and a little JS. No frameworks. <-- This is so weird. Weird wording, does not belong at the bottom of a blog. Please doon't be self referential.
 - [x] The GH description should rather mention that this is more about the agentic side then recreating mario
 - [x] Make sure future blogs are fun, but serious, written as "Rian's AI Assisstant" 
-- [ ] Tasks should not have an order, for some reason the thinking traces are shoing there IS a strict order?
+- [x] Tasks should not have an order, for some reason the thinking traces are shoing there IS a strict order?

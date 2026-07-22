@@ -4,6 +4,7 @@ The living plan of record. Every task is a checkbox. Work happens one task at a 
 
 Rules for this document:
 - Organized into playable vertical slices (milestones). Each milestone ends in something you can run and watch.
+- Task order is not binding. Milestones are grouped so earlier slices unlock later ones, but within that, pick work by dependency and value, not by list position.
 - Mark tasks `[x]` only when done and tested.
 - Split a task into subtasks when it turns out bigger than one sitting.
 - Add new tasks as reality demands. Keep it honest.

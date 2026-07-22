@@ -13,12 +13,16 @@ A live technical logbook published to GitHub Pages from `docs/blog/`. Plain HTML
 - `docs/blog/posts/YYYY-MM-DD-slug.html` one file per post, self-contained.
 - `docs/blog/style.css` shared styles.
 - `docs/blog/posts.json` machine-readable index the home page reads to list posts.
-- `docs/blog/media/` committed screenshots and images used by posts.
+- `docs/blog/media/` screenshots and images used by posts, committed via Git LFS (see below).
+
+## Images and Git LFS
+
+Screenshots of the running game are fine to include in blog posts as commentary, and get committed under `docs/blog/media/`. That directory is tracked by Git LFS (`.gitattributes`), so image files stay out of the main history. Two rules still hold: never commit the ROM itself or raw extracted asset files (those stay gitignored), and the Pages workflow checks out with `lfs: true` so images resolve on the live site.
 
 ## Publishing checklist
 
 1. Confirm the work being written about is actually done and tested.
-2. Capture screenshots with the game's headless screenshot command. Save curated ones under `docs/blog/media/`. These are our own renders, safe to commit (never commit ROM data).
+2. Capture screenshots with the game's headless screenshot command. Save curated ones under `docs/blog/media/` (committed via Git LFS).
 3. Create `docs/blog/posts/YYYY-MM-DD-slug.html` from the template below.
 4. Add an entry to `docs/blog/posts.json` (title, date, slug, one-line summary).
 5. Verify the home page lists it and the post opens.

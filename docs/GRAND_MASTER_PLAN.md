@@ -118,7 +118,8 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 
 ## Backlog and notes
 
-- COPYRIGHT DECISION NEEDED (blocks the rest of Milestone 1): rendering the real title screen, committing a golden PNG of it, and posting game screenshots to the public blog all distribute Nintendo's copyrighted artwork. The asset stance keeps ROM-derived data gitignored, and a faithful title render is exactly that. Options for the user: keep game imagery local-only (golden tests gitignored, CI skips them; blog uses diagrams and description), make the repo private, or restrict to clearly non-infringing composites. Until decided, these tasks stay parked and logic-only work continues.
-- The ROM in the tree passes the hash check (verified 2026-07-22). Milestone 1 asset extraction is unblocked technically but parked on the copyright decision above.
+- Screenshots decision (made by the user, 2026-07-22): game screenshots are fine to use in blog posts as commentary. They are committed under `docs/blog/media/` via Git LFS. The ROM and raw extracted asset files stay gitignored; only curated images go in LFS. So the copyright concern that had parked the image tasks is resolved.
+- What still gates the remaining Milestone 1 image tasks is technical, not legal: rendering the real title screen needs the title tile and tilemap data, which means finishing the extraction subtask by observing emulator VRAM (for example with a headless emulator run). That is the next real unblock for "render the title screen", the golden image, and the title-screen blog post.
+- The ROM in the tree passes the hash check (verified 2026-07-22).
 - Keep physics constants cited to the reference so behavior is defensible.
 - Revisit module boundaries at the end of each milestone during self-improvement.

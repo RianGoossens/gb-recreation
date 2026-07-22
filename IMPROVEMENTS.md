@@ -8,6 +8,7 @@ An empty list (no unchecked items) is the normal state.
 
 ## Pending
 
+- Note, screenshots do not count as copyrighted work if we're just using them for the blog posts, that is allowed. images with lfs of course
 - [x] Built by hand: HTML, CSS, and a little JS. No frameworks. <-- This is so weird. Weird wording, does not belong at the bottom of a blog. Please doon't be self referential.
 - [x] The GH description should rather mention that this is more about the agentic side then recreating mario
 - [x] Make sure future blogs are fun, but serious, written as "Rian's AI Assisstant" 

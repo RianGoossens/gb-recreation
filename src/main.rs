@@ -22,6 +22,7 @@ fn main() -> ExitCode {
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
         Some("run") => run_game(),
+        Some("play") => play(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}");
             usage();
@@ -181,62 +182,74 @@ fn render_title(args: &[String]) -> ExitCode {
     }
 }
 
+/// `play <out.png> [frames] [keys]` runs the game headlessly with a fixed set of
+/// buttons held for `frames` frames, then writes the final frame as a PNG. Keys
+/// are plus-separated: left,right,up,down,a,b,start,select (e.g. right+a). This
+/// is how gameplay gets inspected and captured without ever opening a window.
+fn play(args: &[String]) -> ExitCode {
+    use sml::game::Game;
+    use sml::input::{Button, Buttons};
+
+    let (out, frames, keys) = match args {
+        [out] => (out.as_str(), 1u32, ""),
+        [out, frames] => (out.as_str(), frames.parse().unwrap_or(1), ""),
+        [out, frames, keys] => (out.as_str(), frames.parse().unwrap_or(1), keys.as_str()),
+        _ => {
+            eprintln!("usage: sml play <out.png> [frames] [keys]");
+            eprintln!("  keys: plus-separated, e.g. right+a");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let mut buttons = Buttons::default();
+    for name in keys.split('+').filter(|s| !s.is_empty()) {
+        let button = match name.to_lowercase().as_str() {
+            "left" => Button::Left,
+            "right" => Button::Right,
+            "up" => Button::Up,
+            "down" => Button::Down,
+            "a" => Button::A,
+            "b" => Button::B,
+            "start" => Button::Start,
+            "select" => Button::Select,
+            other => {
+                eprintln!("unknown key: {other}");
+                return ExitCode::FAILURE;
+            }
+        };
+        buttons.set(button, true);
+    }
+
+    let mut game = Game::new(Game::demo_level());
+    for _ in 0..frames {
+        game.step(buttons);
+    }
+    let png = sml::png::encode_gray(sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT, &game.render().to_gray());
+    match std::fs::write(out, png) {
+        Ok(()) => {
+            println!("played {frames} frames (held: {keys:?}) -> {out}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("could not write {out}: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 /// Open a window and play a small test level: Mario on solid ground with a
 /// scrolling camera, driven by the keyboard. Only built with `--features gui`.
 #[cfg(feature = "gui")]
 fn run_game() -> ExitCode {
     use minifb::{Key, Window, WindowOptions};
-    use sml::camera::Camera;
-    use sml::core::level::{Level, TILE};
-    use sml::core::physics::step_motion;
+    use sml::game::Game;
     use sml::input::mapping::{buttons_from_held, Key as GbKey};
-    use sml::render::{render_background, TileMap};
-    use sml::tiles::Tile;
 
     const SCALE: usize = 4;
 
-    let solid = |i: u8| Tile { pixels: [[i; 8]; 8] };
-
-    // Build a wide test level: a floor, a couple of platforms, Mario near the left.
-    let (w, h) = (40usize, 18usize);
-    let mut rows: Vec<String> = Vec::new();
-    for y in 0..h {
-        let mut row = String::new();
-        for x in 0..w {
-            let floor = y >= h - 2;
-            let platform =
-                (y == h - 5 && (10..14).contains(&x)) || (y == h - 8 && (20..26).contains(&x));
-            let c = if floor || platform {
-                '#'
-            } else if x == 2 && y == h - 3 {
-                'M'
-            } else {
-                '.'
-            };
-            row.push(c);
-        }
-        rows.push(row);
-    }
-    let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
-    let level = Level::from_rows(&refs);
-
-    // Visuals: empty tiles white, solid tiles dark; Mario a black block.
-    let bg_tiles = [solid(0), solid(2)];
-    let mut bg_cells = Vec::with_capacity(w * h);
-    for ty in 0..h {
-        for tx in 0..w {
-            bg_cells.push(if level.solids.is_solid(tx as i32, ty as i32) { 1 } else { 0 });
-        }
-    }
-    let bg_map = TileMap::new(w, h, bg_cells);
-    let mario_tile = solid(3);
-    let palette = Palette::new(0xE4);
-
-    let level_w = (w as i32) * TILE;
-    let level_h = (h as i32) * TILE;
-
-    let mut mario = sml::core::entity::Mario::new(level.spawn.0, level.spawn.1);
-    let mut camera = Camera::new();
+    // The whole game lives in Game (headless and tested). This is just a shell
+    // that feeds it keys and blits its frames.
+    let mut game = Game::new(Game::demo_level());
 
     let (win_w, win_h) = sml::frontend::scaled_size(SCALE);
     let mut window = match Window::new("Super Mario Land in Rust", win_w, win_h, WindowOptions::default()) {
@@ -257,16 +270,10 @@ fn run_game() -> ExitCode {
         if window.is_key_down(Key::Z) { held.push(GbKey::Z); }
         if window.is_key_down(Key::X) { held.push(GbKey::X); }
         if window.is_key_down(Key::Enter) { held.push(GbKey::Enter); }
-        let buttons = buttons_from_held(held);
 
-        step_motion(&mut mario, buttons, &level.solids);
-        camera.follow(mario.pixel_x() + 4, mario.pixel_y() + 4, level_w, level_h);
+        game.step(buttons_from_held(held));
 
-        let mut fb = Framebuffer::new();
-        render_background(&mut fb, &bg_map, &bg_tiles, camera.x, camera.y, &palette);
-        fb.draw_tile(&mario_tile, mario.pixel_x() - camera.x, mario.pixel_y() - camera.y, &palette);
-
-        let argb = sml::frontend::to_argb(&fb, SCALE);
+        let argb = sml::frontend::to_argb(&game.render(), SCALE);
         if let Err(e) = window.update_with_buffer(&argb, win_w, win_h) {
             eprintln!("window update failed: {e}");
             return ExitCode::FAILURE;
@@ -290,4 +297,5 @@ fn usage() {
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
     println!("  sml run                                   play in a window (needs --features gui)");
+    println!("  sml play <out.png> [frames] [keys]        run the game headlessly to a PNG");
 }

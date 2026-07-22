@@ -70,4 +70,5 @@ These are not preferences. Treat a violation as a bug.
 - Separate concerns: core game logic (no rendering), rendering/frontend, input, and asset loading are distinct modules.
 - Deterministic core so the game state can be stepped and snapshotted for tests and screenshots.
 - Provide a headless screenshot path so any game state can be rendered to a PNG for visual testing and the blog.
+- The game loop is a headless, deterministic object (`src/game.rs`): it steps a frame from a button snapshot and renders to a framebuffer, with no window or clock. The windowed frontend (behind the `gui` feature) is a thin shell over it. The window is never a testing surface: Rian does not run it, so every feature must be verifiable headlessly through `Game` tests, scripted input, golden images, and `sml play`.
 - Constants (gravity, jump velocity, speeds) live in named, documented places, sourced from the reference and cited.

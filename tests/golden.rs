@@ -7,26 +7,47 @@
 //! To (re)generate the golden after an intentional render change:
 //!   REGEN_GOLDEN=1 cargo test --test golden
 
+use sml::game::Game;
 use std::fs;
 
-const GOLDEN: &str = "tests/golden/demo.png";
+/// Compare a PNG to a committed golden, or regenerate it when REGEN_GOLDEN is set.
+fn check_golden(path: &str, png: &[u8]) {
+    if std::env::var("REGEN_GOLDEN").is_ok() {
+        fs::create_dir_all("tests/golden").unwrap();
+        fs::write(path, png).unwrap();
+        return;
+    }
+    let golden = fs::read(path)
+        .unwrap_or_else(|_| panic!("missing golden {path}; create it with REGEN_GOLDEN=1 cargo test --test golden"));
+    assert!(
+        png == golden.as_slice(),
+        "{path} differs from its golden. If intended, regenerate with \
+         REGEN_GOLDEN=1 cargo test --test golden"
+    );
+}
+
+fn encode(fb: &sml::render::Framebuffer) -> Vec<u8> {
+    sml::png::encode_gray(sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT, &fb.to_gray())
+}
 
 #[test]
 fn demo_scene_matches_golden() {
-    let fb = sml::scene::demo();
-    let png = sml::png::encode_gray(sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT, &fb.to_gray());
+    check_golden("tests/golden/demo.png", &encode(&sml::scene::demo()));
+}
 
-    if std::env::var("REGEN_GOLDEN").is_ok() {
-        fs::create_dir_all("tests/golden").unwrap();
-        fs::write(GOLDEN, &png).unwrap();
-        return;
+#[test]
+fn game_start_frame_matches_golden() {
+    let game = Game::new(Game::demo_level());
+    check_golden("tests/golden/game_start.png", &encode(&game.render()));
+}
+
+#[test]
+fn game_after_walking_right_matches_golden() {
+    let mut game = Game::new(Game::demo_level());
+    let mut buttons = sml::input::Buttons::default();
+    buttons.set(sml::input::Button::Right, true);
+    for _ in 0..90 {
+        game.step(buttons);
     }
-
-    let golden = fs::read(GOLDEN)
-        .expect("missing golden; create it with REGEN_GOLDEN=1 cargo test --test golden");
-    assert!(
-        png == golden,
-        "demo render differs from the golden image. If this change is intended, \
-         regenerate with REGEN_GOLDEN=1 cargo test --test golden"
-    );
+    check_golden("tests/golden/game_walk_right.png", &encode(&game.render()));
 }

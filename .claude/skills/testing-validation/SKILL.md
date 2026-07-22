@@ -7,6 +7,15 @@ description: Write, run, and manage tests for the Rust reproduction. Use wheneve
 
 Everything we build is tested. A plan task with testable behavior is not done until it has tests and they pass.
 
+## The window is not a testing surface
+
+Rian does not run the GUI, so "open the window and look" is never a valid check. The game must be verifiable entirely headlessly. Two rules follow:
+
+- Game logic lives in the headless `Game` object (`src/game.rs`), which steps a frame from a button snapshot and renders to a framebuffer. It never touches a window or the clock. The windowed frontend (behind the `gui` feature) is a thin shell over it and holds no logic worth testing.
+- Every gameplay or visual feature must be reachable through headless paths: unit tests on `Game`, scripted-input assertions, golden-image tests, and the `sml play <out.png> [frames] [keys]` command that renders a scripted run to a PNG you can open and inspect. If a feature can only be seen by running the window, it is not done.
+
+Golden images use our own levels and scenes (for example `Game::demo_level`), never extracted game data, so they are safe to commit and run in CI.
+
 ## Layers
 
 1. Unit tests: pure logic, physics math, collision resolution, state machines. Fast, deterministic, in `#[cfg(test)]` modules next to the code or in `tests/`.

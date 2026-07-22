@@ -16,6 +16,7 @@ pub mod assets;
 pub mod camera;
 pub mod core;
 pub mod frontend;
+pub mod game;
 pub mod input;
 pub mod png;
 pub mod render;

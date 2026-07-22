@@ -8,7 +8,7 @@ A native Rust reproduction of the Game Boy title Super Mario Land. This is NOT a
 
 ## Reference material
 
-Primary manual: the `10yard/supermarioland` GitHub repository. It maps the original assembly logic, physics constants, and memory layout. Reimplement that mapped logic piece by piece. Do not blindly disassemble the ROM from scratch when a mapping already exists.
+Secondary reference: the `kaspermeerts/supermarioland` disassembly. It maps some of the original assembly, physics constants, and memory layout. Lean on it as little as possible: prefer building clean Rust from observed behavior, tests, and screenshots against a real emulator. Reach for the disassembly only to settle a specific number or mechanic you cannot pin down otherwise, and cite what you take.
 
 ## Communication and style rules (hard constraints)
 

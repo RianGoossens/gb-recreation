@@ -16,7 +16,7 @@ Everything we build is tested. A plan task with testable behavior is not done un
 ## Rules
 
 - The game core is deterministic: same inputs and same start state produce the same result. No wall-clock or RNG without a seedable source. This is what makes tests and screenshots reliable.
-- Physics and collision constants get their own tests that pin the values sourced from the `10yard/supermarioland` reference, so a regression is caught immediately.
+- Physics and collision constants get their own tests that pin their values (derived from observed behavior, or from the `kaspermeerts/supermarioland` disassembly when consulted), so a regression is caught immediately.
 - Keep golden images small and committed under version control (they are our own renders, not ROM data). Store them under `tests/golden/`.
 - When a golden image legitimately changes, regenerate it deliberately and review the diff before committing.
 

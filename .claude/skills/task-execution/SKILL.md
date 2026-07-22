@@ -14,7 +14,7 @@ One invocation completes exactly one concrete task from `docs/GRAND_MASTER_PLAN.
 3. Mark the task `[~]`.
 4. Do the work:
    - Follow CLAUDE.md style and architecture rules.
-   - Consult the `10yard/supermarioland` reference for any original-game logic, physics, or memory details. Cite what you use.
+   - Prefer building from observed behavior and emulator comparison. Consult the `kaspermeerts/supermarioland` disassembly sparingly, only to settle a specific number or mechanic you cannot pin down otherwise. Cite what you take.
    - Write tests alongside the code (see the testing-validation skill). No task counts as done without tests when it has testable behavior.
 5. Validate: run `cargo test` (and `cargo build`/`cargo run` for a screenshot when relevant). For visual work, generate a screenshot and inspect it.
 6. Update the plan: mark the task `[x]`. Add any follow-up tasks that surfaced.

@@ -71,7 +71,7 @@ This is an autonomous agent workspace. Guidelines live in [CLAUDE.md](CLAUDE.md)
 
 - Plan of record: `docs/GRAND_MASTER_PLAN.md`, organized as playable vertical slices.
 - Do the next task: run the task execution skill, chained with `/goal` (for example `/goal run the task execution skill 5 times`).
-- Reference for the original game logic: the `10yard/supermarioland` repository.
+- Reference for the original game logic (used sparingly): the `kaspermeerts/supermarioland` disassembly.
 
 ## License
 

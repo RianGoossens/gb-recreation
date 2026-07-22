@@ -15,6 +15,7 @@
 pub mod assets;
 pub mod core;
 pub mod input;
+pub mod png;
 pub mod render;
 pub mod rom;
 pub mod tiles;

@@ -3,8 +3,12 @@
 //! Subcommands grow with the milestones. Available now:
 //!   verify-rom [path]                       check the ROM is SML (World) v1.0
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
+//!   screenshot <out.png>                    render a frame to a PNG (headless)
 
 use std::process::ExitCode;
+
+use sml::render::{render_background, Framebuffer, Palette, TileMap};
+use sml::tiles::Tile;
 
 const DEFAULT_ROM: &str = "super_mario_land.gb";
 
@@ -16,6 +20,7 @@ fn main() -> ExitCode {
             verify_rom(path)
         }
         Some("extract-tiles") => extract_tiles(&args[1..]),
+        Some("screenshot") => screenshot(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}");
             usage();
@@ -106,9 +111,56 @@ fn parse_number(s: &str) -> Option<usize> {
     }
 }
 
+/// `screenshot <out.png>` renders one frame headlessly and writes a PNG.
+/// Until the title screen assets are extracted, this draws a demo scene so the
+/// render-to-image path can be exercised and eyeballed.
+fn screenshot(args: &[String]) -> ExitCode {
+    let out = match args {
+        [out] => out,
+        _ => {
+            eprintln!("usage: sml screenshot <out.png>");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let fb = demo_scene();
+    let png = sml::png::encode_gray(sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT, &fb.to_gray());
+    match std::fs::write(out, png) {
+        Ok(()) => {
+            println!("wrote {}x{} screenshot to {out}", sml::SCREEN_WIDTH, sml::SCREEN_HEIGHT);
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("could not write {out}: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// A placeholder frame: four solid shades arranged as diagonal bands, drawn
+/// through the real tilemap path so the whole render pipeline is exercised.
+fn demo_scene() -> Framebuffer {
+    let tiles: Vec<Tile> = (0..4).map(|i| solid_tile(i as u8)).collect();
+    let (w, h) = (20usize, 18usize);
+    let cells = (0..w * h)
+        .map(|c| (((c % w) + (c / w)) % 4) as u8)
+        .collect();
+    let map = TileMap::new(w, h, cells);
+    let mut fb = Framebuffer::new();
+    render_background(&mut fb, &map, &tiles, 0, 0, &Palette::new(0xE4));
+    fb
+}
+
+fn solid_tile(color_index: u8) -> Tile {
+    Tile {
+        pixels: [[color_index; 8]; 8],
+    }
+}
+
 fn usage() {
     println!("\nusage:");
     println!("  sml                                       print status");
     println!("  sml verify-rom [path]                     verify the ROM hashes");
     println!("  sml extract-tiles <offset> <count> <out>  decode ROM tiles to an asset file");
+    println!("  sml screenshot <out.png>                  render a frame to a PNG");
 }

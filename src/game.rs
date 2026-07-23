@@ -13,12 +13,15 @@ use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
 use crate::core::entity::{pixels, Mario, Power};
 use crate::core::level::{Level, TILE};
 use crate::core::physics::step_motion;
-use crate::core::powerup::{update_mushroom, Mushroom, MUSHROOM_SIZE};
+use crate::core::powerup::{update_item, Item, ItemKind, ITEM_SIZE};
 use crate::tuning::Tuning;
 use crate::input::Buttons;
 use crate::render::{render_background, Framebuffer, Palette, TileMap};
 use crate::sound::SoundEvent;
 use crate::tiles::Tile;
+
+/// How long star invincibility lasts, in frames. Provisional.
+const STAR_DURATION: u32 = 600;
 
 fn solid_tile(color_index: u8) -> Tile {
     Tile {
@@ -40,8 +43,8 @@ pub struct Game {
     pub game_over: bool,
     /// Interactive blocks Mario can bump from below.
     pub blocks: Vec<Block>,
-    /// Active mushroom power-ups.
-    pub mushrooms: Vec<Mushroom>,
+    /// Active power-up items (mushrooms, stars).
+    pub items: Vec<Item>,
     /// Uncollected coins, top-left pixel.
     pub coins: Vec<(i32, i32)>,
     /// Coins collected (wraps every 100, which grants a life).
@@ -65,8 +68,31 @@ pub struct Game {
     used_tile: Tile,
     brick_tile: Tile,
     mushroom_tile: Tile,
+    star_tile: Tile,
     end_tile: Tile,
     palette: Palette,
+}
+
+/// A light block with a dark center: a star.
+fn star_tile() -> Tile {
+    let mut pixels = [[1u8; 8]; 8];
+    for row in pixels.iter_mut().take(6).skip(2) {
+        for cell in row.iter_mut().take(6).skip(2) {
+            *cell = 3;
+        }
+    }
+    Tile { pixels }
+}
+
+fn spawn_items(level: &Level) -> Vec<Item> {
+    level
+        .items
+        .iter()
+        .map(|&(x, y, kind)| match kind {
+            ItemKind::Mushroom => Item::mushroom(x, y, false),
+            ItemKind::Star => Item::star(x, y, false),
+        })
+        .collect()
 }
 
 /// A tall marker for the level end: a vertical pole.
@@ -155,13 +181,14 @@ impl Game {
         let enemies = spawn_enemies(&level);
         let coins = level.coins.clone();
         let blocks = spawn_blocks(&level);
+        let items = spawn_items(&level);
         let tuning = Tuning::default();
         Self {
             level,
             mario,
             enemies,
             blocks,
-            mushrooms: Vec::new(),
+            items,
             coins,
             coins_collected: 0,
             lives: 3,
@@ -187,6 +214,7 @@ impl Game {
             used_tile: solid_tile(2),
             brick_tile: brick_tile(),
             mushroom_tile: mushroom_tile(),
+            star_tile: star_tile(),
             end_tile: end_tile(),
             palette: Palette::new(0xE4),
         }
@@ -260,13 +288,16 @@ impl Game {
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
         }
-        for mushroom in &mut self.mushrooms {
-            update_mushroom(mushroom, &self.level.solids);
+        for item in &mut self.items {
+            update_item(item, &self.level.solids);
         }
         if self.mario.invuln > 0 {
             self.mario.invuln -= 1;
         }
-        self.collect_mushrooms();
+        if self.mario.invincible > 0 {
+            self.mario.invincible -= 1;
+        }
+        self.collect_items();
         self.resolve_interactions();
         self.collect_coins();
         self.tick_timer();
@@ -316,8 +347,10 @@ impl Game {
         let (mr, mb) = (ml + mw - 1, mt + mh - 1);
         let descending = self.mario.vy > 0;
 
+        let invincible = self.mario.invincible > 0;
         let mut stomped = false;
         let mut hit = false;
+        let mut plowed = false;
         for enemy in &mut self.enemies {
             if !enemy.alive {
                 continue;
@@ -327,12 +360,20 @@ impl Game {
             if !overlap {
                 continue;
             }
-            if descending && mb <= et + ENEMY_SIZE / 2 {
+            if invincible {
+                // A star runs straight through enemies, defeating them.
+                enemy.alive = false;
+                plowed = true;
+            } else if descending && mb <= et + ENEMY_SIZE / 2 {
                 enemy.alive = false;
                 stomped = true;
             } else {
                 hit = true;
             }
+        }
+        if plowed {
+            self.score += 100;
+            self.sounds.push(SoundEvent::Stomp);
         }
         if stomped {
             self.mario.vy = -self.tuning.stomp_bounce;
@@ -346,7 +387,7 @@ impl Game {
         if hit && !stomped && self.mario.invuln == 0 {
             if self.mario.power == Power::Big {
                 self.mario.power = Power::Small;
-                self.mario.y += pixels(MUSHROOM_SIZE); // shrink, feet stay put
+                self.mario.y += pixels(ITEM_SIZE); // shrink, feet stay put
                 self.mario.invuln = 90;
                 self.sounds.push(SoundEvent::Shrink);
             } else {
@@ -394,7 +435,7 @@ impl Game {
             self.gain_coin();
         }
         if let Some((x, y)) = mushroom_at {
-            self.mushrooms.push(Mushroom::new(x, y, false));
+            self.items.push(Item::mushroom(x, y, false));
         }
     }
 
@@ -421,27 +462,30 @@ impl Game {
         }
     }
 
-    /// Pick up any mushroom Mario overlaps: small Mario grows, and either way it
-    /// is worth points.
-    fn collect_mushrooms(&mut self) {
+    /// Pick up any item Mario overlaps: a mushroom grows small Mario, a star
+    /// grants invincibility. Either way it is worth points.
+    fn collect_items(&mut self) {
         let (mw, mh) = self.mario.size();
         let ml = self.mario.pixel_x();
         let mt = self.mario.pixel_y();
         let (mr, mb) = (ml + mw - 1, mt + mh - 1);
 
-        let mut grew = false;
-        self.mushrooms.retain(|m| {
-            let (el, et, er, eb) = m.edges();
+        let mut picked = Vec::new();
+        self.items.retain(|item| {
+            let (el, et, er, eb) = item.edges();
             let overlap = ml <= er && mr >= el && mt <= eb && mb >= et;
             if overlap {
-                grew = true;
+                picked.push(item.kind);
                 false
             } else {
                 true
             }
         });
-        if grew {
-            self.grow_mario();
+        for kind in picked {
+            match kind {
+                ItemKind::Mushroom => self.grow_mario(),
+                ItemKind::Star => self.mario.invincible = STAR_DURATION,
+            }
             self.score += 1000;
             self.sounds.push(SoundEvent::PowerUp);
         }
@@ -452,7 +496,7 @@ impl Game {
     pub fn grow_mario(&mut self) {
         if self.mario.power == Power::Small {
             self.mario.power = Power::Big;
-            self.mario.y -= pixels(MUSHROOM_SIZE);
+            self.mario.y -= pixels(ITEM_SIZE);
         }
     }
 
@@ -513,11 +557,15 @@ impl Game {
         for &(cx, cy) in &self.coins {
             fb.draw_tile(&self.coin_tile, cx - self.camera.x, cy - self.camera.y, &self.palette);
         }
-        for mushroom in &self.mushrooms {
+        for item in &self.items {
+            let tile = match item.kind {
+                ItemKind::Mushroom => &self.mushroom_tile,
+                ItemKind::Star => &self.star_tile,
+            };
             fb.draw_tile(
-                &self.mushroom_tile,
-                mushroom.pixel_x() - self.camera.x,
-                mushroom.pixel_y() - self.camera.y,
+                tile,
+                item.pixel_x() - self.camera.x,
+                item.pixel_y() - self.camera.y,
                 &self.palette,
             );
         }
@@ -532,7 +580,8 @@ impl Game {
             }
         }
         // Flicker Mario while invulnerable. Big Mario is two tiles tall.
-        let visible = self.mario.invuln == 0 || (self.mario.invuln / 4).is_multiple_of(2);
+        let flicker = self.mario.invuln.max(self.mario.invincible);
+        let visible = flicker == 0 || (flicker / 4).is_multiple_of(2);
         if visible {
             let (_mw, mh) = self.mario.size();
             let mx = self.mario.pixel_x() - self.camera.x;
@@ -709,12 +758,12 @@ mod tests {
     fn picking_up_a_mushroom_makes_mario_big() {
         use crate::core::entity::Power;
         use crate::core::level::Level;
-        use crate::core::powerup::Mushroom;
+        use crate::core::powerup::Item;
 
         let level = Level::from_rows(&["M...", "####"]);
         let mut game = Game::new(level);
         assert_eq!(game.mario.power, Power::Small);
-        game.mushrooms.push(Mushroom::new(0, 0, false)); // right on top of Mario
+        game.items.push(Item::mushroom(0, 0, false)); // right on top of Mario
 
         for _ in 0..30 {
             game.step(Buttons::default());
@@ -723,21 +772,21 @@ mod tests {
             }
         }
         assert_eq!(game.mario.power, Power::Big);
-        assert!(game.mushrooms.is_empty(), "the mushroom is consumed");
+        assert!(game.items.is_empty(), "the mushroom is consumed");
     }
 
     #[test]
     fn power_state_machine_grows_then_shrinks() {
         use crate::core::entity::Power;
         use crate::core::level::Level;
-        use crate::core::powerup::Mushroom;
+        use crate::core::powerup::Item;
 
         let level = Level::from_rows(&["M..G", "####"]);
         let mut game = Game::new(level);
 
         // Small -> Big by picking up a mushroom dropped on Mario.
-        game.mushrooms
-            .push(Mushroom::new(game.level.spawn.0, game.level.spawn.1, false));
+        game.items
+            .push(Item::mushroom(game.level.spawn.0, game.level.spawn.1, false));
         for _ in 0..10 {
             game.step(Buttons::default());
             if game.mario.power == Power::Big {
@@ -756,6 +805,37 @@ mod tests {
         assert_eq!(game.mario.power, Power::Small);
         assert!(game.mario.alive);
         assert_eq!(game.deaths, 0, "shrinking is not dying");
+    }
+
+    #[test]
+    fn a_star_makes_mario_invincible_and_plows_through_enemies() {
+        use crate::core::level::Level;
+        use crate::core::powerup::Item;
+
+        // Mario, a goomba to his right, on a flat floor.
+        let level = Level::from_rows(&["M...G", "#####"]);
+        let mut game = Game::new(level);
+        // Drop a star on Mario so he grabs it right away.
+        game.items
+            .push(Item::star(game.level.spawn.0, game.level.spawn.1, false));
+        for _ in 0..5 {
+            game.step(Buttons::default());
+            if game.mario.invincible > 0 {
+                break;
+            }
+        }
+        assert!(game.mario.invincible > 0, "the star grants invincibility");
+
+        // Walk into the goomba: it dies, Mario lives and does not shrink.
+        for _ in 0..200 {
+            game.step(held(Button::Right));
+            if game.enemies.is_empty() {
+                break;
+            }
+        }
+        assert!(game.enemies.is_empty(), "the star defeats the enemy on contact");
+        assert!(game.mario.alive);
+        assert_eq!(game.deaths, 0);
     }
 
     #[test]

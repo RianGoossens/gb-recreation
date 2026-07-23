@@ -47,6 +47,9 @@ pub struct Mario {
     /// Frames of invulnerability after shrinking, so one touch does not chain
     /// into a second hit. Counts down to zero.
     pub invuln: u32,
+    /// Frames of star invincibility remaining. While positive, touching an enemy
+    /// defeats it instead of hurting Mario.
+    pub invincible: u32,
 }
 
 impl Mario {
@@ -63,6 +66,7 @@ impl Mario {
             jump_latched: false,
             alive: true,
             invuln: 0,
+            invincible: 0,
         }
     }
 

@@ -13,7 +13,9 @@ code with `Level::from_file` / `Level::from_text`.
 | `.` | empty space |
 | `M` | Mario's spawn (use one) |
 | `G` | a Goomba enemy |
+| `F` | a Fly enemy (walks and hops) |
 | `C` | a coin |
+| `S` | a star (grants brief invincibility) |
 | `?` | question block, gives a coin when bumped (solid) |
 | `P` | power block, gives a mushroom when bumped (solid) |
 | `B` | brick block (solid) |

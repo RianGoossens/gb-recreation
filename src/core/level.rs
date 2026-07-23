@@ -6,6 +6,7 @@
 
 use crate::core::block::BlockKind;
 use crate::core::enemy::EnemyKind;
+use crate::core::powerup::ItemKind;
 
 /// Tile size in pixels.
 pub const TILE: i32 = 8;
@@ -89,14 +90,17 @@ pub struct Level {
     pub blocks: Vec<(i32, i32, BlockKind)>,
     /// The level-end trigger, top-left pixel, if the level has one.
     pub end: Option<(i32, i32)>,
+    /// Free-standing item spawns: top-left pixel and kind.
+    pub items: Vec<(i32, i32, ItemKind)>,
 }
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `M` marks Mario's
-    /// spawn, `G` a Goomba, `F` a Fly, `C` a coin, `?` a question block, `P` a
-    /// power block, `B` a brick block, `E` the level-end trigger. The block
-    /// markers are also solid; `E` is not. Anything else is empty. Rows must be
-    /// equal length. This is the human-editable format levels are authored in.
+    /// spawn, `G` a Goomba, `F` a Fly, `C` a coin, `S` a star, `?` a question
+    /// block, `P` a power block, `B` a brick block, `E` the level-end trigger.
+    /// The block markers are also solid; `E`, `S`, and coins are not. Anything
+    /// else is empty. Rows must be equal length. This is the human-editable
+    /// format levels are authored in.
     pub fn from_rows(rows: &[&str]) -> Self {
         let solids = Solids::from_rows(rows);
         let mut spawn = (0, 0);
@@ -104,6 +108,7 @@ impl Level {
         let mut coins = Vec::new();
         let mut blocks = Vec::new();
         let mut end = None;
+        let mut items = Vec::new();
         for (ty, row) in rows.iter().enumerate() {
             for (tx, ch) in row.chars().enumerate() {
                 let (px, py) = (tx as i32 * TILE, ty as i32 * TILE);
@@ -115,6 +120,7 @@ impl Level {
                     '?' => blocks.push((px, py, BlockKind::Question)),
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),
                     'B' => blocks.push((px, py, BlockKind::Brick)),
+                    'S' => items.push((px, py, ItemKind::Star)),
                     'E' => end = Some((px, py)),
                     _ => {}
                 }
@@ -127,6 +133,7 @@ impl Level {
             coins,
             blocks,
             end,
+            items,
         }
     }
 

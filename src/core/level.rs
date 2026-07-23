@@ -4,6 +4,8 @@
 //! tile. This is deliberately simple and human editable, which also serves the
 //! later moddability goal: a level's solids can be written as rows of text.
 
+use crate::core::block::BlockKind;
+
 /// Tile size in pixels.
 pub const TILE: i32 = 8;
 
@@ -29,8 +31,9 @@ impl Solids {
         Self::new(width, height, vec![false; width * height])
     }
 
-    /// Build from rows of text: `#` is solid, anything else is empty. Rows must
-    /// be equal length. Handy for tests and hand-made levels.
+    /// Build from rows of text. Solid tiles are `#` and the block markers `?`
+    /// (question) and `B` (brick), since blocks are part of the solid world.
+    /// Anything else is empty. Rows must be equal length.
     pub fn from_rows(rows: &[&str]) -> Self {
         let height = rows.len();
         let width = rows.first().map(|r| r.len()).unwrap_or(0);
@@ -38,7 +41,7 @@ impl Solids {
         for row in rows {
             assert_eq!(row.len(), width, "rows must be equal length");
             for ch in row.chars() {
-                cells.push(ch == '#');
+                cells.push(matches!(ch, '#' | '?' | 'B'));
             }
         }
         Self::new(width, height, cells)
@@ -82,25 +85,30 @@ pub struct Level {
     pub enemy_spawns: Vec<(i32, i32)>,
     /// Coin positions, top-left pixel.
     pub coins: Vec<(i32, i32)>,
+    /// Interactive block spawns: top-left pixel and kind.
+    pub blocks: Vec<(i32, i32, BlockKind)>,
 }
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `M` marks Mario's
-    /// spawn, `G` marks a Goomba spawn, `C` marks a coin (all otherwise empty),
-    /// anything else is empty. Rows must be equal length. This is the
-    /// human-editable format levels are authored in.
+    /// spawn, `G` a Goomba, `C` a coin, `?` a question block, `B` a brick block.
+    /// The block markers are also solid. Anything else is empty. Rows must be
+    /// equal length. This is the human-editable format levels are authored in.
     pub fn from_rows(rows: &[&str]) -> Self {
         let solids = Solids::from_rows(rows);
         let mut spawn = (0, 0);
         let mut enemy_spawns = Vec::new();
         let mut coins = Vec::new();
+        let mut blocks = Vec::new();
         for (ty, row) in rows.iter().enumerate() {
             for (tx, ch) in row.chars().enumerate() {
-                let px = (tx as i32 * TILE, ty as i32 * TILE);
+                let (px, py) = (tx as i32 * TILE, ty as i32 * TILE);
                 match ch {
-                    'M' => spawn = px,
-                    'G' => enemy_spawns.push(px),
-                    'C' => coins.push(px),
+                    'M' => spawn = (px, py),
+                    'G' => enemy_spawns.push((px, py)),
+                    'C' => coins.push((px, py)),
+                    '?' => blocks.push((px, py, BlockKind::Question)),
+                    'B' => blocks.push((px, py, BlockKind::Brick)),
                     _ => {}
                 }
             }
@@ -110,6 +118,7 @@ impl Level {
             spawn,
             enemy_spawns,
             coins,
+            blocks,
         }
     }
 }

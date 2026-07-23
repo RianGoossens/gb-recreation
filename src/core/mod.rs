@@ -10,6 +10,7 @@
 //! outermost shape, a stepping loop over an input snapshot.
 
 pub mod animation;
+pub mod block;
 pub mod enemy;
 pub mod entity;
 pub mod level;

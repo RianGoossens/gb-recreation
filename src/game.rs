@@ -8,6 +8,7 @@
 
 use crate::camera::Camera;
 use crate::core::animation::Animator;
+use crate::core::block::{Block, BlockKind};
 use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
 use crate::core::entity::Mario;
 use crate::core::level::{Level, TILE};
@@ -30,6 +31,8 @@ pub struct Game {
     pub animator: Animator,
     /// How many times Mario has died and respawned this session.
     pub deaths: u32,
+    /// Interactive blocks Mario can bump from below.
+    pub blocks: Vec<Block>,
     /// Uncollected coins, top-left pixel.
     pub coins: Vec<(i32, i32)>,
     /// Coins collected (wraps every 100, which grants a life).
@@ -45,7 +48,40 @@ pub struct Game {
     mario_tile: Tile,
     enemy_tile: Tile,
     coin_tile: Tile,
+    question_tile: Tile,
+    used_tile: Tile,
+    brick_tile: Tile,
     palette: Palette,
+}
+
+fn spawn_blocks(level: &Level) -> Vec<Block> {
+    level
+        .blocks
+        .iter()
+        .map(|&(x, y, kind)| Block::new(x, y, kind))
+        .collect()
+}
+
+/// A dark block with a light center dot: an unused question block.
+fn question_tile() -> Tile {
+    let mut pixels = [[2u8; 8]; 8];
+    for row in pixels.iter_mut().take(5).skip(2) {
+        row[3] = 1;
+        row[4] = 1;
+    }
+    Tile { pixels }
+}
+
+/// A dark block with light mortar lines: a brick.
+fn brick_tile() -> Tile {
+    let mut pixels = [[2u8; 8]; 8];
+    pixels[0] = [0; 8];
+    pixels[4] = [0; 8];
+    for row in pixels.iter_mut() {
+        row[0] = 0;
+        row[4] = 0;
+    }
+    Tile { pixels }
 }
 
 /// A small dark mark on an otherwise empty tile, so coins read differently from
@@ -80,10 +116,12 @@ impl Game {
         let mario = Mario::new(level.spawn.0, level.spawn.1);
         let enemies = spawn_enemies(&level);
         let coins = level.coins.clone();
+        let blocks = spawn_blocks(&level);
         Self {
             level,
             mario,
             enemies,
+            blocks,
             coins,
             coins_collected: 0,
             lives: 3,
@@ -101,6 +139,9 @@ impl Game {
             // the white background and the dark terrain.
             enemy_tile: solid_tile(1),
             coin_tile: coin_tile(),
+            question_tile: question_tile(),
+            used_tile: solid_tile(2),
+            brick_tile: brick_tile(),
             palette: Palette::new(0xE4),
         }
     }
@@ -122,6 +163,8 @@ impl Game {
                     'M'
                 } else if x == 16 && y == h - 3 {
                     'G'
+                } else if x == 6 && y == h - 6 {
+                    '?'
                 } else {
                     '.'
                 };
@@ -142,7 +185,11 @@ impl Game {
 
     /// Advance one frame from the held buttons.
     pub fn step(&mut self, buttons: Buttons) {
+        let rising = self.mario.vy < 0;
         step_motion(&mut self.mario, buttons, &self.level.solids);
+        if rising {
+            self.bump_blocks();
+        }
         self.animator.update(&self.mario);
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
@@ -197,6 +244,33 @@ impl Game {
         // A stomp in the same frame saves Mario from a simultaneous side hit.
         if hit && !stomped {
             self.mario.alive = false;
+        }
+    }
+
+    /// Mario just moved up this frame. If his head is flush against an unused
+    /// block, bump it. A question block gives a coin and becomes used; a brick
+    /// takes the hit but does not break (small Mario).
+    fn bump_blocks(&mut self) {
+        let (mw, _mh) = self.mario.size();
+        let ml = self.mario.pixel_x();
+        let mt = self.mario.pixel_y();
+        let mr = ml + mw - 1;
+
+        let mut got_coin = false;
+        for block in &mut self.blocks {
+            if block.used {
+                continue;
+            }
+            let (bl, _bt, br, bb) = block.edges();
+            let flush_below = mt == bb + 1;
+            let overlap_x = ml <= br && mr >= bl;
+            if flush_below && overlap_x && block.kind == BlockKind::Question {
+                block.used = true;
+                got_coin = true;
+            }
+        }
+        if got_coin {
+            self.gain_coin();
         }
     }
 
@@ -261,6 +335,14 @@ impl Game {
             self.camera.y,
             &self.palette,
         );
+        for block in &self.blocks {
+            let tile = match (block.kind, block.used) {
+                (_, true) => &self.used_tile,
+                (BlockKind::Question, false) => &self.question_tile,
+                (BlockKind::Brick, false) => &self.brick_tile,
+            };
+            fb.draw_tile(tile, block.x - self.camera.x, block.y - self.camera.y, &self.palette);
+        }
         for &(cx, cy) in &self.coins {
             fb.draw_tile(&self.coin_tile, cx - self.camera.x, cy - self.camera.y, &self.palette);
         }
@@ -421,6 +503,25 @@ mod tests {
         }
         assert!(game.coins.is_empty(), "the coin should be collected");
         assert_eq!(game.coins_collected, 1);
+    }
+
+    #[test]
+    fn bumping_a_question_block_gives_a_coin_and_spends_it() {
+        use crate::core::level::Level;
+        // Mario a couple tiles under a question block, over a floor.
+        let level = Level::from_rows(&[".?..", "....", ".M..", "####"]);
+        let mut game = Game::new(level);
+        assert_eq!(game.blocks.len(), 1);
+        assert!(!game.blocks[0].used);
+
+        for _ in 0..30 {
+            game.step(held(Button::A)); // jump up into the block
+            if game.blocks[0].used {
+                break;
+            }
+        }
+        assert!(game.blocks[0].used, "the question block should be spent");
+        assert_eq!(game.coins_collected, 1, "it should give one coin");
     }
 
     #[test]

@@ -203,6 +203,21 @@ mod tests {
     }
 
     #[test]
+    fn completing_a_middle_level_advances_and_keeps_playing() {
+        let mut session = Session::new(vec![short_level(), short_level()]);
+        press_start(&mut session);
+        for _ in 0..400 {
+            session.step(held(Button::Right));
+            if session.current_level() == 1 {
+                break;
+            }
+        }
+        // The completion trigger advanced the level but the run continues.
+        assert_eq!(session.current_level(), 1);
+        assert_eq!(session.phase, Phase::Playing);
+    }
+
+    #[test]
     fn winning_then_start_returns_to_title() {
         let mut session = Session::new(vec![short_level()]);
         press_start(&mut session);

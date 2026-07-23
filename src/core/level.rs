@@ -128,6 +128,30 @@ impl Level {
             end,
         }
     }
+
+    /// Parse a level from a block of text, one row per line. Trailing blank
+    /// lines are ignored. Every remaining row must be the same width, otherwise
+    /// this returns an error rather than panicking, so a bad file is reported.
+    pub fn from_text(text: &str) -> Result<Self, String> {
+        let lines: Vec<&str> = text.trim_end_matches(['\n', '\r']).lines().collect();
+        if lines.is_empty() {
+            return Err("level is empty".to_string());
+        }
+        let width = lines[0].len();
+        if let Some(bad) = lines.iter().position(|l| l.len() != width) {
+            return Err(format!(
+                "row {bad} is {} wide but the level is {width} wide",
+                lines[bad].len()
+            ));
+        }
+        Ok(Self::from_rows(&lines))
+    }
+
+    /// Load a level from a text file.
+    pub fn from_file(path: impl AsRef<std::path::Path>) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path).map_err(|e| format!("could not read level: {e}"))?;
+        Self::from_text(&text)
+    }
 }
 
 #[cfg(test)]
@@ -147,6 +171,27 @@ mod tests {
         // The 'M' tile is not solid, the floor is.
         assert!(!level.solids.is_solid(3, 1));
         assert!(level.solids.is_solid(0, 3));
+    }
+
+    #[test]
+    fn from_str_parses_a_level() {
+        let text = "..?..\n..M..\n#####\n";
+        let level = Level::from_text(text).unwrap();
+        assert_eq!(level.spawn, (2 * TILE, TILE)); // 'M' at col 2, row 1
+        assert_eq!(level.blocks.len(), 1); // the '?'
+        assert!(level.solids.is_solid(0, 2)); // floor row
+    }
+
+    #[test]
+    fn from_str_rejects_ragged_rows() {
+        let err = Level::from_text("####\n###\n").unwrap_err();
+        assert!(err.contains("wide"), "error explains the width mismatch: {err}");
+    }
+
+    #[test]
+    fn from_str_ignores_trailing_blank_lines() {
+        let level = Level::from_text("M.\n##\n\n").unwrap();
+        assert_eq!(level.solids.height, 2);
     }
 
     #[test]

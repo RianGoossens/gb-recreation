@@ -54,4 +54,44 @@ header.site p { margin: 0; color: var(--muted); }
 }
 .post code { font-family: var(--mono); font-size: .9rem; }
 
+/* Optional components posts can mix in to avoid a uniform look. Use them where
+   they help; no post needs all of them. */
+
+/* A short standfirst under the title. */
+.post .lead { font-size: 1.15rem; color: var(--fg); }
+
+/* An aside/callout box for a side note, warning, or highlight. */
+.post .callout {
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+  border-radius: 0 8px 8px 0;
+  padding: .8rem 1rem;
+  margin: 1.5rem 0;
+}
+.post .callout p { margin: .3rem 0; }
+
+/* A pull quote to break up long stretches of text. */
+.post .pull {
+  font-size: 1.3rem;
+  line-height: 1.4;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 0;
+  margin: 1.5rem 0;
+  color: var(--fg);
+}
+
+/* Two images side by side (stacks on narrow screens). */
+.post .two-up {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .8rem;
+  margin: 1.5rem 0;
+}
+.post .two-up figure { margin: 0; }
+@media (max-width: 560px) {
+  .post .two-up { grid-template-columns: 1fr; }
+}
+
 footer { color: var(--muted); font-size: .8rem; text-align: center; padding: 2rem 1rem; }

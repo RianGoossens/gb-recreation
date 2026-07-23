@@ -38,7 +38,13 @@ Screenshots of the running game are fine to include in blog posts as commentary,
 - No references to local line numbers ("see line 15"). Refer to files, functions, and concepts by name.
 - No em-dashes. No filler words. Direct, technical writing.
 - Not self-referential. Write about the game and the engineering, never about the blog's own construction (no notes on frameworks, HTML/CSS, "built by hand", and so on). The reader does not care how the page was made.
-- Include before/after or emulator-vs-ours screenshots when relevant.
+- Vary the look. Do not run every post through the same rigid template. Reach for more than one image when it helps (a before/after pair, a two-up comparison, an action shot next to a still), and change up the structure so posts do not feel identical. Keep it interesting to read.
+- Use the shared components in `style.css` where they fit, so variety is easy and consistent:
+  - `<p class="lead">` a stronger opening paragraph.
+  - `<div class="callout">...</div>` an aside, warning, or highlight.
+  - `<blockquote class="pull">...</blockquote>` a pull quote to break up long text.
+  - `<div class="two-up"><figure>...</figure><figure>...</figure></div>` two images side by side.
+- Multiple images are encouraged. Each goes under `docs/blog/media/` via Git LFS.
 
 ## Post template
 

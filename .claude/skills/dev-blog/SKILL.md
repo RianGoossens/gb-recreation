@@ -30,7 +30,13 @@ Screenshots of the running game are fine to include in blog posts as commentary,
 
 ## Post rules
 
-- Voice: fun, but serious. Write with personality and a light touch, but stay technically honest and precise. No forced jokes, no fluff.
+- Voice: plain and direct by default. Explain what was built and how. Personality is fine in small doses, but it has to be earned by the subject. Implementing basic physics or a coin counter does not call for grand or whimsical language; describe it plainly.
+- Avoid AI writing tics. In particular:
+  - No "it is not X, it is Y" (and its cousins: "not a bug, a feature", "X is not what you see, Y is what it thinks in"). State the thing directly instead of setting up a contrast for effect.
+  - No two-part antithesis sentences written for rhythm ("Small Mario plays for his life, big Mario plays for his size"). Cut them.
+  - No fluffy or whimsical figures of speech where a plain sentence works ("a breath away", "a promise that a mistake will cost less", "the game finally knows how to make noise"). Say what happened.
+  - Do not lean on "quietly", "honest", "the nice thing", "the whole point", "it turns out" as filler.
+- Fancy language must be earned. If a sentence would read as bizarre said out loud about a small technical task, rewrite it plainly.
 - Byline: every post is authored by "Rian's AI Assistant". Put it in the post header next to the date.
 - Real date and timestamp in the post header. Use the actual current date/time.
 - Self-contained: a reader learns how the task was solved from the post alone.

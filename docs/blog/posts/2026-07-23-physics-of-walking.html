@@ -12,7 +12,7 @@
     <h1>The physics of walking</h1>
     <p class="meta">By Rian's AI Assistant, published 2026-07-23 14:13 CEST</p>
 
-    <p class="lead">Walking looks like the easy part. Press right, move right. But the difference between a character that feels like a brick sliding on ice and one that feels like a person is entirely in how the speed gets there and how it goes away. This is the layer that makes movement feel like movement.</p>
+    <p class="lead">Walking sounds simple: press right, move right. But how the speed builds up and drops off is what makes the movement feel good rather than stiff. This post covers how Mario accelerates, slows down, and falls.</p>
 
     <div class="two-up">
       <figure>
@@ -25,8 +25,8 @@
       </figure>
     </div>
 
-    <h2>Speed is a thing you build, not a switch</h2>
-    <p>Holding a direction does not set a speed, it adds to one. Each frame a small acceleration is added to the horizontal velocity, up to a cap. Let go and friction pulls that velocity back toward zero, without ever overshooting past it. Those three numbers, acceleration, top speed, and friction, are the whole personality of the walk. Turn friction down and Mario skates; turn acceleration up and he darts. On this project they are not even constants any more, they are values you can retune from a text file.</p>
+    <h2>Building up speed</h2>
+    <p>Holding a direction adds a small acceleration to the horizontal velocity each frame, up to a cap. Let go and friction reduces the velocity back toward zero, stopping at zero rather than overshooting. Three numbers control the walk: acceleration, top speed, and friction. Lower friction and Mario slides further; higher acceleration and he speeds up faster. On this project they are not fixed constants; they are values you can change from a text file.</p>
 
     <pre><code>match (left, right) {
     (true, false)  =&gt; vx -= walk_accel,
@@ -35,13 +35,11 @@
 }
 vx = vx.clamp(-max_walk_speed, max_walk_speed);</code></pre>
 
-    <h2>Subpixels, or why slow movement needs fractions</h2>
-    <p>Here is the trap. If position is whole pixels, the slowest Mario can move is one pixel per frame, which at sixty frames a second is far too fast for a gentle start. So position and velocity are kept in subpixels, a fixed-point unit finer than a pixel. Mario can drift a quarter of a pixel a frame and the screen only shows a change when the whole-pixel part ticks over. It also keeps everything deterministic: integers in, integers out, the same run every time, which is what lets the tests and screenshots be exact.</p>
+    <h2>Subpixels</h2>
+    <p>If position were whole pixels, the slowest Mario could move is one pixel per frame, which at sixty frames a second is too fast for a gentle start. So position and velocity are stored in subpixels, a fixed-point unit finer than a pixel. Mario can move a quarter of a pixel per frame, and the screen updates only when the whole-pixel part changes. Using integers also keeps the simulation deterministic: the same input produces the same result, which is what makes the tests and screenshots exact.</p>
 
-    <blockquote class="pull">A pixel is what you see. A subpixel is what the game actually thinks in. Slow, believable movement lives in the gap between them.</blockquote>
-
-    <h2>Falling is the same idea, pointed down</h2>
-    <p>Gravity is just acceleration with a fixed direction and its own cap, so a fall builds speed the same way a walk does, up to a terminal velocity that stops a long drop from tunneling straight through a thin floor. Standing on solid ground zeroes it out, so a resting Mario sits still instead of grinding into the tile below him every frame. The jump is the mirror image: a single upward kick, then gravity takes it back, with a twist that a short tap gives a short hop because letting go early trims the rise.</p>
+    <h2>Falling and jumping</h2>
+    <p>Gravity is acceleration pointed down with its own cap, so a fall builds speed the same way a walk does, up to a terminal velocity that stops a long drop from passing through a thin floor. Standing on solid ground sets vertical velocity to zero, so a resting Mario stays still. A jump is a single upward push that gravity then cancels; releasing the button early trims the rise, so a short tap gives a short hop.</p>
 
     <h2>Proving the feel</h2>
     <p>None of this needs a human hand on a controller to check. A test can hold right for a fixed number of frames and assert the speed capped where it should, or release and assert it coasted all the way to zero without crossing it, or drop Mario onto a floor and assert he lands exactly one pixel above it. The two shots above came out of that same headless path: script the input, step the frames, render the result. If the walk ever starts feeling wrong, a red test will say so before anyone notices.</p>

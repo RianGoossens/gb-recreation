@@ -15,7 +15,7 @@
     <p class="lead">Up to now we had a pile of good parts: a plumber who walks and jumps, enemies to stomp, blocks to bump, a mushroom that changes the stakes. What we did not have was a game. A game has a beginning and an end and a way back to the beginning. This milestone built that loop, and with it the whole thing becomes something you can actually start, lose, win, and start again.</p>
 
     <h2>Reaching the end</h2>
-    <p>A level needs a finish line. Ours is a plain trigger tile: walk into it and the level is complete. The moment that happens the scene freezes, because the level is over and nothing should keep moving. That freeze is not a special case bolted on, it is the same idea as game over. When a level ends, for any reason, it stops.</p>
+    <p>A level needs a finish line. Ours is a trigger tile: walk into it and the level is complete, and the scene freezes because the level is over and nothing should keep moving. That freeze uses the same code path as game over. When a level ends, for any reason, it stops.</p>
 
     <div class="callout">
       <p>Completing a level and dying share more than you would think. Both are terminal states of a single level: one good, one bad. Modeling them the same way, as "this level has ended, here is why", kept the logic small and made the next layer, the flow between levels, almost fall out for free.</p>
@@ -65,9 +65,7 @@
       <figcaption>The session state machine. Start moves you off a screen; how a level ends decides where you go.</figcaption>
     </figure>
 
-    <p>The nice thing about writing the flow as a state machine is that "held Start" cannot rocket you through three screens in three frames. A press is an edge, not a state, so it fires once and waits for you to let go. Small detail, but it is the difference between a menu and a slot machine.</p>
-
-    <blockquote class="pull">A level knows how it ended. The session knows what that means. Neither one has to know about the other's job.</blockquote>
+    <p>Writing the flow as a state machine means a held Start button cannot skip through three screens in three frames. A press is treated as an edge: it fires once and waits for the button to be released before it can fire again. Without that, holding Start would blow past every menu.</p>
 
     <h2>The slice, on screen</h2>
     <figure>

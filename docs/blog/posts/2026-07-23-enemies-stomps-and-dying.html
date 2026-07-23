@@ -30,10 +30,10 @@
     </div>
 
     <h2>An enemy that walks a floor</h2>
-    <p>The enemy shares Mario's collision model but carries a much smaller brain. It walks in one direction, falls under the same gravity, and lands on the same solid tiles. Two rules keep it honest. It reverses when it bumps a wall, and it reverses at a ledge rather than strolling into open air. The ledge check is the interesting one: before the enemy steps, it looks at the ground just past its leading foot, and if nothing is there, it turns around first. That single probe is the difference between a creature that patrols a platform and one that commits suicide off the first edge.</p>
+    <p>The enemy shares Mario's collision model but carries a much smaller brain. It walks in one direction, falls under the same gravity, and lands on the same solid tiles. Two rules keep it honest. It reverses when it hits a wall, and it reverses at a ledge instead of walking off. The ledge check is worth a note: before the enemy steps, it checks the ground just past its leading foot, and if nothing is there, it turns around. Without that probe the enemy walks off the first edge it reaches.</p>
 
     <h2>The stomp, and who was moving down</h2>
-    <p>Contact between Mario and an enemy is not one event, it is two, and the whole feel of the game lives in telling them apart. The rule we use: if Mario is moving downward and his feet meet the upper part of the enemy, that is a stomp. The enemy is defeated and Mario gets a bounce back up, which is what makes chaining hops feel springy. Any other contact, walking into it, brushing its side, touching it from below, is a hit.</p>
+    <p>Contact between Mario and an enemy has two outcomes, and telling them apart is the core of the interaction. The rule: if Mario is moving downward and his feet meet the upper part of the enemy, that is a stomp. The enemy is defeated and Mario bounces up, which lets you chain hops. Any other contact, walking into it, touching its side, or touching it from below, is a hit.</p>
     <pre><code>if overlap &amp;&amp; descending &amp;&amp; mario_bottom &lt;= enemy_top + half {
     enemy.defeated();
     mario.bounce();
@@ -42,13 +42,11 @@
 }</code></pre>
     <p>Because the simulation runs in fixed steps and enemies are not part of the solid world, the check happens every frame after everyone has moved. That ordering matters: move first, then judge the overlaps, so a fast fall cannot sneak through.</p>
 
-    <blockquote class="pull">One contact, two meanings. Coming down is a victory, anything else is a funeral.</blockquote>
-
     <h2>Dying, and getting another go</h2>
     <p>A hit while small is fatal. The game notices, counts the death, and puts Mario back at the level's spawn with the enemies restored, ready to try again. There is no death animation yet, and that is on purpose: Mario is still a featureless block, so an animation would be dressing up nothing. It goes in when there is a real sprite to flip and drop. The rule underneath is what matters now, and it is testable today.</p>
 
     <h2>Seeing it without a window</h2>
-    <p>Here is the part I care about most. None of this was checked by playing. The game logic is a plain object that takes a button press and produces a frame, with no window and no clock attached. So a test can drop Mario onto an enemy and assert the enemy is gone and Mario is rising. Another can march him sideways into one and assert the death count ticked up and he is back at the start. And a command renders any scripted run straight to an image, which is how the screenshots here were made. If a behavior can only be seen by a human watching a window, it is not finished. Every rule in this post has a test that fails if the rule breaks.</p>
+    <p>None of this was checked by playing. The game logic is an object that takes a button press and produces a frame, with no window and no clock attached. A test can drop Mario onto an enemy and assert the enemy is gone and Mario is rising, or walk him sideways into one and assert the death count went up and he is back at the start. A command renders any scripted run to an image, which is how the screenshots here were made. Every rule in this post has a test that fails if the rule breaks.</p>
 
     <h2>What is next</h2>
     <p>Milestone 4: things worth collecting. Coins and a counter, blocks that give something back when bumped, and the power-up that changes what a hit means. That last one turns today's single fatal outcome into a proper exchange, lose your size instead of your life, which is the heart of how the original stays tense without being cruel.</p>

@@ -16,6 +16,8 @@ These are not preferences. Treat a violation as a bug.
 
 - No em-dashes anywhere: not in chat, comments, commit messages, markdown, blog posts, or code. Use commas, parentheses, or colons.
 - No AI filler vocabulary. Banned words include: delve, robust, tapestry, navigate (as a metaphor), seamless, leverage (as a verb), realm, testament, boilerplate-speak. Say the plain thing.
+- No AI sentence tics. Do not use the "it is not X, it is Y" contrast (or "not a bug, a feature", and similar). Do not write two-part antithesis sentences for rhythm. Do not use "quietly", "honest", "the nice thing", "the whole point", "it turns out" as filler. State the point directly.
+- Fancy language must be earned by the subject. Plain topics (basic physics, a counter, a loader) get plain writing. If a sentence would sound bizarre said aloud about a small technical task, rewrite it.
 - KISS. Prefer the simple, direct solution. Small functions, clear names.
 - Minimal comments. Code should read on its own. Comment only when the "why" is not obvious from the code.
 - Be direct in writing. State outcomes plainly. If something failed, say so with the evidence.

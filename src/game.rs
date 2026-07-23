@@ -498,8 +498,12 @@ impl Game {
             ItemKind::Flower
         };
 
+        // Big or fire Mario breaks bricks; small Mario only bumps them.
+        let can_break = self.mario.power != Power::Small;
+
         let mut got_coin = false;
         let mut item_at: Option<(i32, i32)> = None;
+        let mut break_tiles: Vec<(i32, i32)> = Vec::new();
         for block in &mut self.blocks {
             if block.used {
                 continue;
@@ -520,7 +524,12 @@ impl Game {
                     // The item emerges from the top of the block.
                     item_at = Some((block.x, block.y - TILE));
                 }
-                BlockKind::Brick => {}
+                BlockKind::Brick => {
+                    if can_break {
+                        block.used = true;
+                        break_tiles.push((block.x / TILE, block.y / TILE));
+                    }
+                }
             }
             self.sounds.push(SoundEvent::BlockBump);
         }
@@ -534,6 +543,13 @@ impl Game {
             };
             self.items.push(item);
         }
+        // Remove broken bricks and clear their solidity so Mario can pass.
+        for &(tx, ty) in &break_tiles {
+            self.level.solids.clear(tx, ty);
+        }
+        self.blocks.retain(|b| {
+            !(b.kind == BlockKind::Brick && break_tiles.contains(&(b.x / TILE, b.y / TILE)))
+        });
     }
 
     /// Collect any coins Mario overlaps. Every 100 coins grants a life.
@@ -1186,6 +1202,34 @@ mod tests {
             game.step(Buttons::default());
         }
         (game, ())
+    }
+
+    #[test]
+    fn big_mario_breaks_a_brick_small_mario_does_not() {
+        use crate::core::entity::{pixels, Power};
+        use crate::core::level::Level;
+
+        let rows = &[".B..", "....", "....", ".M..", "####"];
+
+        // Small Mario: the brick survives.
+        let mut small = Game::new(Level::from_rows(rows));
+        for _ in 0..40 {
+            small.step(held(Button::A));
+        }
+        assert_eq!(small.blocks.len(), 1, "small Mario does not break the brick");
+
+        // Big Mario: the brick breaks and its tile stops being solid.
+        let mut big = Game::new(Level::from_rows(rows));
+        big.mario.power = Power::Big;
+        big.mario.y -= pixels(8);
+        for _ in 0..40 {
+            big.step(held(Button::A));
+            if big.blocks.is_empty() {
+                break;
+            }
+        }
+        assert!(big.blocks.is_empty(), "big Mario breaks the brick");
+        assert!(!big.level.solids.is_solid(1, 0), "the broken tile is no longer solid");
     }
 
     #[test]

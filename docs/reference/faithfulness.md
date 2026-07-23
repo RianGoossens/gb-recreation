@@ -34,7 +34,7 @@ are visible and deliberate rather than accidental. Three labels:
 | Coins, 100-coin 1up | canonical | |
 | Question block gives a coin | canonical | |
 | Power block gives mushroom/flower by size | canonical | matches SML's size-based item |
-| Brick block | stand-in | currently inert; SML lets big Mario break bricks (see below) |
+| Brick block | canonical | big/fire Mario breaks it; small Mario bumps it |
 | Score, lives, timer, time-out death | canonical | point values not yet matched to the cartridge |
 
 ## Physics and levels

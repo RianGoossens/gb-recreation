@@ -49,6 +49,14 @@ impl Solids {
         Self::new(width, height, cells)
     }
 
+    /// Make the tile at (tx, ty) empty (for example, a broken brick). No effect
+    /// if it is out of range.
+    pub fn clear(&mut self, tx: i32, ty: i32) {
+        if tx >= 0 && ty >= 0 && (tx as usize) < self.width && (ty as usize) < self.height {
+            self.cells[ty as usize * self.width + tx as usize] = false;
+        }
+    }
+
     /// Is the tile at (tx, ty) solid? Out-of-range tiles are empty.
     pub fn is_solid(&self, tx: i32, ty: i32) -> bool {
         if tx < 0 || ty < 0 || tx as usize >= self.width || ty as usize >= self.height {

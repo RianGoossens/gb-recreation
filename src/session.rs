@@ -10,6 +10,32 @@ use crate::game::Game;
 use crate::input::{Button, Buttons};
 use crate::render::Framebuffer;
 
+/// Our own hand-made campaign levels, played in order. Each is a rectangle of
+/// the level-format markers (see docs/reference/level-format.md).
+const CAMPAIGN: &[&str] = &[
+    concat!(
+        "....................\n",
+        "......?.....S.......\n",
+        "..M..............E..\n",
+        "####################\n",
+        "####################\n",
+    ),
+    concat!(
+        "....................\n",
+        "....W....C.C........\n",
+        "..M..............E..\n",
+        "####################\n",
+        "####################\n",
+    ),
+    concat!(
+        "....................\n",
+        ".....P......C.......\n",
+        "..M..............E..\n",
+        "####################\n",
+        "####################\n",
+    ),
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     Title,
@@ -45,6 +71,15 @@ impl Session {
     /// A session over the built-in demo level, for the window frontend.
     pub fn demo() -> Self {
         Self::new(vec![Game::demo_level()])
+    }
+
+    /// A short campaign of our own hand-made levels, played back to back.
+    pub fn campaign() -> Self {
+        let levels = CAMPAIGN
+            .iter()
+            .map(|text| Level::from_text(text).expect("built-in campaign level is valid"))
+            .collect();
+        Self::new(levels)
     }
 
     /// Which level index is being played (0-based).
@@ -151,6 +186,21 @@ mod tests {
     fn press_start(session: &mut Session) {
         session.step(held(Button::Start));
         session.step(Buttons::default());
+    }
+
+    #[test]
+    fn the_campaign_builds_and_can_be_won() {
+        let mut session = Session::campaign();
+        assert_eq!(session.phase, Phase::Title);
+        press_start(&mut session);
+        // Walk right through every level to the win screen.
+        for _ in 0..2000 {
+            session.step(held(Button::Right));
+            if session.phase == Phase::Win {
+                break;
+            }
+        }
+        assert_eq!(session.phase, Phase::Win, "the whole campaign should be winnable");
     }
 
     #[test]

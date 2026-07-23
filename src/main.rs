@@ -286,7 +286,7 @@ fn run_game(args: &[String]) -> ExitCode {
                 return ExitCode::FAILURE;
             }
         },
-        None => Session::demo(),
+        None => Session::campaign(),
     };
 
     let (win_w, win_h) = sml::frontend::scaled_size(SCALE);

@@ -114,6 +114,11 @@ impl Session {
     pub fn render(&self) -> Framebuffer {
         self.game.render()
     }
+
+    /// Sound events from the most recent step, for a frontend to play.
+    pub fn drain_sounds(&mut self) -> Vec<crate::sound::SoundEvent> {
+        self.game.drain_sounds()
+    }
 }
 
 #[cfg(test)]

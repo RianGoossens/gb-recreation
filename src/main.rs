@@ -310,6 +310,8 @@ fn run_game(args: &[String]) -> ExitCode {
         if window.is_key_down(Key::Enter) { held.push(GbKey::Enter); }
 
         session.step(buttons_from_held(held));
+        // A future audio backend would play these; for now they are discarded.
+        let _sounds = session.drain_sounds();
 
         let argb = sml::frontend::to_argb(&session.render(), SCALE);
         if let Err(e) = window.update_with_buffer(&argb, win_w, win_h) {

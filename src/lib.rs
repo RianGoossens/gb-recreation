@@ -24,6 +24,7 @@ pub mod render;
 pub mod rom;
 pub mod scene;
 pub mod session;
+pub mod sound;
 pub mod tiles;
 pub mod tuning;
 

@@ -17,6 +17,7 @@ use crate::core::powerup::{update_mushroom, Mushroom, MUSHROOM_SIZE};
 use crate::tuning::Tuning;
 use crate::input::Buttons;
 use crate::render::{render_background, Framebuffer, Palette, TileMap};
+use crate::sound::SoundEvent;
 use crate::tiles::Tile;
 
 fn solid_tile(color_index: u8) -> Tile {
@@ -53,6 +54,8 @@ pub struct Game {
     timer_ticks: u32,
     /// Tunable movement values (walk, jump, gravity, stomp, timer).
     pub tuning: Tuning,
+    /// Sound events emitted this frame, for a frontend to play. Cleared each step.
+    sounds: Vec<SoundEvent>,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
     mario_tile: Tile,
@@ -166,6 +169,7 @@ impl Game {
             timer: tuning.timer_start,
             timer_ticks: 0,
             tuning,
+            sounds: Vec::new(),
             camera: Camera::new(),
             animator: Animator::new(),
             deaths: 0,
@@ -231,14 +235,24 @@ impl Game {
         )
     }
 
+    /// Sound events emitted on the most recent step, drained by a frontend.
+    pub fn drain_sounds(&mut self) -> Vec<SoundEvent> {
+        std::mem::take(&mut self.sounds)
+    }
+
     /// Advance one frame from the held buttons.
     pub fn step(&mut self, buttons: Buttons) {
+        self.sounds.clear();
         // Once the level is complete or Mario is out of lives, the scene freezes.
         if self.completed || self.game_over {
             return;
         }
         let rising = self.mario.vy < 0;
+        let was_grounded = self.mario.on_ground;
         step_motion(&mut self.mario, buttons, &self.level.solids, &self.tuning);
+        if was_grounded && !self.mario.on_ground && self.mario.vy < 0 {
+            self.sounds.push(SoundEvent::Jump);
+        }
         if rising {
             self.bump_blocks();
         }
@@ -269,6 +283,7 @@ impl Game {
             let (el, et, er, eb) = (ex, ey, ex + TILE - 1, ey + TILE - 1);
             if ml <= er && mr >= el && mt <= eb && mb >= et {
                 self.completed = true;
+                self.sounds.push(SoundEvent::LevelComplete);
                 return;
             }
         }
@@ -280,9 +295,11 @@ impl Game {
 
         if !self.mario.alive {
             self.deaths += 1;
+            self.sounds.push(SoundEvent::Death);
             self.lives = self.lives.saturating_sub(1);
             if self.lives == 0 {
                 self.game_over = true;
+                self.sounds.push(SoundEvent::GameOver);
                 return;
             }
             self.respawn();
@@ -321,6 +338,7 @@ impl Game {
             self.mario.vy = -self.tuning.stomp_bounce;
             self.mario.on_ground = false;
             self.score += 100;
+            self.sounds.push(SoundEvent::Stomp);
         }
         // A stomp in the same frame saves Mario from a simultaneous side hit.
         // A hit shrinks big Mario (with brief invulnerability) but kills small
@@ -330,6 +348,7 @@ impl Game {
                 self.mario.power = Power::Small;
                 self.mario.y += pixels(MUSHROOM_SIZE); // shrink, feet stay put
                 self.mario.invuln = 90;
+                self.sounds.push(SoundEvent::Shrink);
             } else {
                 self.mario.alive = false;
             }
@@ -369,6 +388,7 @@ impl Game {
                 }
                 BlockKind::Brick => {}
             }
+            self.sounds.push(SoundEvent::BlockBump);
         }
         if got_coin {
             self.gain_coin();
@@ -423,6 +443,7 @@ impl Game {
         if grew {
             self.grow_mario();
             self.score += 1000;
+            self.sounds.push(SoundEvent::PowerUp);
         }
     }
 
@@ -438,9 +459,11 @@ impl Game {
     fn gain_coin(&mut self) {
         self.coins_collected += 1;
         self.score += 100;
+        self.sounds.push(SoundEvent::Coin);
         if self.coins_collected >= 100 {
             self.coins_collected -= 100;
             self.lives += 1;
+            self.sounds.push(SoundEvent::OneUp);
         }
     }
 
@@ -848,6 +871,63 @@ mod tests {
         }
 
         assert!(floaty_apex < normal_apex, "a bigger jump_velocity jumps higher");
+    }
+
+    #[test]
+    fn jumping_emits_a_jump_sound() {
+        use crate::sound::SoundEvent;
+        let (mut game, _) = resting_game();
+        // Step until grounded, draining sounds, then jump.
+        for _ in 0..60 {
+            game.step(Buttons::default());
+            let _ = game.drain_sounds();
+        }
+        game.step(held(Button::A));
+        assert!(game.drain_sounds().contains(&SoundEvent::Jump));
+    }
+
+    #[test]
+    fn collecting_a_coin_emits_a_coin_sound() {
+        use crate::core::level::Level;
+        use crate::sound::SoundEvent;
+        let level = Level::from_rows(&["MC..", "####"]);
+        let mut game = Game::new(level);
+        let mut heard = false;
+        for _ in 0..30 {
+            game.step(held(Button::Right));
+            if game.drain_sounds().contains(&SoundEvent::Coin) {
+                heard = true;
+                break;
+            }
+        }
+        assert!(heard, "collecting a coin should emit a Coin sound");
+    }
+
+    #[test]
+    fn dying_emits_a_death_sound() {
+        use crate::core::level::Level;
+        use crate::sound::SoundEvent;
+        let level = Level::from_rows(&["M.G", "###"]);
+        let mut game = Game::new(level);
+        let mut heard = false;
+        for _ in 0..300 {
+            game.step(held(Button::Right));
+            if game.drain_sounds().contains(&SoundEvent::Death) {
+                heard = true;
+                break;
+            }
+        }
+        assert!(heard, "a fatal hit should emit a Death sound");
+    }
+
+    /// A flat level with Mario, settled onto the floor.
+    fn resting_game() -> (Game, ()) {
+        use crate::core::level::Level;
+        let mut game = Game::new(Level::from_rows(&["M...", "####"]));
+        for _ in 0..30 {
+            game.step(Buttons::default());
+        }
+        (game, ())
     }
 
     #[test]

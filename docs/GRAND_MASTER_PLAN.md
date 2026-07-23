@@ -102,7 +102,7 @@ Goal: expand from a vertical slice to coverage of the original game.
 
 - [ ] Remaining World 1 levels
 - [x] Remaining enemy types for World 1 (added a hopping Fly alongside the Goomba; more can follow)
-- [ ] Sound and music model (design first, then implement)
+- [x] Sound and music model: event model implemented (Game emits SoundEvents; frontend drains them). Tone playback is a documented frontend follow-up.
 - [ ] Additional worlds, level by level
 - [ ] Bosses and special stages
 - [ ] Blog posts per major addition

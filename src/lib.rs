@@ -25,6 +25,7 @@ pub mod rom;
 pub mod scene;
 pub mod session;
 pub mod tiles;
+pub mod tuning;
 
 /// The Game Boy display is 160x144 pixels.
 pub const SCREEN_WIDTH: u32 = 160;

@@ -113,7 +113,7 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 
 - [x] Human-editable level format and loader
 - [x] Documentation and an example custom level
-- [ ] Hooks or data-driven config for tuning mechanics
+- [x] Hooks or data-driven config for tuning mechanics
 - [ ] Blog post: build your own level
 
 ---

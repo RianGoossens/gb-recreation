@@ -12,8 +12,9 @@ use crate::core::block::{Block, BlockKind};
 use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
 use crate::core::entity::{pixels, Mario, Power};
 use crate::core::level::{Level, TILE};
-use crate::core::physics::{step_motion, STOMP_BOUNCE};
+use crate::core::physics::step_motion;
 use crate::core::powerup::{update_mushroom, Mushroom, MUSHROOM_SIZE};
+use crate::tuning::Tuning;
 use crate::input::Buttons;
 use crate::render::{render_background, Framebuffer, Palette, TileMap};
 use crate::tiles::Tile;
@@ -50,6 +51,8 @@ pub struct Game {
     /// by the timer task, not here.
     pub timer: u32,
     timer_ticks: u32,
+    /// Tunable movement values (walk, jump, gravity, stomp, timer).
+    pub tuning: Tuning,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
     mario_tile: Tile,
@@ -145,6 +148,7 @@ impl Game {
         let enemies = spawn_enemies(&level);
         let coins = level.coins.clone();
         let blocks = spawn_blocks(&level);
+        let tuning = Tuning::default();
         Self {
             level,
             mario,
@@ -155,8 +159,9 @@ impl Game {
             coins_collected: 0,
             lives: 3,
             score: 0,
-            timer: 400,
+            timer: tuning.timer_start,
             timer_ticks: 0,
+            tuning,
             camera: Camera::new(),
             animator: Animator::new(),
             deaths: 0,
@@ -229,7 +234,7 @@ impl Game {
             return;
         }
         let rising = self.mario.vy < 0;
-        step_motion(&mut self.mario, buttons, &self.level.solids);
+        step_motion(&mut self.mario, buttons, &self.level.solids, &self.tuning);
         if rising {
             self.bump_blocks();
         }
@@ -309,7 +314,7 @@ impl Game {
             }
         }
         if stomped {
-            self.mario.vy = -STOMP_BOUNCE;
+            self.mario.vy = -self.tuning.stomp_bounce;
             self.mario.on_ground = false;
             self.score += 100;
         }
@@ -451,7 +456,7 @@ impl Game {
         self.mario = Mario::new(self.level.spawn.0, self.level.spawn.1);
         self.enemies = spawn_enemies(&self.level);
         self.animator = Animator::new();
-        self.timer = 400;
+        self.timer = self.tuning.timer_start;
         self.timer_ticks = 0;
     }
 
@@ -814,6 +819,31 @@ mod tests {
         assert!(died_to_time, "the clock hitting zero should kill Mario");
         assert!(game.mario.alive, "and then respawn him");
         assert_eq!(game.timer, 400, "the timer resets on respawn");
+    }
+
+    #[test]
+    fn tuning_changes_how_high_mario_jumps() {
+        use crate::core::level::Level;
+        let level = || Level::from_rows(&["....", "....", "....", "M...", "####"]);
+
+        // Default jump.
+        let mut normal = Game::new(level());
+        let mut normal_apex = normal.mario.pixel_y();
+        for _ in 0..40 {
+            normal.step(held(Button::A));
+            normal_apex = normal_apex.min(normal.mario.pixel_y());
+        }
+
+        // A stronger jump via tuning should reach higher (a smaller y).
+        let mut floaty = Game::new(level());
+        floaty.tuning.jump_velocity = 1100;
+        let mut floaty_apex = floaty.mario.pixel_y();
+        for _ in 0..40 {
+            floaty.step(held(Button::A));
+            floaty_apex = floaty_apex.min(floaty.mario.pixel_y());
+        }
+
+        assert!(floaty_apex < normal_apex, "a bigger jump_velocity jumps higher");
     }
 
     #[test]

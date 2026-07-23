@@ -11,6 +11,7 @@
 use super::entity::{pixels, Mario};
 use super::level::{Solids, TILE};
 use crate::input::{Button, Buttons};
+use crate::tuning::Tuning;
 
 /// Horizontal acceleration while a direction is held.
 pub const WALK_ACCEL: i32 = 24;
@@ -31,41 +32,41 @@ pub const JUMP_CUT: i32 = 200;
 pub const STOMP_BOUNCE: i32 = 500;
 
 /// Update horizontal velocity and facing from the held buttons, without moving.
-fn walk_velocity(mario: &mut Mario, buttons: Buttons) {
+fn walk_velocity(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
     let left = buttons.is_held(Button::Left);
     let right = buttons.is_held(Button::Right);
 
     match (left, right) {
-        (true, false) => mario.vx -= WALK_ACCEL,
-        (false, true) => mario.vx += WALK_ACCEL,
-        _ => mario.vx = coast_to_zero(mario.vx, FRICTION),
+        (true, false) => mario.vx -= t.walk_accel,
+        (false, true) => mario.vx += t.walk_accel,
+        _ => mario.vx = coast_to_zero(mario.vx, t.friction),
     }
 
-    mario.vx = mario.vx.clamp(-MAX_WALK_SPEED, MAX_WALK_SPEED);
+    mario.vx = mario.vx.clamp(-t.max_walk_speed, t.max_walk_speed);
     mario.face_from_input(buttons);
 }
 
 /// Advance Mario's horizontal movement by one frame from the held buttons,
 /// ignoring the world. Used where there is no level yet.
-pub fn step_walk(mario: &mut Mario, buttons: Buttons) {
-    walk_velocity(mario, buttons);
+pub fn step_walk(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
+    walk_velocity(mario, buttons, t);
     mario.x += mario.vx;
 }
 
 /// Advance Mario one frame against the level: walk sideways, fall under gravity,
 /// and resolve collisions with solid tiles. Sets `on_ground` when standing on a
 /// solid.
-pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids) {
-    walk_velocity(mario, buttons);
+pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids, t: &Tuning) {
+    walk_velocity(mario, buttons, t);
     mario.x += mario.vx;
     resolve_horizontal(mario, solids);
 
-    apply_jump(mario, buttons);
+    apply_jump(mario, buttons, t);
 
     // Gravity only builds up while airborne. Resting on a solid keeps vy at 0,
     // so Mario sits still instead of nudging into the floor every frame.
     if !mario.on_ground {
-        mario.vy = (mario.vy + GRAVITY).min(MAX_FALL_SPEED);
+        mario.vy = (mario.vy + t.gravity).min(t.max_fall_speed);
     }
     mario.y += mario.vy;
     resolve_vertical(mario, solids);
@@ -79,18 +80,18 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids) {
 /// Start a jump on the frame the jump button is pressed while grounded. Holding
 /// the button does not re-jump (a latch guards that). Releasing early while
 /// still rising cuts the jump short, which gives variable jump height.
-fn apply_jump(mario: &mut Mario, buttons: Buttons) {
+fn apply_jump(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
     let jump = buttons.is_held(Button::A);
 
     if mario.on_ground && jump && !mario.jump_latched {
-        mario.vy = -JUMP_VELOCITY;
+        mario.vy = -t.jump_velocity;
         mario.on_ground = false;
         mario.jump_latched = true;
     }
     if !jump {
         mario.jump_latched = false;
-        if mario.vy < -JUMP_CUT {
-            mario.vy = -JUMP_CUT;
+        if mario.vy < -t.jump_cut {
+            mario.vy = -t.jump_cut;
         }
     }
 }
@@ -163,7 +164,7 @@ mod tests {
     fn holding_right_builds_speed_and_moves_right() {
         let mut m = Mario::new(50, 100);
         let start = m.x;
-        step_walk(&mut m, held(Button::Right));
+        step_walk(&mut m, held(Button::Right), &Tuning::default());
         assert_eq!(m.vx, WALK_ACCEL);
         assert!(m.x > start);
         assert_eq!(m.facing, Facing::Right);
@@ -173,7 +174,7 @@ mod tests {
     fn speed_is_capped_at_max_walk() {
         let mut m = Mario::new(0, 0);
         for _ in 0..1000 {
-            step_walk(&mut m, held(Button::Right));
+            step_walk(&mut m, held(Button::Right), &Tuning::default());
         }
         assert_eq!(m.vx, MAX_WALK_SPEED);
     }
@@ -182,11 +183,11 @@ mod tests {
     fn releasing_coasts_to_a_stop() {
         let mut m = Mario::new(0, 0);
         for _ in 0..20 {
-            step_walk(&mut m, held(Button::Right));
+            step_walk(&mut m, held(Button::Right), &Tuning::default());
         }
         assert!(m.vx > 0);
         for _ in 0..1000 {
-            step_walk(&mut m, Buttons::default());
+            step_walk(&mut m, Buttons::default(), &Tuning::default());
         }
         assert_eq!(m.vx, 0);
     }
@@ -195,7 +196,7 @@ mod tests {
     fn friction_does_not_overshoot_past_zero() {
         let mut m = Mario::new(0, 0);
         m.vx = FRICTION / 2; // less than one friction step
-        step_walk(&mut m, Buttons::default());
+        step_walk(&mut m, Buttons::default(), &Tuning::default());
         assert_eq!(m.vx, 0);
     }
 
@@ -206,7 +207,7 @@ mod tests {
         let mut both = Buttons::default();
         both.set(Button::Left, true);
         both.set(Button::Right, true);
-        step_walk(&mut m, both);
+        step_walk(&mut m, both, &Tuning::default());
         assert_eq!(m.vx, 100 - FRICTION);
     }
 
@@ -216,8 +217,8 @@ mod tests {
         let mut a = Mario::new(10, 10);
         let mut b = Mario::new(10, 10);
         for &button in &script {
-            step_walk(&mut a, held(button));
-            step_walk(&mut b, held(button));
+            step_walk(&mut a, held(button), &Tuning::default());
+            step_walk(&mut b, held(button), &Tuning::default());
         }
         assert_eq!(a, b);
     }
@@ -256,7 +257,7 @@ mod tests {
         let solids = floor_level();
         let mut m = Mario::new(8, 0); // small (8x8), above the floor
         for _ in 0..200 {
-            step_motion(&mut m, Buttons::default(), &solids);
+            step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
         }
         // Floor top is y=24, Mario is 8 tall, so he rests at y=16.
         assert_eq!(m.pixel_y(), 16);
@@ -275,13 +276,13 @@ mod tests {
         ]);
         let mut m = Mario::new(8, 16); // on the floor, left of the wall
         for _ in 0..200 {
-            step_motion(&mut m, held(Button::Right), &solids);
+            step_motion(&mut m, held(Button::Right), &solids, &Tuning::default());
         }
         // Wall's left edge is x=56, Mario is 8 wide, so he stops at x=48 and
         // cannot pass it no matter how long he pushes.
         assert_eq!(m.pixel_x(), 48);
         for _ in 0..10 {
-            step_motion(&mut m, held(Button::Right), &solids);
+            step_motion(&mut m, held(Button::Right), &solids, &Tuning::default());
             assert_eq!(m.pixel_x(), 48);
         }
     }
@@ -290,7 +291,7 @@ mod tests {
     fn not_grounded_while_in_the_air() {
         let solids = floor_level();
         let mut m = Mario::new(8, 0);
-        step_motion(&mut m, Buttons::default(), &solids);
+        step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
         assert!(!m.on_ground);
     }
 
@@ -299,7 +300,7 @@ mod tests {
         let solids = floor_level();
         let mut m = Mario::new(8, 0);
         for _ in 0..200 {
-            step_motion(&mut m, Buttons::default(), &solids);
+            step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
         }
         assert!(m.on_ground);
         (m, solids)
@@ -309,12 +310,12 @@ mod tests {
     fn pressing_jump_from_the_ground_launches_up() {
         let (mut m, solids) = resting_on_floor();
         let top = m.pixel_y();
-        step_motion(&mut m, held(Button::A), &solids);
+        step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
         assert!(m.vy < 0, "should be moving up");
         assert!(!m.on_ground);
         // A few frames in, he is above where he started.
         for _ in 0..5 {
-            step_motion(&mut m, held(Button::A), &solids);
+            step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
         }
         assert!(m.pixel_y() < top);
     }
@@ -322,10 +323,10 @@ mod tests {
     #[test]
     fn cannot_jump_again_while_airborne() {
         let (mut m, solids) = resting_on_floor();
-        step_motion(&mut m, held(Button::A), &solids);
+        step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
         let vy_after_first = m.vy;
         // Still holding A in the air must not relaunch.
-        step_motion(&mut m, held(Button::A), &solids);
+        step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
         assert!(m.vy > vy_after_first, "gravity should reduce upward speed, not reset it");
     }
 
@@ -333,10 +334,10 @@ mod tests {
     fn holding_jump_goes_higher_than_tapping() {
         // Tapped jump: pressed one frame, released after.
         let (mut tap, solids) = resting_on_floor();
-        step_motion(&mut tap, held(Button::A), &solids);
+        step_motion(&mut tap, held(Button::A), &solids, &Tuning::default());
         let mut tap_apex = tap.pixel_y();
         for _ in 0..40 {
-            step_motion(&mut tap, Buttons::default(), &solids);
+            step_motion(&mut tap, Buttons::default(), &solids, &Tuning::default());
             tap_apex = tap_apex.min(tap.pixel_y());
         }
 
@@ -344,7 +345,7 @@ mod tests {
         let (mut hold, solids) = resting_on_floor();
         let mut hold_apex = hold.pixel_y();
         for _ in 0..40 {
-            step_motion(&mut hold, held(Button::A), &solids);
+            step_motion(&mut hold, held(Button::A), &solids, &Tuning::default());
             hold_apex = hold_apex.min(hold.pixel_y());
         }
 
@@ -362,7 +363,7 @@ mod tests {
         ]);
         let mut m = Mario::new(8, 8); // top just below the ceiling
         m.vy = -pixels(1); // launched straight up
-        step_motion(&mut m, Buttons::default(), &solids);
+        step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
         // He cannot enter the ceiling: top is pushed back to y=8, vy cleared.
         assert_eq!(m.pixel_y(), 8);
         assert_eq!(m.vy, 0);

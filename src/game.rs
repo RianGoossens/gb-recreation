@@ -643,6 +643,38 @@ mod tests {
     }
 
     #[test]
+    fn power_state_machine_grows_then_shrinks() {
+        use crate::core::entity::Power;
+        use crate::core::level::Level;
+        use crate::core::powerup::Mushroom;
+
+        let level = Level::from_rows(&["M..G", "####"]);
+        let mut game = Game::new(level);
+
+        // Small -> Big by picking up a mushroom dropped on Mario.
+        game.mushrooms
+            .push(Mushroom::new(game.level.spawn.0, game.level.spawn.1, false));
+        for _ in 0..10 {
+            game.step(Buttons::default());
+            if game.mario.power == Power::Big {
+                break;
+            }
+        }
+        assert_eq!(game.mario.power, Power::Big);
+
+        // Big -> Small by walking into the goomba, without dying.
+        for _ in 0..200 {
+            game.step(held(Button::Right));
+            if game.mario.power == Power::Small {
+                break;
+            }
+        }
+        assert_eq!(game.mario.power, Power::Small);
+        assert!(game.mario.alive);
+        assert_eq!(game.deaths, 0, "shrinking is not dying");
+    }
+
+    #[test]
     fn big_mario_shrinks_instead_of_dying_on_a_hit() {
         use crate::core::entity::{pixels, Power};
         use crate::core::level::Level;

@@ -178,6 +178,8 @@ impl Game {
                     'M'
                 } else if x == 16 && y == h - 3 {
                     'G'
+                } else if x == 4 && y == h - 3 {
+                    'C'
                 } else if x == 6 && y == h - 6 {
                     '?'
                 } else if x == 9 && y == h - 6 {
@@ -369,12 +371,17 @@ impl Game {
             }
         });
         if grew {
-            if self.mario.power == Power::Small {
-                self.mario.power = Power::Big;
-                // Grow upward so his feet stay put.
-                self.mario.y -= pixels(MUSHROOM_SIZE);
-            }
+            self.grow_mario();
             self.score += 1000;
+        }
+    }
+
+    /// Make small Mario big, lifting him so his feet stay on the ground. No
+    /// effect if he is already big. Public so tools can capture the big state.
+    pub fn grow_mario(&mut self) {
+        if self.mario.power == Power::Small {
+            self.mario.power = Power::Big;
+            self.mario.y -= pixels(MUSHROOM_SIZE);
         }
     }
 

@@ -201,7 +201,10 @@ fn play(args: &[String]) -> ExitCode {
         }
     };
 
+    // "big" is not a button: it starts Mario in his big state, so any size can
+    // be captured headlessly.
     let mut buttons = Buttons::default();
+    let mut start_big = false;
     for name in keys.split('+').filter(|s| !s.is_empty()) {
         let button = match name.to_lowercase().as_str() {
             "left" => Button::Left,
@@ -212,6 +215,10 @@ fn play(args: &[String]) -> ExitCode {
             "b" => Button::B,
             "start" => Button::Start,
             "select" => Button::Select,
+            "big" => {
+                start_big = true;
+                continue;
+            }
             other => {
                 eprintln!("unknown key: {other}");
                 return ExitCode::FAILURE;
@@ -221,6 +228,9 @@ fn play(args: &[String]) -> ExitCode {
     }
 
     let mut game = Game::new(Game::demo_level());
+    if start_big {
+        game.grow_mario();
+    }
     for _ in 0..frames {
         game.step(buttons);
     }

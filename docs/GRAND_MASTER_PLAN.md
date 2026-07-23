@@ -83,7 +83,7 @@ Goal: question blocks, coins, the power-up flow, score and coin counters.
 - [x] HUD: score, coins, lives, timer
 - [x] Timer countdown and time-out death
 - [x] Tests: block bumping, coin counting, power-up state machine (bump gives coin; coin count + 100-coin life + score; power state grow/shrink/die)
-- [ ] Blog post: blocks, coins, and getting big
+- [~] Blog post: blocks, coins, and getting big
 
 ## Milestone 5: Level completion and flow
 

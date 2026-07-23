@@ -10,6 +10,9 @@ use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub struct Camera {
     pub x: i32,
     pub y: i32,
+    /// The furthest right the view has scrolled. Horizontal scrolling is one
+    /// way, like the originals: the view never backs up, even if Mario does.
+    frontier: i32,
 }
 
 impl Camera {
@@ -18,10 +21,13 @@ impl Camera {
     }
 
     /// Center the view on a focus point, clamped so the view stays within a
-    /// level of the given pixel size. If the level is smaller than the screen on
-    /// an axis, that axis stays at 0.
+    /// level of the given pixel size. Horizontal scrolling only ever advances;
+    /// vertical follows freely. If the level is smaller than the screen on an
+    /// axis, that axis stays at 0.
     pub fn follow(&mut self, focus_x: i32, focus_y: i32, level_w: i32, level_h: i32) {
-        self.x = center_clamped(focus_x, SCREEN_WIDTH as i32, level_w);
+        let desired = center_clamped(focus_x, SCREEN_WIDTH as i32, level_w);
+        self.x = desired.max(self.frontier);
+        self.frontier = self.x;
         self.y = center_clamped(focus_y, SCREEN_HEIGHT as i32, level_h);
     }
 }
@@ -61,6 +67,17 @@ mod tests {
         cam.follow(1990, 1990, 2000, 2000);
         assert_eq!(cam.x, 2000 - W);
         assert_eq!(cam.y, 2000 - H);
+    }
+
+    #[test]
+    fn scrolling_is_one_way() {
+        let mut cam = Camera::new();
+        cam.follow(1000, 400, 4000, 2000); // scroll well to the right
+        let advanced = cam.x;
+        assert!(advanced > 0);
+        // Focus moves back left, but the view holds its ground.
+        cam.follow(200, 400, 4000, 2000);
+        assert_eq!(cam.x, advanced, "the camera should not scroll back left");
     }
 
     #[test]

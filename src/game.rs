@@ -483,6 +483,7 @@ impl Game {
         self.mario = Mario::new(self.level.spawn.0, self.level.spawn.1);
         self.enemies = spawn_enemies(&self.level);
         self.animator = Animator::new();
+        self.camera = Camera::new(); // the one-way view resets to the spawn
         self.timer = self.tuning.timer_start;
         self.timer_ticks = 0;
     }

@@ -21,7 +21,7 @@ fn main() -> ExitCode {
         Some("extract-tiles") => extract_tiles(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
-        Some("run") => run_game(),
+        Some("run") => run_game(&args[1..]),
         Some("play") => play(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}");
@@ -187,15 +187,22 @@ fn render_title(args: &[String]) -> ExitCode {
 /// are plus-separated: left,right,up,down,a,b,start,select (e.g. right+a). This
 /// is how gameplay gets inspected and captured without ever opening a window.
 fn play(args: &[String]) -> ExitCode {
+    use sml::core::level::Level;
     use sml::game::Game;
     use sml::input::{Button, Buttons};
 
-    let (out, frames, keys) = match args {
-        [out] => (out.as_str(), 1u32, ""),
-        [out, frames] => (out.as_str(), frames.parse().unwrap_or(1), ""),
-        [out, frames, keys] => (out.as_str(), frames.parse().unwrap_or(1), keys.as_str()),
+    let (out, frames, keys, level) = match args {
+        [out] => (out.as_str(), 1u32, "", None),
+        [out, frames] => (out.as_str(), frames.parse().unwrap_or(1), "", None),
+        [out, frames, keys] => (out.as_str(), frames.parse().unwrap_or(1), keys.as_str(), None),
+        [out, frames, keys, level] => (
+            out.as_str(),
+            frames.parse().unwrap_or(1),
+            keys.as_str(),
+            Some(level.as_str()),
+        ),
         _ => {
-            eprintln!("usage: sml play <out.png> [frames] [keys]");
+            eprintln!("usage: sml play <out.png> [frames] [keys] [level.txt]");
             eprintln!("  keys: plus-separated, e.g. right+a");
             return ExitCode::FAILURE;
         }
@@ -227,7 +234,17 @@ fn play(args: &[String]) -> ExitCode {
         buttons.set(button, true);
     }
 
-    let mut game = Game::new(Game::demo_level());
+    let level = match level {
+        Some(path) => match Level::from_file(path) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("could not load level {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+        },
+        None => Game::demo_level(),
+    };
+    let mut game = Game::new(level);
     if start_big {
         game.grow_mario();
     }
@@ -250,8 +267,9 @@ fn play(args: &[String]) -> ExitCode {
 /// Open a window and play a small test level: Mario on solid ground with a
 /// scrolling camera, driven by the keyboard. Only built with `--features gui`.
 #[cfg(feature = "gui")]
-fn run_game() -> ExitCode {
+fn run_game(args: &[String]) -> ExitCode {
     use minifb::{Key, Window, WindowOptions};
+    use sml::core::level::Level;
     use sml::input::mapping::{buttons_from_held, Key as GbKey};
     use sml::session::Session;
 
@@ -259,7 +277,17 @@ fn run_game() -> ExitCode {
 
     // The whole game lives in Session (headless and tested): title, play, and
     // the end screens. This is just a shell that feeds it keys and blits frames.
-    let mut session = Session::demo();
+    // An optional level file plays a custom level instead of the built-in demo.
+    let mut session = match args.first() {
+        Some(path) => match Level::from_file(path) {
+            Ok(level) => Session::new(vec![level]),
+            Err(e) => {
+                eprintln!("could not load level {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+        },
+        None => Session::demo(),
+    };
 
     let (win_w, win_h) = sml::frontend::scaled_size(SCALE);
     let mut window = match Window::new("Super Mario Land in Rust", win_w, win_h, WindowOptions::default()) {
@@ -293,9 +321,9 @@ fn run_game() -> ExitCode {
 }
 
 #[cfg(not(feature = "gui"))]
-fn run_game() -> ExitCode {
+fn run_game(_args: &[String]) -> ExitCode {
     eprintln!("this build has no window support.");
-    eprintln!("rebuild with the gui feature: cargo run --features gui -- run");
+    eprintln!("rebuild with the gui feature: cargo run --features gui -- run [level.txt]");
     ExitCode::FAILURE
 }
 
@@ -306,6 +334,6 @@ fn usage() {
     println!("  sml extract-tiles <offset> <count> <out>  decode ROM tiles to an asset file");
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
-    println!("  sml run                                   play in a window (needs --features gui)");
-    println!("  sml play <out.png> [frames] [keys]        run the game headlessly to a PNG");
+    println!("  sml run [level.txt]                       play in a window (needs --features gui)");
+    println!("  sml play <out.png> [frames] [keys] [lvl]  run the game headlessly to a PNG");
 }

@@ -195,6 +195,15 @@ mod tests {
     }
 
     #[test]
+    fn the_shipped_example_level_loads() {
+        // Guards the committed example file against typos or ragged rows.
+        let level = Level::from_file("levels/example.txt").expect("example level should load");
+        assert!(level.end.is_some(), "the example has an end trigger");
+        assert!(!level.enemy_spawns.is_empty(), "and some enemies");
+        assert!(!level.blocks.is_empty(), "and some blocks");
+    }
+
+    #[test]
     fn level_without_spawn_defaults_to_origin() {
         let level = Level::from_rows(&["....", "####"]);
         assert_eq!(level.spawn, (0, 0));

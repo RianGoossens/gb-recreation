@@ -34,6 +34,8 @@ pub struct Game {
     pub deaths: u32,
     /// Set once Mario reaches the level-end trigger. The scene freezes.
     pub completed: bool,
+    /// Set when the last life is spent. The scene freezes.
+    pub game_over: bool,
     /// Interactive blocks Mario can bump from below.
     pub blocks: Vec<Block>,
     /// Active mushroom power-ups.
@@ -159,6 +161,7 @@ impl Game {
             animator: Animator::new(),
             deaths: 0,
             completed: false,
+            game_over: false,
             bg_map: TileMap::new(w, h, cells),
             // Empty tiles render white, solid tiles dark, Mario a black block.
             bg_tiles: vec![solid_tile(0), solid_tile(2)],
@@ -221,8 +224,8 @@ impl Game {
 
     /// Advance one frame from the held buttons.
     pub fn step(&mut self, buttons: Buttons) {
-        // Once the level is complete, the scene freezes.
-        if self.completed {
+        // Once the level is complete or Mario is out of lives, the scene freezes.
+        if self.completed || self.game_over {
             return;
         }
         let rising = self.mario.vy < 0;
@@ -268,6 +271,11 @@ impl Game {
 
         if !self.mario.alive {
             self.deaths += 1;
+            self.lives = self.lives.saturating_sub(1);
+            if self.lives == 0 {
+                self.game_over = true;
+                return;
+            }
             self.respawn();
         }
     }
@@ -740,6 +748,30 @@ mod tests {
         assert!(shrank, "big Mario should shrink, not die");
         assert!(game.mario.alive);
         assert_eq!(game.deaths, 0);
+    }
+
+    #[test]
+    fn losing_all_lives_ends_the_game() {
+        use crate::core::level::Level;
+        // Mario walks straight into a goomba, dies, respawns, repeats.
+        let level = Level::from_rows(&["M.G", "###"]);
+        let mut game = Game::new(level);
+        let starting_lives = game.lives;
+
+        for _ in 0..2000 {
+            game.step(held(Button::Right));
+            if game.game_over {
+                break;
+            }
+        }
+        assert!(game.game_over, "running out of lives ends the game");
+        assert_eq!(game.lives, 0);
+        assert_eq!(game.deaths, starting_lives, "one death per life");
+
+        // The scene is frozen once it is over.
+        let before = game.mario.pixel_x();
+        game.step(held(Button::Right));
+        assert_eq!(game.mario.pixel_x(), before);
     }
 
     #[test]

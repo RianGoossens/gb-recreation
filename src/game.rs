@@ -69,6 +69,7 @@ pub struct Game {
     brick_tile: Tile,
     mushroom_tile: Tile,
     star_tile: Tile,
+    flower_tile: Tile,
     end_tile: Tile,
     palette: Palette,
 }
@@ -84,6 +85,18 @@ fn star_tile() -> Tile {
     Tile { pixels }
 }
 
+/// A dark block with a light cross: a flower.
+fn flower_tile() -> Tile {
+    let mut pixels = [[2u8; 8]; 8];
+    pixels[3] = [0; 8];
+    pixels[4] = [0; 8];
+    for row in pixels.iter_mut() {
+        row[3] = 0;
+        row[4] = 0;
+    }
+    Tile { pixels }
+}
+
 fn spawn_items(level: &Level) -> Vec<Item> {
     level
         .items
@@ -91,6 +104,7 @@ fn spawn_items(level: &Level) -> Vec<Item> {
         .map(|&(x, y, kind)| match kind {
             ItemKind::Mushroom => Item::mushroom(x, y, false),
             ItemKind::Star => Item::star(x, y, false),
+            ItemKind::Flower => Item::flower(x, y, false),
         })
         .collect()
 }
@@ -215,6 +229,7 @@ impl Game {
             brick_tile: brick_tile(),
             mushroom_tile: mushroom_tile(),
             star_tile: star_tile(),
+            flower_tile: flower_tile(),
             end_tile: end_tile(),
             palette: Palette::new(0xE4),
         }
@@ -385,7 +400,8 @@ impl Game {
         // A hit shrinks big Mario (with brief invulnerability) but kills small
         // Mario. Invulnerability frames ignore hits entirely.
         if hit && !stomped && self.mario.invuln == 0 {
-            if self.mario.power == Power::Big {
+            if self.mario.power != Power::Small {
+                // Big or Fire Mario shrinks back to small instead of dying.
                 self.mario.power = Power::Small;
                 self.mario.y += pixels(ITEM_SIZE); // shrink, feet stay put
                 self.mario.invuln = 90;
@@ -405,8 +421,16 @@ impl Game {
         let mt = self.mario.pixel_y();
         let mr = ml + mw - 1;
 
+        // A power block gives a mushroom to small Mario, a flower otherwise, the
+        // way the original decides an item by Mario's current size.
+        let power_item = if self.mario.power == Power::Small {
+            ItemKind::Mushroom
+        } else {
+            ItemKind::Flower
+        };
+
         let mut got_coin = false;
-        let mut mushroom_at: Option<(i32, i32)> = None;
+        let mut item_at: Option<(i32, i32)> = None;
         for block in &mut self.blocks {
             if block.used {
                 continue;
@@ -424,8 +448,8 @@ impl Game {
                 }
                 BlockKind::PowerUp => {
                     block.used = true;
-                    // The mushroom emerges from the top of the block.
-                    mushroom_at = Some((block.x, block.y - TILE));
+                    // The item emerges from the top of the block.
+                    item_at = Some((block.x, block.y - TILE));
                 }
                 BlockKind::Brick => {}
             }
@@ -434,8 +458,12 @@ impl Game {
         if got_coin {
             self.gain_coin();
         }
-        if let Some((x, y)) = mushroom_at {
-            self.items.push(Item::mushroom(x, y, false));
+        if let Some((x, y)) = item_at {
+            let item = match power_item {
+                ItemKind::Flower => Item::flower(x, y, false),
+                _ => Item::mushroom(x, y, false),
+            };
+            self.items.push(item);
         }
     }
 
@@ -485,6 +513,11 @@ impl Game {
             match kind {
                 ItemKind::Mushroom => self.grow_mario(),
                 ItemKind::Star => self.mario.invincible = STAR_DURATION,
+                ItemKind::Flower => {
+                    // A flower makes Mario fire-powered, growing him if small.
+                    self.grow_mario();
+                    self.mario.power = Power::Fire;
+                }
             }
             self.score += 1000;
             self.sounds.push(SoundEvent::PowerUp);
@@ -561,6 +594,7 @@ impl Game {
             let tile = match item.kind {
                 ItemKind::Mushroom => &self.mushroom_tile,
                 ItemKind::Star => &self.star_tile,
+                ItemKind::Flower => &self.flower_tile,
             };
             fb.draw_tile(
                 tile,
@@ -834,6 +868,46 @@ mod tests {
             }
         }
         assert!(game.enemies.is_empty(), "the star defeats the enemy on contact");
+        assert!(game.mario.alive);
+        assert_eq!(game.deaths, 0);
+    }
+
+    #[test]
+    fn a_flower_makes_mario_fire_powered() {
+        use crate::core::entity::Power;
+        use crate::core::level::Level;
+        use crate::core::powerup::Item;
+
+        let level = Level::from_rows(&["M...", "####"]);
+        let mut game = Game::new(level);
+        game.items
+            .push(Item::flower(game.level.spawn.0, game.level.spawn.1, false));
+        for _ in 0..10 {
+            game.step(Buttons::default());
+            if game.mario.power == Power::Fire {
+                break;
+            }
+        }
+        assert_eq!(game.mario.power, Power::Fire);
+    }
+
+    #[test]
+    fn a_hit_shrinks_fire_mario_back_to_small() {
+        use crate::core::entity::{pixels, Power};
+        use crate::core::level::Level;
+
+        let level = Level::from_rows(&["M..G", "####"]);
+        let mut game = Game::new(level);
+        game.mario.power = Power::Fire;
+        game.mario.y -= pixels(8); // stand properly as the taller sprite
+
+        for _ in 0..200 {
+            game.step(held(Button::Right));
+            if game.mario.power == Power::Small {
+                break;
+            }
+        }
+        assert_eq!(game.mario.power, Power::Small);
         assert!(game.mario.alive);
         assert_eq!(game.deaths, 0);
     }

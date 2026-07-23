@@ -18,6 +18,8 @@ pub const ITEM_SPEED: i32 = 96;
 pub enum ItemKind {
     Mushroom,
     Star,
+    /// A flower: makes Mario fire-powered (able to throw superballs).
+    Flower,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +51,10 @@ impl Item {
 
     pub fn star(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
         Self::new(pixel_x, pixel_y, going_left, ItemKind::Star)
+    }
+
+    pub fn flower(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        Self::new(pixel_x, pixel_y, going_left, ItemKind::Flower)
     }
 
     pub fn pixel_x(&self) -> i32 {

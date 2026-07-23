@@ -16,6 +16,7 @@ code with `Level::from_file` / `Level::from_text`.
 | `F` | a Fly enemy (walks and hops) |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility) |
+| `W` | a flower (makes Mario fire-powered) |
 | `?` | question block, gives a coin when bumped (solid) |
 | `P` | power block, gives a mushroom when bumped (solid) |
 | `B` | brick block (solid) |

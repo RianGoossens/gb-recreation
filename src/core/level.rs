@@ -121,6 +121,7 @@ impl Level {
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),
                     'B' => blocks.push((px, py, BlockKind::Brick)),
                     'S' => items.push((px, py, ItemKind::Star)),
+                    'W' => items.push((px, py, ItemKind::Flower)),
                     'E' => end = Some((px, py)),
                     _ => {}
                 }

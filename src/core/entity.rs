@@ -20,11 +20,14 @@ pub enum Facing {
     Right,
 }
 
-/// Mario's power level. Drives his height and what a hit does.
+/// Mario's power level. Drives his height, what a hit does, and whether he can
+/// throw a superball.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Power {
     Small,
     Big,
+    /// Big and able to throw superballs (from a flower).
+    Fire,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,7 +87,7 @@ impl Mario {
     pub fn size(&self) -> (i32, i32) {
         match self.power {
             Power::Small => (8, 8),
-            Power::Big => (8, 16),
+            Power::Big | Power::Fire => (8, 16),
         }
     }
 

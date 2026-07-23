@@ -1,5 +1,11 @@
 [
   {
+    "title": "Build your own level",
+    "date": "2026-07-23",
+    "slug": "2026-07-23-build-your-own-level",
+    "summary": "Levels are plain text and the movement is a handful of tunable numbers, both editable without touching Rust. If you can type, you can make a level."
+  },
+  {
     "title": "Closing the loop",
     "date": "2026-07-23",
     "slug": "2026-07-23-closing-the-loop",

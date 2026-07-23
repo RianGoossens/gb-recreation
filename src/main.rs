@@ -252,14 +252,14 @@ fn play(args: &[String]) -> ExitCode {
 #[cfg(feature = "gui")]
 fn run_game() -> ExitCode {
     use minifb::{Key, Window, WindowOptions};
-    use sml::game::Game;
     use sml::input::mapping::{buttons_from_held, Key as GbKey};
+    use sml::session::Session;
 
     const SCALE: usize = 4;
 
-    // The whole game lives in Game (headless and tested). This is just a shell
-    // that feeds it keys and blits its frames.
-    let mut game = Game::new(Game::demo_level());
+    // The whole game lives in Session (headless and tested): title, play, and
+    // the end screens. This is just a shell that feeds it keys and blits frames.
+    let mut session = Session::demo();
 
     let (win_w, win_h) = sml::frontend::scaled_size(SCALE);
     let mut window = match Window::new("Super Mario Land in Rust", win_w, win_h, WindowOptions::default()) {
@@ -281,9 +281,9 @@ fn run_game() -> ExitCode {
         if window.is_key_down(Key::X) { held.push(GbKey::X); }
         if window.is_key_down(Key::Enter) { held.push(GbKey::Enter); }
 
-        game.step(buttons_from_held(held));
+        session.step(buttons_from_held(held));
 
-        let argb = sml::frontend::to_argb(&game.render(), SCALE);
+        let argb = sml::frontend::to_argb(&session.render(), SCALE);
         if let Err(e) = window.update_with_buffer(&argb, win_w, win_h) {
             eprintln!("window update failed: {e}");
             return ExitCode::FAILURE;

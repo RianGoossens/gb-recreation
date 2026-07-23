@@ -92,7 +92,7 @@ Goal: reach the end of 1-1, complete it, advance. The core loop is playable end 
 - [x] Level-end trigger and completion sequence
 - [x] Level-to-level transition and world map or direct advance (per original)
 - [x] Lives and game-over flow
-- [ ] Title -> play -> die/complete -> title loop closed
+- [x] Title -> play -> die/complete -> title loop closed
 - [ ] Tests: completion trigger, game-over transition
 - [ ] Blog post: closing the loop, a playable slice
 

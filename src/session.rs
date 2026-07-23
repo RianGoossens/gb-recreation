@@ -7,11 +7,12 @@
 
 use crate::core::level::Level;
 use crate::game::Game;
-use crate::input::Buttons;
+use crate::input::{Button, Buttons};
 use crate::render::Framebuffer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
+    Title,
     Playing,
     GameOver,
     Win,
@@ -22,10 +23,12 @@ pub struct Session {
     current: usize,
     pub game: Game,
     pub phase: Phase,
+    /// Tracks the Start button so a held press does not skip through screens.
+    start_latched: bool,
 }
 
 impl Session {
-    /// Start a session on the first of `levels`. There must be at least one.
+    /// Start a session at the title screen. There must be at least one level.
     pub fn new(levels: Vec<Level>) -> Self {
         assert!(!levels.is_empty(), "a session needs at least one level");
         let game = Game::new(levels[0].clone());
@@ -33,8 +36,14 @@ impl Session {
             levels,
             current: 0,
             game,
-            phase: Phase::Playing,
+            phase: Phase::Title,
+            start_latched: false,
         }
+    }
+
+    /// A session over the built-in demo level, for the window frontend.
+    pub fn demo() -> Self {
+        Self::new(vec![Game::demo_level()])
     }
 
     /// Which level index is being played (0-based).
@@ -42,19 +51,47 @@ impl Session {
         self.current
     }
 
-    /// Advance one frame. While playing, step the level and react to it ending:
-    /// completing advances (or wins on the last level), running out of lives
-    /// ends the run. Other phases hold until the flow wiring moves them.
+    /// Advance one frame. Start moves off the title and the end screens; while
+    /// playing, the level steps and reacts to completing or running out of lives.
     pub fn step(&mut self, buttons: Buttons) {
-        if self.phase != Phase::Playing {
-            return;
+        let start = buttons.is_held(Button::Start);
+        let start_pressed = start && !self.start_latched;
+        self.start_latched = start;
+
+        match self.phase {
+            Phase::Title => {
+                if start_pressed {
+                    self.begin();
+                }
+            }
+            Phase::Playing => {
+                self.game.step(buttons);
+                if self.game.completed {
+                    self.advance();
+                } else if self.game.game_over {
+                    self.phase = Phase::GameOver;
+                }
+            }
+            Phase::GameOver | Phase::Win => {
+                if start_pressed {
+                    self.return_to_title();
+                }
+            }
         }
-        self.game.step(buttons);
-        if self.game.completed {
-            self.advance();
-        } else if self.game.game_over {
-            self.phase = Phase::GameOver;
-        }
+    }
+
+    /// Begin a fresh run from the first level.
+    fn begin(&mut self) {
+        self.current = 0;
+        self.game = Game::new(self.levels[0].clone());
+        self.phase = Phase::Playing;
+    }
+
+    /// Return to the title screen with a fresh first level behind it.
+    fn return_to_title(&mut self) {
+        self.current = 0;
+        self.game = Game::new(self.levels[0].clone());
+        self.phase = Phase::Title;
     }
 
     fn advance(&mut self) {
@@ -95,10 +132,24 @@ mod tests {
         Level::from_rows(&["M.E", "###"])
     }
 
+    /// Press Start once (edge) to leave the title screen.
+    fn press_start(session: &mut Session) {
+        session.step(held(Button::Start));
+        session.step(Buttons::default());
+    }
+
+    #[test]
+    fn a_session_starts_on_the_title_and_start_begins_play() {
+        let mut session = Session::new(vec![short_level()]);
+        assert_eq!(session.phase, Phase::Title);
+        press_start(&mut session);
+        assert_eq!(session.phase, Phase::Playing);
+    }
+
     #[test]
     fn completing_the_last_level_wins() {
         let mut session = Session::new(vec![short_level(), short_level()]);
-        assert_eq!(session.phase, Phase::Playing);
+        press_start(&mut session);
         assert_eq!(session.current_level(), 0);
 
         for _ in 0..400 {
@@ -114,11 +165,11 @@ mod tests {
     #[test]
     fn advancing_carries_score_and_lives_forward() {
         let mut session = Session::new(vec![short_level(), short_level()]);
+        press_start(&mut session);
         // Bank some progress on level one before it is completed.
         session.game.score = 500;
         session.game.lives = 5;
 
-        // Finish level one to trigger the transition.
         for _ in 0..400 {
             session.step(held(Button::Right));
             if session.current_level() == 1 {
@@ -131,10 +182,12 @@ mod tests {
     }
 
     #[test]
-    fn running_out_of_lives_reaches_game_over() {
+    fn running_out_of_lives_reaches_game_over_then_start_returns_to_title() {
         // A level with a goomba and no reachable end: Mario keeps dying.
         let level = Level::from_rows(&["M.G", "###"]);
         let mut session = Session::new(vec![level]);
+        press_start(&mut session);
+
         for _ in 0..3000 {
             session.step(held(Button::Right));
             if session.phase == Phase::GameOver {
@@ -142,5 +195,25 @@ mod tests {
             }
         }
         assert_eq!(session.phase, Phase::GameOver);
+
+        // Start from game over goes back to the title, ready for another run.
+        press_start(&mut session);
+        assert_eq!(session.phase, Phase::Title);
+        assert_eq!(session.game.lives, 3, "a fresh run has full lives");
+    }
+
+    #[test]
+    fn winning_then_start_returns_to_title() {
+        let mut session = Session::new(vec![short_level()]);
+        press_start(&mut session);
+        for _ in 0..400 {
+            session.step(held(Button::Right));
+            if session.phase == Phase::Win {
+                break;
+            }
+        }
+        assert_eq!(session.phase, Phase::Win);
+        press_start(&mut session);
+        assert_eq!(session.phase, Phase::Title);
     }
 }

@@ -94,7 +94,7 @@ Goal: reach the end of 1-1, complete it, advance. The core loop is playable end 
 - [x] Lives and game-over flow
 - [x] Title -> play -> die/complete -> title loop closed
 - [x] Tests: completion trigger, game-over transition (game: end-completes-and-freezes, lives-out-ends; session: win, advance, game-over, title-return)
-- [ ] Blog post: closing the loop, a playable slice
+- [~] Blog post: closing the loop, a playable slice
 
 ## Milestone 6: Breadth (more levels and enemies)
 

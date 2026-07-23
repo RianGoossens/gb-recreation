@@ -65,7 +65,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 
 Goal: full solid-world collision, a Goomba-equivalent enemy that walks and can be stomped, Mario can die.
 
-- [ ] Full tile collision (walls, floors, ceilings, slopes if present)
+- [x] Full tile collision (walls, floors, ceilings; one-tile pits). SML tile levels have no slopes, so none are modeled.
 - [x] Enemy framework (spawn, update, despawn offscreen)
 - [x] The 1-1 first enemy (Goomba equivalent): walk, turn at edges/walls
 - [x] Stomp interaction: kill enemy, bounce Mario

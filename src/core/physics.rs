@@ -353,6 +353,26 @@ mod tests {
     }
 
     #[test]
+    fn mario_settles_into_a_one_tile_wide_pit() {
+        // Walls on columns 2 and 4 make a one-tile-wide slot at column 3, with a
+        // floor underneath. Mario dropped in should rest on the floor.
+        let solids = Solids::from_rows(&[
+            "..#.#...",
+            "..#.#...",
+            "..#.#...",
+            "########",
+        ]);
+        let mut m = Mario::new(24, 0); // column 3, in the slot
+        for _ in 0..200 {
+            step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
+        }
+        // Pit floor top is row 3 (y=24); small Mario rests at y=16.
+        assert_eq!(m.pixel_x(), 24);
+        assert_eq!(m.pixel_y(), 16);
+        assert!(m.on_ground);
+    }
+
+    #[test]
     fn ceiling_stops_upward_motion() {
         // Solid ceiling on the top row (pixels y 0..7).
         let solids = Solids::from_rows(&[

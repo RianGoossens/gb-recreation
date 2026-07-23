@@ -1,5 +1,11 @@
 [
   {
+    "title": "The physics of walking",
+    "date": "2026-07-23",
+    "slug": "2026-07-23-physics-of-walking",
+    "summary": "Acceleration, friction, and a top speed give the walk its feel, subpixels make slow movement believable, and gravity is the same idea pointed down. All deterministic, all tested headlessly."
+  },
+  {
     "title": "Build your own level",
     "date": "2026-07-23",
     "slug": "2026-07-23-build-your-own-level",

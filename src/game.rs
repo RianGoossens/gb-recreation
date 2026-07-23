@@ -226,6 +226,11 @@ impl Game {
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
         despawn_offscreen(&mut self.enemies, self.camera.x);
 
+        // Running out of time is fatal.
+        if self.timer == 0 {
+            self.mario.alive = false;
+        }
+
         if !self.mario.alive {
             self.deaths += 1;
             self.respawn();
@@ -398,6 +403,8 @@ impl Game {
         self.mario = Mario::new(self.level.spawn.0, self.level.spawn.1);
         self.enemies = spawn_enemies(&self.level);
         self.animator = Animator::new();
+        self.timer = 400;
+        self.timer_ticks = 0;
     }
 
     /// Render the current frame.
@@ -658,6 +665,27 @@ mod tests {
         assert!(shrank, "big Mario should shrink, not die");
         assert!(game.mario.alive);
         assert_eq!(game.deaths, 0);
+    }
+
+    #[test]
+    fn running_out_of_time_kills_and_respawns() {
+        use crate::core::level::Level;
+        // A calm level with nothing to bump into.
+        let level = Level::from_rows(&["M...", "####"]);
+        let mut game = Game::new(level);
+        game.timer = 1; // about to run out
+
+        let mut died_to_time = false;
+        for _ in 0..60 {
+            game.step(Buttons::default());
+            if game.deaths > 0 {
+                died_to_time = true;
+                break;
+            }
+        }
+        assert!(died_to_time, "the clock hitting zero should kill Mario");
+        assert!(game.mario.alive, "and then respawn him");
+        assert_eq!(game.timer, 400, "the timer resets on respawn");
     }
 
     #[test]

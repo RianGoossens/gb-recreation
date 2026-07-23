@@ -81,7 +81,7 @@ Goal: question blocks, coins, the power-up flow, score and coin counters.
 - [x] Coins: collect, counter, 100-coin life
 - [x] Power-up (mushroom equivalent): spawn, movement, pickup, size/state change
 - [x] HUD: score, coins, lives, timer
-- [ ] Timer countdown and time-out death
+- [x] Timer countdown and time-out death
 - [ ] Tests: block bumping, coin counting, power-up state machine
 - [ ] Blog post: blocks, coins, and getting big
 

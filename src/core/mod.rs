@@ -16,6 +16,7 @@ pub mod entity;
 pub mod level;
 pub mod physics;
 pub mod powerup;
+pub mod superball;
 
 use crate::input::Buttons;
 

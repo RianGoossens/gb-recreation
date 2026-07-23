@@ -14,8 +14,9 @@ use crate::core::entity::{pixels, Mario, Power};
 use crate::core::level::{Level, TILE};
 use crate::core::physics::step_motion;
 use crate::core::powerup::{update_item, Item, ItemKind, ITEM_SIZE};
+use crate::core::superball::{update_superball, Superball};
 use crate::tuning::Tuning;
-use crate::input::Buttons;
+use crate::input::{Button, Buttons};
 use crate::render::{render_background, Framebuffer, Palette, TileMap};
 use crate::sound::SoundEvent;
 use crate::tiles::Tile;
@@ -43,8 +44,12 @@ pub struct Game {
     pub game_over: bool,
     /// Interactive blocks Mario can bump from below.
     pub blocks: Vec<Block>,
-    /// Active power-up items (mushrooms, stars).
+    /// Active power-up items (mushrooms, stars, flowers).
     pub items: Vec<Item>,
+    /// Superballs currently in flight.
+    pub superballs: Vec<Superball>,
+    /// Tracks the throw button so a held press throws only once.
+    throw_latched: bool,
     /// Uncollected coins, top-left pixel.
     pub coins: Vec<(i32, i32)>,
     /// Coins collected (wraps every 100, which grants a life).
@@ -70,8 +75,20 @@ pub struct Game {
     mushroom_tile: Tile,
     star_tile: Tile,
     flower_tile: Tile,
+    superball_tile: Tile,
     end_tile: Tile,
     palette: Palette,
+}
+
+/// A small black dot: a superball.
+fn superball_tile() -> Tile {
+    let mut pixels = [[0u8; 8]; 8];
+    for row in pixels.iter_mut().take(5).skip(1) {
+        for cell in row.iter_mut().take(5).skip(1) {
+            *cell = 3;
+        }
+    }
+    Tile { pixels }
 }
 
 /// A light block with a dark center: a star.
@@ -203,6 +220,8 @@ impl Game {
             enemies,
             blocks,
             items,
+            superballs: Vec::new(),
+            throw_latched: false,
             coins,
             coins_collected: 0,
             lives: 3,
@@ -230,6 +249,7 @@ impl Game {
             mushroom_tile: mushroom_tile(),
             star_tile: star_tile(),
             flower_tile: flower_tile(),
+            superball_tile: superball_tile(),
             end_tile: end_tile(),
             palette: Palette::new(0xE4),
         }
@@ -299,6 +319,7 @@ impl Game {
         if rising {
             self.bump_blocks();
         }
+        self.handle_throw(buttons);
         self.animator.update(&self.mario);
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
@@ -306,6 +327,7 @@ impl Game {
         for item in &mut self.items {
             update_item(item, &self.level.solids);
         }
+        self.update_superballs();
         if self.mario.invuln > 0 {
             self.mario.invuln -= 1;
         }
@@ -410,6 +432,53 @@ impl Game {
                 self.mario.alive = false;
             }
         }
+    }
+
+    /// Fire Mario throws a superball on a fresh press of B, up to two at a time.
+    fn handle_throw(&mut self, buttons: Buttons) {
+        use crate::core::entity::Facing;
+        let b = buttons.is_held(Button::B);
+        let pressed = b && !self.throw_latched;
+        self.throw_latched = b;
+        if pressed && self.mario.power == Power::Fire && self.superballs.len() < 2 {
+            let going_left = self.mario.facing == Facing::Left;
+            let ball = Superball::new(self.mario.pixel_x(), self.mario.pixel_y(), going_left);
+            self.superballs.push(ball);
+        }
+    }
+
+    /// Advance superballs, remove fizzled ones, and defeat any enemy a ball hits.
+    /// A ball that connects is spent.
+    fn update_superballs(&mut self) {
+        let solids = &self.level.solids;
+        self.superballs.retain_mut(|s| update_superball(s, solids));
+
+        let mut spent = vec![false; self.superballs.len()];
+        let mut hits = 0;
+        for (i, ball) in self.superballs.iter().enumerate() {
+            let (bl, bt, br, bb) = ball.edges();
+            for enemy in &mut self.enemies {
+                if !enemy.alive {
+                    continue;
+                }
+                let (el, et, er, eb) = enemy.edges();
+                if bl <= er && br >= el && bt <= eb && bb >= et {
+                    enemy.alive = false;
+                    spent[i] = true;
+                    hits += 1;
+                }
+            }
+        }
+        if hits > 0 {
+            self.score += 100 * hits;
+            self.sounds.push(SoundEvent::Stomp);
+        }
+        let mut i = 0;
+        self.superballs.retain(|_| {
+            let keep = !spent[i];
+            i += 1;
+            keep
+        });
     }
 
     /// Mario just moved up this frame. If his head is flush against an unused
@@ -600,6 +669,14 @@ impl Game {
                 tile,
                 item.pixel_x() - self.camera.x,
                 item.pixel_y() - self.camera.y,
+                &self.palette,
+            );
+        }
+        for ball in &self.superballs {
+            fb.draw_tile(
+                &self.superball_tile,
+                ball.pixel_x() - self.camera.x,
+                ball.pixel_y() - self.camera.y,
                 &self.palette,
             );
         }
@@ -870,6 +947,32 @@ mod tests {
         assert!(game.enemies.is_empty(), "the star defeats the enemy on contact");
         assert!(game.mario.alive);
         assert_eq!(game.deaths, 0);
+    }
+
+    #[test]
+    fn fire_mario_throws_a_superball_that_defeats_an_enemy() {
+        use crate::core::entity::{pixels, Power};
+        use crate::core::level::Level;
+
+        // Fire Mario facing a goomba a few tiles to his right.
+        let level = Level::from_rows(&["M....G", "######"]);
+        let mut game = Game::new(level);
+        game.mario.power = Power::Fire;
+        game.mario.y -= pixels(8);
+        game.mario.facing = crate::core::entity::Facing::Right;
+
+        // Throw (press B once).
+        game.step(held(Button::B));
+        assert!(!game.superballs.is_empty(), "pressing B throws a superball");
+
+        // Let the ball travel into the goomba.
+        for _ in 0..120 {
+            game.step(Buttons::default());
+            if game.enemies.is_empty() {
+                break;
+            }
+        }
+        assert!(game.enemies.is_empty(), "the superball should defeat the enemy");
     }
 
     #[test]

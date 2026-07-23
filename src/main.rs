@@ -212,6 +212,7 @@ fn play(args: &[String]) -> ExitCode {
     // be captured headlessly.
     let mut buttons = Buttons::default();
     let mut start_big = false;
+    let mut start_fire = false;
     for name in keys.split('+').filter(|s| !s.is_empty()) {
         let button = match name.to_lowercase().as_str() {
             "left" => Button::Left,
@@ -224,6 +225,10 @@ fn play(args: &[String]) -> ExitCode {
             "select" => Button::Select,
             "big" => {
                 start_big = true;
+                continue;
+            }
+            "fire" => {
+                start_fire = true;
                 continue;
             }
             other => {
@@ -245,8 +250,11 @@ fn play(args: &[String]) -> ExitCode {
         None => Game::demo_level(),
     };
     let mut game = Game::new(level);
-    if start_big {
+    if start_big || start_fire {
         game.grow_mario();
+    }
+    if start_fire {
+        game.mario.power = sml::core::entity::Power::Fire;
     }
     for _ in 0..frames {
         game.step(buttons);

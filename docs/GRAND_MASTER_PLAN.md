@@ -106,7 +106,7 @@ Goal: expand from a vertical slice to coverage of the original game.
 - [x] Sound and music model: event model implemented (Game emits SoundEvents; frontend drains them). Tone playback is a documented frontend follow-up.
 - [ ] Additional worlds, level by level
 - [ ] Bosses and special stages
-- [ ] Blog posts per major addition
+- [x] Blog posts per major addition (power-ups and polish post covers the star, superball, pause, one-way camera, sound; more per addition)
 
 ## Milestone 7: Moddability
 

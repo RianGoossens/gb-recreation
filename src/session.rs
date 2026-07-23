@@ -10,8 +10,10 @@ use crate::game::Game;
 use crate::input::{Button, Buttons};
 use crate::render::Framebuffer;
 
-/// Our own hand-made campaign levels, played in order. Each is a rectangle of
-/// the level-format markers (see docs/reference/level-format.md).
+/// Placeholder demo levels for exercising the multi-level flow until the
+/// cartridge's real levels are extracted. These are not end-goal content; the
+/// shipped game is meant to be the original's levels. Each is a rectangle of the
+/// level-format markers (see docs/reference/level-format.md).
 const CAMPAIGN: &[&str] = &[
     concat!(
         "....................\n",
@@ -73,7 +75,8 @@ impl Session {
         Self::new(vec![Game::demo_level()])
     }
 
-    /// A short campaign of our own hand-made levels, played back to back.
+    /// A short demo campaign (placeholder levels) for playing the multi-level
+    /// flow until the cartridge's real levels are extracted.
     pub fn campaign() -> Self {
         let levels = CAMPAIGN
             .iter()

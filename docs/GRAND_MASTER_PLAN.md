@@ -101,7 +101,7 @@ Goal: reach the end of 1-1, complete it, advance. The core loop is playable end 
 Goal: expand from a vertical slice to coverage of the original game.
 
 - [ ] Remaining World 1 levels (the original's real geometry; ROM/copyright gated)
-- [x] A playable campaign of our own hand-made levels (breadth without the copyrighted layouts)
+- [x] A temporary demo campaign to exercise the multi-level flow (placeholder only, until the cartridge's real levels are extracted; shipping our own invented levels is NOT a project goal)
 - [x] Remaining enemy types for World 1 (added a hopping Fly alongside the Goomba; more can follow)
 - [x] Sound and music model: event model implemented (Game emits SoundEvents; frontend drains them). Tone playback is a documented frontend follow-up.
 - [ ] Additional worlds, level by level

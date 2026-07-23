@@ -5,6 +5,7 @@
 //! later moddability goal: a level's solids can be written as rows of text.
 
 use crate::core::block::BlockKind;
+use crate::core::enemy::EnemyKind;
 
 /// Tile size in pixels.
 pub const TILE: i32 = 8;
@@ -80,9 +81,8 @@ pub struct Level {
     pub solids: Solids,
     /// Mario's spawn, top-left pixel.
     pub spawn: (i32, i32),
-    /// Enemy spawn points, top-left pixel. Kind is decided by the caller; for
-    /// now every marker is a Goomba.
-    pub enemy_spawns: Vec<(i32, i32)>,
+    /// Enemy spawn points: top-left pixel and kind.
+    pub enemy_spawns: Vec<(i32, i32, EnemyKind)>,
     /// Coin positions, top-left pixel.
     pub coins: Vec<(i32, i32)>,
     /// Interactive block spawns: top-left pixel and kind.
@@ -93,10 +93,10 @@ pub struct Level {
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `M` marks Mario's
-    /// spawn, `G` a Goomba, `C` a coin, `?` a question block, `B` a brick block,
-    /// `E` the level-end trigger. The block markers are also solid; `E` is not.
-    /// Anything else is empty. Rows must be equal length. This is the
-    /// human-editable format levels are authored in.
+    /// spawn, `G` a Goomba, `F` a Fly, `C` a coin, `?` a question block, `P` a
+    /// power block, `B` a brick block, `E` the level-end trigger. The block
+    /// markers are also solid; `E` is not. Anything else is empty. Rows must be
+    /// equal length. This is the human-editable format levels are authored in.
     pub fn from_rows(rows: &[&str]) -> Self {
         let solids = Solids::from_rows(rows);
         let mut spawn = (0, 0);
@@ -109,7 +109,8 @@ impl Level {
                 let (px, py) = (tx as i32 * TILE, ty as i32 * TILE);
                 match ch {
                     'M' => spawn = (px, py),
-                    'G' => enemy_spawns.push((px, py)),
+                    'G' => enemy_spawns.push((px, py, EnemyKind::Goomba)),
+                    'F' => enemy_spawns.push((px, py, EnemyKind::Fly)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),

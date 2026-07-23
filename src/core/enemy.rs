@@ -16,10 +16,17 @@ pub const ENEMY_SIZE: i32 = 8;
 pub const ENEMY_WALK_SPEED: i32 = 96;
 /// How far past the screen edges an enemy may be before it despawns.
 pub const DESPAWN_MARGIN: i32 = 32;
+/// Upward speed a Fly gets on each hop. Provisional.
+pub const HOP_VELOCITY: i32 = 520;
+/// Frames a Fly waits on the ground between hops.
+pub const HOP_INTERVAL: u32 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
+    /// Walks along the ground and turns at walls and ledges.
     Goomba,
+    /// Walks but hops on a timer, so it does not respect ledges.
+    Fly,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,11 +39,12 @@ pub struct Enemy {
     pub on_ground: bool,
     pub alive: bool,
     pub kind: EnemyKind,
+    /// Countdown to the next hop, for a Fly. Ignored by other kinds.
+    pub hop_timer: u32,
 }
 
 impl Enemy {
-    /// A Goomba at a whole-pixel position, walking left or right.
-    pub fn goomba(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+    fn new(pixel_x: i32, pixel_y: i32, going_left: bool, kind: EnemyKind) -> Self {
         use crate::core::entity::pixels;
         let speed = if going_left { -ENEMY_WALK_SPEED } else { ENEMY_WALK_SPEED };
         Self {
@@ -46,8 +54,19 @@ impl Enemy {
             vy: 0,
             on_ground: false,
             alive: true,
-            kind: EnemyKind::Goomba,
+            kind,
+            hop_timer: HOP_INTERVAL,
         }
+    }
+
+    /// A Goomba at a whole-pixel position, walking left or right.
+    pub fn goomba(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        Self::new(pixel_x, pixel_y, going_left, EnemyKind::Goomba)
+    }
+
+    /// A Fly at a whole-pixel position: it walks and hops.
+    pub fn fly(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        Self::new(pixel_x, pixel_y, going_left, EnemyKind::Fly)
     }
 
     pub fn pixel_x(&self) -> i32 {
@@ -93,6 +112,17 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
         let wall_right = l.div_euclid(TILE) * TILE + (TILE - 1);
         enemy.x = pixels(wall_right + 1);
         enemy.vx = -enemy.vx;
+    }
+
+    // A Fly hops on a timer while it is on the ground.
+    if enemy.kind == EnemyKind::Fly && enemy.on_ground {
+        if enemy.hop_timer == 0 {
+            enemy.vy = -HOP_VELOCITY;
+            enemy.on_ground = false;
+            enemy.hop_timer = HOP_INTERVAL;
+        } else {
+            enemy.hop_timer -= 1;
+        }
     }
 
     // Gravity only builds up while airborne, so a resting enemy sits still
@@ -218,6 +248,29 @@ mod tests {
         // It never leaves the platform: its feet stay over solid tiles 5..9.
         let (l, _t, r, b) = e.edges();
         assert!(solids.rect_hits_solid(l, b + 1, r, b + 1), "should still be on the platform");
+    }
+
+    #[test]
+    fn a_fly_hops_off_the_ground() {
+        let solids = floor();
+        let mut f = Enemy::fly(40, 16, false);
+        f.vx = 0; // isolate the hop
+        // Settle onto the floor.
+        for _ in 0..10 {
+            update_enemy(&mut f, &solids);
+        }
+        assert!(f.on_ground);
+        let resting_y = f.pixel_y();
+        // Within one hop interval it should leave the ground and rise.
+        let mut rose = false;
+        for _ in 0..(HOP_INTERVAL as usize + 5) {
+            update_enemy(&mut f, &solids);
+            if f.pixel_y() < resting_y {
+                rose = true;
+                break;
+            }
+        }
+        assert!(rose, "a Fly should hop above its resting height");
     }
 
     #[test]

@@ -127,10 +127,14 @@ fn coin_tile() -> Tile {
 }
 
 fn spawn_enemies(level: &Level) -> Vec<Enemy> {
+    use crate::core::enemy::EnemyKind;
     level
         .enemy_spawns
         .iter()
-        .map(|&(px, py)| Enemy::goomba(px, py, true))
+        .map(|&(px, py, kind)| match kind {
+            EnemyKind::Goomba => Enemy::goomba(px, py, true),
+            EnemyKind::Fly => Enemy::fly(px, py, true),
+        })
         .collect()
 }
 

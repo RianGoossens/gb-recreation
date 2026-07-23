@@ -101,7 +101,7 @@ Goal: reach the end of 1-1, complete it, advance. The core loop is playable end 
 Goal: expand from a vertical slice to coverage of the original game.
 
 - [ ] Remaining World 1 levels
-- [ ] Remaining enemy types for World 1
+- [x] Remaining enemy types for World 1 (added a hopping Fly alongside the Goomba; more can follow)
 - [ ] Sound and music model (design first, then implement)
 - [ ] Additional worlds, level by level
 - [ ] Bosses and special stages

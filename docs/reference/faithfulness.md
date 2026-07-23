@@ -17,7 +17,7 @@ are visible and deliberate rather than accidental. Three labels:
 | Small Mario | canonical | |
 | Super mushroom, big Mario | canonical | |
 | Superball flower, fire Mario | canonical | SML's signature power-up |
-| Superball projectile | canonical | thrown by fire Mario; bounces |
+| Superball projectile | canonical | thrown by fire Mario; bounces; collects coins |
 | Invincibility star | **invented** | Super Mario Land has NO star. Recommend removing it, or keeping it only as an opt-in mod, not in the faithful game. |
 
 ## Enemies

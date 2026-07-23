@@ -479,6 +479,26 @@ impl Game {
             i += 1;
             keep
         });
+
+        // Superballs also collect coins they pass through, without being spent.
+        let ball_boxes: Vec<(i32, i32, i32, i32)> =
+            self.superballs.iter().map(|b| b.edges()).collect();
+        let mut coin_hits = 0;
+        self.coins.retain(|&(cx, cy)| {
+            let (cl, ct, cr, cb) = (cx, cy, cx + TILE - 1, cy + TILE - 1);
+            let hit = ball_boxes
+                .iter()
+                .any(|&(bl, bt, br, bb)| bl <= cr && br >= cl && bt <= cb && bb >= ct);
+            if hit {
+                coin_hits += 1;
+                false
+            } else {
+                true
+            }
+        });
+        for _ in 0..coin_hits {
+            self.gain_coin();
+        }
     }
 
     /// Mario just moved up this frame. If his head is flush against an unused
@@ -989,6 +1009,26 @@ mod tests {
             }
         }
         assert!(game.enemies.is_empty(), "the superball should defeat the enemy");
+    }
+
+    #[test]
+    fn a_superball_collects_a_coin_in_its_path() {
+        use crate::core::entity::{pixels, Power};
+        use crate::core::level::Level;
+
+        let mut game = Game::new(Level::from_rows(&["M.C.", "####"]));
+        game.mario.power = Power::Fire;
+        game.mario.y -= pixels(8);
+
+        game.step(held(Button::B)); // throw
+        for _ in 0..40 {
+            game.step(Buttons::default());
+            if game.coins_collected > 0 {
+                break;
+            }
+        }
+        assert_eq!(game.coins_collected, 1, "the superball should collect the coin");
+        assert!(game.coins.is_empty());
     }
 
     #[test]

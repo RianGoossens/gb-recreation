@@ -14,6 +14,7 @@ use crate::render::Framebuffer;
 pub enum Phase {
     Title,
     Playing,
+    Paused,
     GameOver,
     Win,
 }
@@ -65,11 +66,20 @@ impl Session {
                 }
             }
             Phase::Playing => {
+                if start_pressed {
+                    self.phase = Phase::Paused;
+                    return;
+                }
                 self.game.step(buttons);
                 if self.game.completed {
                     self.advance();
                 } else if self.game.game_over {
                     self.phase = Phase::GameOver;
+                }
+            }
+            Phase::Paused => {
+                if start_pressed {
+                    self.phase = Phase::Playing;
                 }
             }
             Phase::GameOver | Phase::Win => {
@@ -148,6 +158,30 @@ mod tests {
         let mut session = Session::new(vec![short_level()]);
         assert_eq!(session.phase, Phase::Title);
         press_start(&mut session);
+        assert_eq!(session.phase, Phase::Playing);
+    }
+
+    #[test]
+    fn start_pauses_and_resumes_play() {
+        let mut session = Session::new(vec![short_level()]);
+        press_start(&mut session); // Title -> Playing
+        assert_eq!(session.phase, Phase::Playing);
+
+        // Advance a few frames, then pause.
+        for _ in 0..5 {
+            session.step(held(Button::Right));
+        }
+        let paused_x = session.game.mario.pixel_x();
+        press_start(&mut session); // Playing -> Paused
+        assert_eq!(session.phase, Phase::Paused);
+
+        // While paused, holding right does nothing.
+        for _ in 0..10 {
+            session.step(held(Button::Right));
+        }
+        assert_eq!(session.game.mario.pixel_x(), paused_x, "paused game does not move");
+
+        press_start(&mut session); // Paused -> Playing
         assert_eq!(session.phase, Phase::Playing);
     }
 

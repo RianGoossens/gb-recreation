@@ -10,6 +10,11 @@ are visible and deliberate rather than accidental. Three labels:
 - **invented**: not in the original. Fine as an optional mod, but not end-goal
   content. Flagged for a decision.
 
+Decision (Rian, 2026-07-23): invented pieces can stay in the codebase during
+development. They must not ship in the final faithful build. Before release,
+either remove them or gate them behind an explicit opt-in so the default game
+matches the cartridge.
+
 ## Power-ups and states
 
 | Item / state | Label | Notes |
@@ -18,14 +23,14 @@ are visible and deliberate rather than accidental. Three labels:
 | Super mushroom, big Mario | canonical | |
 | Superball flower, fire Mario | canonical | SML's signature power-up |
 | Superball projectile | canonical | thrown by fire Mario; bounces; collects coins |
-| Invincibility star | **invented** | Super Mario Land has NO star. Recommend removing it, or keeping it only as an opt-in mod, not in the faithful game. |
+| Invincibility star | **invented** | Super Mario Land has NO star. Kept in the codebase for now (per Rian, 2026-07-23); must be removed or gated behind opt-in before the final faithful build. |
 
 ## Enemies
 
 | Enemy | Label | Notes |
 |-------|-------|-------|
 | Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls and ledges); confirm exact behavior against the cartridge. |
-| Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Recommend replacing the Fly with a real SML enemy. |
+| Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Kept in the codebase for now (per Rian, 2026-07-23); replace with a real SML enemy or gate behind opt-in before the final faithful build. |
 
 ## Items, blocks, scoring
 
@@ -49,9 +54,9 @@ are visible and deliberate rather than accidental. Three labels:
 
 ## Recommended next steps toward faithfulness
 
-1. Decide on the invented star (remove, or keep opt-in only).
-2. Replace the Fly with a real SML enemy (Nokobon) once its behavior is confirmed.
-3. Make brick blocks breakable by big/fire Mario (canonical).
-4. Have the superball collect coins on contact (canonical).
-5. Measure the movement constants against the cartridge and replace the placeholders.
-6. Extract the real level geometry.
+1. Measure the movement constants against the cartridge and replace the placeholders.
+2. Extract the real level geometry.
+3. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
+4. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.
+
+(Brick breaking and superball coin collection are already canonical, done.)

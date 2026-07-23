@@ -79,7 +79,7 @@ Goal: question blocks, coins, the power-up flow, score and coin counters.
 
 - [x] Interactive blocks (question, brick): bump, spawn contents
 - [x] Coins: collect, counter, 100-coin life
-- [ ] Power-up (mushroom equivalent): spawn, movement, pickup, size/state change
+- [x] Power-up (mushroom equivalent): spawn, movement, pickup, size/state change
 - [x] HUD: score, coins, lives, timer
 - [ ] Timer countdown and time-out death
 - [ ] Tests: block bumping, coin counting, power-up state machine

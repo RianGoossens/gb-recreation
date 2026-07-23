@@ -15,6 +15,7 @@ pub mod enemy;
 pub mod entity;
 pub mod level;
 pub mod physics;
+pub mod powerup;
 
 use crate::input::Buttons;
 

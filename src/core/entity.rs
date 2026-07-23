@@ -44,6 +44,9 @@ pub struct Mario {
     /// Cleared when Mario takes a fatal hit. The game turns this back on when it
     /// respawns him.
     pub alive: bool,
+    /// Frames of invulnerability after shrinking, so one touch does not chain
+    /// into a second hit. Counts down to zero.
+    pub invuln: u32,
 }
 
 impl Mario {
@@ -59,6 +62,7 @@ impl Mario {
             power: Power::Small,
             jump_latched: false,
             alive: true,
+            invuln: 0,
         }
     }
 

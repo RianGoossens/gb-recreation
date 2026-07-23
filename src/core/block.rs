@@ -9,7 +9,10 @@ use crate::core::level::TILE;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockKind {
+    /// Gives a coin when bumped.
     Question,
+    /// Gives a mushroom power-up when bumped.
+    PowerUp,
     Brick,
 }
 

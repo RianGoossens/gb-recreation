@@ -10,9 +10,10 @@ use crate::camera::Camera;
 use crate::core::animation::Animator;
 use crate::core::block::{Block, BlockKind};
 use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
-use crate::core::entity::Mario;
+use crate::core::entity::{pixels, Mario, Power};
 use crate::core::level::{Level, TILE};
 use crate::core::physics::{step_motion, STOMP_BOUNCE};
+use crate::core::powerup::{update_mushroom, Mushroom, MUSHROOM_SIZE};
 use crate::input::Buttons;
 use crate::render::{render_background, Framebuffer, Palette, TileMap};
 use crate::tiles::Tile;
@@ -33,6 +34,8 @@ pub struct Game {
     pub deaths: u32,
     /// Interactive blocks Mario can bump from below.
     pub blocks: Vec<Block>,
+    /// Active mushroom power-ups.
+    pub mushrooms: Vec<Mushroom>,
     /// Uncollected coins, top-left pixel.
     pub coins: Vec<(i32, i32)>,
     /// Coins collected (wraps every 100, which grants a life).
@@ -51,7 +54,17 @@ pub struct Game {
     question_tile: Tile,
     used_tile: Tile,
     brick_tile: Tile,
+    mushroom_tile: Tile,
     palette: Palette,
+}
+
+/// A dark cap over a light body: a mushroom.
+fn mushroom_tile() -> Tile {
+    let mut pixels = [[1u8; 8]; 8];
+    for row in pixels.iter_mut().take(4) {
+        *row = [2; 8];
+    }
+    Tile { pixels }
 }
 
 fn spawn_blocks(level: &Level) -> Vec<Block> {
@@ -122,6 +135,7 @@ impl Game {
             mario,
             enemies,
             blocks,
+            mushrooms: Vec::new(),
             coins,
             coins_collected: 0,
             lives: 3,
@@ -142,6 +156,7 @@ impl Game {
             question_tile: question_tile(),
             used_tile: solid_tile(2),
             brick_tile: brick_tile(),
+            mushroom_tile: mushroom_tile(),
             palette: Palette::new(0xE4),
         }
     }
@@ -165,6 +180,8 @@ impl Game {
                     'G'
                 } else if x == 6 && y == h - 6 {
                     '?'
+                } else if x == 9 && y == h - 6 {
+                    'P'
                 } else {
                     '.'
                 };
@@ -194,6 +211,13 @@ impl Game {
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
         }
+        for mushroom in &mut self.mushrooms {
+            update_mushroom(mushroom, &self.level.solids);
+        }
+        if self.mario.invuln > 0 {
+            self.mario.invuln -= 1;
+        }
+        self.collect_mushrooms();
         self.resolve_interactions();
         self.collect_coins();
         self.tick_timer();
@@ -242,8 +266,16 @@ impl Game {
             self.score += 100;
         }
         // A stomp in the same frame saves Mario from a simultaneous side hit.
-        if hit && !stomped {
-            self.mario.alive = false;
+        // A hit shrinks big Mario (with brief invulnerability) but kills small
+        // Mario. Invulnerability frames ignore hits entirely.
+        if hit && !stomped && self.mario.invuln == 0 {
+            if self.mario.power == Power::Big {
+                self.mario.power = Power::Small;
+                self.mario.y += pixels(MUSHROOM_SIZE); // shrink, feet stay put
+                self.mario.invuln = 90;
+            } else {
+                self.mario.alive = false;
+            }
         }
     }
 
@@ -257,6 +289,7 @@ impl Game {
         let mr = ml + mw - 1;
 
         let mut got_coin = false;
+        let mut mushroom_at: Option<(i32, i32)> = None;
         for block in &mut self.blocks {
             if block.used {
                 continue;
@@ -264,13 +297,27 @@ impl Game {
             let (bl, _bt, br, bb) = block.edges();
             let flush_below = mt == bb + 1;
             let overlap_x = ml <= br && mr >= bl;
-            if flush_below && overlap_x && block.kind == BlockKind::Question {
-                block.used = true;
-                got_coin = true;
+            if !(flush_below && overlap_x) {
+                continue;
+            }
+            match block.kind {
+                BlockKind::Question => {
+                    block.used = true;
+                    got_coin = true;
+                }
+                BlockKind::PowerUp => {
+                    block.used = true;
+                    // The mushroom emerges from the top of the block.
+                    mushroom_at = Some((block.x, block.y - TILE));
+                }
+                BlockKind::Brick => {}
             }
         }
         if got_coin {
             self.gain_coin();
+        }
+        if let Some((x, y)) = mushroom_at {
+            self.mushrooms.push(Mushroom::new(x, y, false));
         }
     }
 
@@ -294,6 +341,35 @@ impl Game {
         });
         for _ in 0..got {
             self.gain_coin();
+        }
+    }
+
+    /// Pick up any mushroom Mario overlaps: small Mario grows, and either way it
+    /// is worth points.
+    fn collect_mushrooms(&mut self) {
+        let (mw, mh) = self.mario.size();
+        let ml = self.mario.pixel_x();
+        let mt = self.mario.pixel_y();
+        let (mr, mb) = (ml + mw - 1, mt + mh - 1);
+
+        let mut grew = false;
+        self.mushrooms.retain(|m| {
+            let (el, et, er, eb) = m.edges();
+            let overlap = ml <= er && mr >= el && mt <= eb && mb >= et;
+            if overlap {
+                grew = true;
+                false
+            } else {
+                true
+            }
+        });
+        if grew {
+            if self.mario.power == Power::Small {
+                self.mario.power = Power::Big;
+                // Grow upward so his feet stay put.
+                self.mario.y -= pixels(MUSHROOM_SIZE);
+            }
+            self.score += 1000;
         }
     }
 
@@ -338,13 +414,21 @@ impl Game {
         for block in &self.blocks {
             let tile = match (block.kind, block.used) {
                 (_, true) => &self.used_tile,
-                (BlockKind::Question, false) => &self.question_tile,
+                (BlockKind::Question | BlockKind::PowerUp, false) => &self.question_tile,
                 (BlockKind::Brick, false) => &self.brick_tile,
             };
             fb.draw_tile(tile, block.x - self.camera.x, block.y - self.camera.y, &self.palette);
         }
         for &(cx, cy) in &self.coins {
             fb.draw_tile(&self.coin_tile, cx - self.camera.x, cy - self.camera.y, &self.palette);
+        }
+        for mushroom in &self.mushrooms {
+            fb.draw_tile(
+                &self.mushroom_tile,
+                mushroom.pixel_x() - self.camera.x,
+                mushroom.pixel_y() - self.camera.y,
+                &self.palette,
+            );
         }
         for enemy in &self.enemies {
             if enemy.alive {
@@ -356,12 +440,18 @@ impl Game {
                 );
             }
         }
-        fb.draw_tile(
-            &self.mario_tile,
-            self.mario.pixel_x() - self.camera.x,
-            self.mario.pixel_y() - self.camera.y,
-            &self.palette,
-        );
+        // Flicker Mario while invulnerable. Big Mario is two tiles tall.
+        let visible = self.mario.invuln == 0 || (self.mario.invuln / 4).is_multiple_of(2);
+        if visible {
+            let (_mw, mh) = self.mario.size();
+            let mx = self.mario.pixel_x() - self.camera.x;
+            let my = self.mario.pixel_y() - self.camera.y;
+            let mut ty = 0;
+            while ty < mh {
+                fb.draw_tile(&self.mario_tile, mx, my + ty, &self.palette);
+                ty += TILE;
+            }
+        }
         self.draw_hud(&mut fb);
         fb
     }
@@ -522,6 +612,52 @@ mod tests {
         }
         assert!(game.blocks[0].used, "the question block should be spent");
         assert_eq!(game.coins_collected, 1, "it should give one coin");
+    }
+
+    #[test]
+    fn picking_up_a_mushroom_makes_mario_big() {
+        use crate::core::entity::Power;
+        use crate::core::level::Level;
+        use crate::core::powerup::Mushroom;
+
+        let level = Level::from_rows(&["M...", "####"]);
+        let mut game = Game::new(level);
+        assert_eq!(game.mario.power, Power::Small);
+        game.mushrooms.push(Mushroom::new(0, 0, false)); // right on top of Mario
+
+        for _ in 0..30 {
+            game.step(Buttons::default());
+            if game.mario.power == Power::Big {
+                break;
+            }
+        }
+        assert_eq!(game.mario.power, Power::Big);
+        assert!(game.mushrooms.is_empty(), "the mushroom is consumed");
+    }
+
+    #[test]
+    fn big_mario_shrinks_instead_of_dying_on_a_hit() {
+        use crate::core::entity::{pixels, Power};
+        use crate::core::level::Level;
+
+        let level = Level::from_rows(&["M..G", "####"]);
+        let mut game = Game::new(level);
+        // Grow Mario the way a pickup does: bigger, and lifted so his feet stay
+        // on the floor rather than embedded in it.
+        game.mario.power = Power::Big;
+        game.mario.y -= pixels(8);
+
+        let mut shrank = false;
+        for _ in 0..200 {
+            game.step(held(Button::Right));
+            if game.mario.power == Power::Small && game.mario.invuln > 0 {
+                shrank = true;
+                break;
+            }
+        }
+        assert!(shrank, "big Mario should shrink, not die");
+        assert!(game.mario.alive);
+        assert_eq!(game.deaths, 0);
     }
 
     #[test]

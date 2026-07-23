@@ -41,7 +41,7 @@ impl Solids {
         for row in rows {
             assert_eq!(row.len(), width, "rows must be equal length");
             for ch in row.chars() {
-                cells.push(matches!(ch, '#' | '?' | 'B'));
+                cells.push(matches!(ch, '#' | '?' | 'B' | 'P'));
             }
         }
         Self::new(width, height, cells)
@@ -108,6 +108,7 @@ impl Level {
                     'G' => enemy_spawns.push((px, py)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
+                    'P' => blocks.push((px, py, BlockKind::PowerUp)),
                     'B' => blocks.push((px, py, BlockKind::Brick)),
                     _ => {}
                 }

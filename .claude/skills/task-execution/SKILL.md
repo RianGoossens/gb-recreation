@@ -16,6 +16,7 @@ One invocation completes exactly one concrete task from `docs/GRAND_MASTER_PLAN.
 3. Mark the task `[~]`.
 4. Do the work:
    - Follow CLAUDE.md style and architecture rules.
+   - Stay faithful. Reproduce what is in Super Mario Land; do not invent mechanics, enemies, items, or levels. Confirm a thing exists in the original before adding it. Prefer tasks that make the reproduction more faithful (real behavior, real values, real levels) over adding new content. Label any stand-in or non-canonical piece in `docs/reference/faithfulness.md`.
    - Prefer building from observed behavior and emulator comparison. Consult the `kaspermeerts/supermarioland` disassembly sparingly, only to settle a specific number or mechanic you cannot pin down otherwise. Cite what you take.
    - Write tests alongside the code (see the testing-validation skill). No task counts as done without tests when it has testable behavior.
 5. Validate: run `cargo test` (and `cargo build`/`cargo run` for a screenshot when relevant). For visual work, generate a screenshot and inspect it.

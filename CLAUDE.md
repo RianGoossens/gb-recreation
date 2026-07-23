@@ -8,6 +8,8 @@ A native Rust reproduction of the Game Boy title Super Mario Land. This is NOT a
 
 End goal: a faithful recreation of the cartridge that is easy to modify. The game's shipped content is the cartridge's own levels, enemies, and behavior. Moddability means a user can make their own levels; it does not mean the project ships invented levels as content. Any levels we author (the demo level, the example level, the demo campaign) are test fixtures, documentation, or placeholders until the real levels are extracted, never end-goal content.
 
+Faithfulness is a working rule, not just an aim. Reproduce what is in Super Mario Land; do not invent mechanics, enemies, items, or levels. Before adding a mechanic, confirm it exists in the original (from play, an emulator, or the disassembly). If you build a stand-in before the exact original is pinned, or add something that is not in the game, label it in `docs/reference/faithfulness.md` and keep that audit current. When unsure whether something is canonical, ask rather than invent.
+
 ## Reference material
 
 Secondary reference: the `kaspermeerts/supermarioland` disassembly. It maps some of the original assembly, physics constants, and memory layout. Lean on it as little as possible: prefer building clean Rust from observed behavior, tests, and screenshots against a real emulator. Reach for the disassembly only to settle a specific number or mechanic you cannot pin down otherwise, and cite what you take.

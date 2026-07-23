@@ -89,7 +89,7 @@ Goal: question blocks, coins, the power-up flow, score and coin counters.
 
 Goal: reach the end of 1-1, complete it, advance. The core loop is playable end to end.
 
-- [ ] Level-end trigger and completion sequence
+- [x] Level-end trigger and completion sequence
 - [ ] Level-to-level transition and world map or direct advance (per original)
 - [ ] Lives and game-over flow
 - [ ] Title -> play -> die/complete -> title loop closed

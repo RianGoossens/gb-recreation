@@ -32,6 +32,8 @@ pub struct Game {
     pub animator: Animator,
     /// How many times Mario has died and respawned this session.
     pub deaths: u32,
+    /// Set once Mario reaches the level-end trigger. The scene freezes.
+    pub completed: bool,
     /// Interactive blocks Mario can bump from below.
     pub blocks: Vec<Block>,
     /// Active mushroom power-ups.
@@ -55,7 +57,18 @@ pub struct Game {
     used_tile: Tile,
     brick_tile: Tile,
     mushroom_tile: Tile,
+    end_tile: Tile,
     palette: Palette,
+}
+
+/// A tall marker for the level end: a vertical pole.
+fn end_tile() -> Tile {
+    let mut pixels = [[0u8; 8]; 8];
+    for row in pixels.iter_mut() {
+        row[3] = 3;
+        row[4] = 3;
+    }
+    Tile { pixels }
 }
 
 /// A dark cap over a light body: a mushroom.
@@ -145,6 +158,7 @@ impl Game {
             camera: Camera::new(),
             animator: Animator::new(),
             deaths: 0,
+            completed: false,
             bg_map: TileMap::new(w, h, cells),
             // Empty tiles render white, solid tiles dark, Mario a black block.
             bg_tiles: vec![solid_tile(0), solid_tile(2)],
@@ -157,6 +171,7 @@ impl Game {
             used_tile: solid_tile(2),
             brick_tile: brick_tile(),
             mushroom_tile: mushroom_tile(),
+            end_tile: end_tile(),
             palette: Palette::new(0xE4),
         }
     }
@@ -180,6 +195,8 @@ impl Game {
                     'G'
                 } else if x == 4 && y == h - 3 {
                     'C'
+                } else if x == 38 && y == h - 3 {
+                    'E'
                 } else if x == 6 && y == h - 6 {
                     '?'
                 } else if x == 9 && y == h - 6 {
@@ -204,6 +221,10 @@ impl Game {
 
     /// Advance one frame from the held buttons.
     pub fn step(&mut self, buttons: Buttons) {
+        // Once the level is complete, the scene freezes.
+        if self.completed {
+            return;
+        }
         let rising = self.mario.vy < 0;
         step_motion(&mut self.mario, buttons, &self.level.solids);
         if rising {
@@ -227,6 +248,18 @@ impl Game {
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
         despawn_offscreen(&mut self.enemies, self.camera.x);
+
+        // Reaching the end trigger completes the level.
+        if let Some((ex, ey)) = self.level.end {
+            let (mw, mh) = self.mario.size();
+            let (ml, mt) = (self.mario.pixel_x(), self.mario.pixel_y());
+            let (mr, mb) = (ml + mw - 1, mt + mh - 1);
+            let (el, et, er, eb) = (ex, ey, ex + TILE - 1, ey + TILE - 1);
+            if ml <= er && mr >= el && mt <= eb && mb >= et {
+                self.completed = true;
+                return;
+            }
+        }
 
         // Running out of time is fatal.
         if self.timer == 0 {
@@ -425,6 +458,9 @@ impl Game {
             self.camera.y,
             &self.palette,
         );
+        if let Some((ex, ey)) = self.level.end {
+            fb.draw_tile(&self.end_tile, ex - self.camera.x, ey - self.camera.y, &self.palette);
+        }
         for block in &self.blocks {
             let tile = match (block.kind, block.used) {
                 (_, true) => &self.used_tile,
@@ -704,6 +740,27 @@ mod tests {
         assert!(shrank, "big Mario should shrink, not die");
         assert!(game.mario.alive);
         assert_eq!(game.deaths, 0);
+    }
+
+    #[test]
+    fn reaching_the_end_completes_the_level_and_freezes() {
+        use crate::core::level::Level;
+        let level = Level::from_rows(&["M..E", "####"]);
+        let mut game = Game::new(level);
+        assert!(!game.completed);
+
+        for _ in 0..200 {
+            game.step(held(Button::Right));
+            if game.completed {
+                break;
+            }
+        }
+        assert!(game.completed, "walking into the end should complete the level");
+
+        // The scene is frozen: further steps do nothing.
+        let before = (game.mario.pixel_x(), game.timer);
+        game.step(held(Button::Right));
+        assert_eq!((game.mario.pixel_x(), game.timer), before);
     }
 
     #[test]

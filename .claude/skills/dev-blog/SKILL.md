@@ -1,6 +1,6 @@
 ---
 name: dev-blog
-description: Write and publish posts to the live technical dev blog on GitHub Pages. Use when a major task or milestone lands. Produces self-contained HTML posts with dates, timestamps, and screenshots; no frameworks, no local line-number references.
+description: Write and publish posts to the live technical dev blog on GitHub Pages. Use when a major task or milestone lands. Produces self-contained HTML posts with dates, timestamps, screenshots, and inline diagrams/charts where the evidence is numeric; no frameworks, no local line-number references.
 ---
 
 # Live dev blog
@@ -18,6 +18,8 @@ A live technical logbook published to GitHub Pages from `docs/blog/`. Plain HTML
 ## Images and Git LFS
 
 Screenshots of the running game are fine to include in blog posts as commentary, and get committed under `docs/blog/media/`. That directory is tracked by Git LFS (`.gitattributes`), so image files stay out of the main history. Two rules still hold: never commit the ROM itself or raw extracted asset files (those stay gitignored), and the Pages workflow checks out with `lfs: true` so images resolve on the live site.
+
+A hand-built chart or diagram illustrating numeric data (a curve fit, a trace, a comparison) is different: write it as inline `<svg>` directly in the post HTML, not a separate file. It is text, not an asset, so it needs no LFS entry and no `docs/blog/media/` file; it just lives in the post like any other markup.
 
 ## Publishing checklist
 
@@ -54,6 +56,8 @@ Any hit is a candidate for the "not X, it is Y" / "X, not Y" antithesis pattern 
 - No em-dashes. No filler words. Direct, technical writing.
 - Not self-referential. Write about the game and the engineering, never about the blog's own construction (no notes on frameworks, HTML/CSS, "built by hand", and so on). The reader does not care how the page was made.
 - Vary the look. Do not run every post through the same rigid template. Reach for more than one image when it helps (a before/after pair, a two-up comparison, an action shot next to a still), and change up the structure so posts do not feel identical. Keep it interesting to read.
+- Name a piece of Game Boy hardware and explain it in the same breath, the first time it appears in a post: not "the background scroll register, `SCX`" left to sit as a bare name, but a clause on what it actually does ("`SCX`, the register that shifts the background left and right on screen"). A raw address (`0xC207`, `0x9800`) needs no such intro; it is self-evidently "some byte of memory." A *named* register or acronym (`SCX`, `STAT`, `OAM`) reads as jargon without one. This is not about avoiding technical depth, a technical reader is still the audience; it is about not assuming the name alone carries its own meaning. Missed once already: "World 1-1 was never stuck" used `SCX` as a bare name with no explanation of what it controls.
+- Reach for a graph, diagram, or plot, not only a screenshot, when the post's evidence is itself numeric (a curve fit, a per-frame trace, a comparison of two shapes). A table of numbers in a `<pre>` block is correct but not always the clearest way to show a reader "this curve doesn't fit, this one does." An inline SVG plot (no external chart library; keep it hand-built and small) or a simple annotated diagram often makes the point in one glance where a paragraph of numbers takes several reads. Not every post needs this: a post with no numeric shape to show (a bugfix, a one-off decision) doesn't need a chart bolted on. Missed on "Gravity is not one number" and "Shipping the real jump," both entirely prose-and-code with no visual for what were fundamentally shape-of-a-curve arguments.
 - Use the shared components in `style.css` where they fit, so variety is easy and consistent:
   - `<p class="lead">` a stronger opening paragraph.
   - `<div class="callout">...</div>` an aside, warning, or highlight.

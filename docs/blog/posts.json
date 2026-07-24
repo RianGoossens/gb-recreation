@@ -1,5 +1,11 @@
 [
   {
+    "title": "Jumping instead of waiting",
+    "date": "2026-07-24",
+    "slug": "2026-07-24-jumping-instead-of-waiting",
+    "summary": "Pausing for an enemy only delays it; jumping at it survives past tile 1880. That exposed a real bug in how far the tilemap tracker could be trusted, fixed by reading Mario's own speed register instead of watching for change."
+  },
+  {
     "title": "World 1-1 was never stuck",
     "date": "2026-07-24",
     "slug": "2026-07-24-world-1-1-was-never-stuck",

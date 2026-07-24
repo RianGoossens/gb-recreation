@@ -343,17 +343,65 @@ especially once the walk pattern isn't a steady rhythm. Both figures are
 real and both are recorded so a future session comparing runs is not
 misled by only one of them.
 
+### Standing still doesn't save him, and jumping changes everything
+
+Checked what the death at world column 77 actually looked like: Mario
+sat stationary (Right released, `x` and `y` both flat) for over ten
+frames with the same hazard sprite (tile `144`) persistently within
+`DANGER_RADIUS`, and still died. That rules out the "wait for the enemy
+to pass" theory from the first hazard: this enemy (or Mario's earlier
+one, revisited) walks toward him regardless of what he does, so pausing
+only delays contact, it does not avoid it.
+
+Changed the reaction from "release Right and wait" to "release Right and
+jump" (a stomp attempt, cooldown-limited so it does not spam) whenever a
+sprite is within radius and Mario is grounded. The effect was dramatic:
+the same run that died at column 77 pausing survived past world column
+1880 jumping, over a 15000-frame run, without dying once. `radius=90`
+with a stomp reaction was enough; wider radii did not change the
+outcome.
+
+That result needs an important caveat, found by actually running the
+updated `stitch_level_1_1.py` with a 5000-frame cap: it reported "safely
+captured up to world column ~630" (Mario's real dead-reckoned travel
+distance) but the tracked tilemap output only reached world column 63,
+barely two ring-buffer laps. The transition-watching method (a slot's
+world-column identity increments by 32 only when its *value* changes)
+has a real blind spot at this scale: long uniform terrain, most likely a
+long flat stretch of ground tile `96` repeated across many laps,
+produces identical bytes lap after lap, so nothing ever looks like a
+change and the tracked identity silently stalls. This is not wrong data,
+each entry that does appear is still a genuine direct observation, it is
+missing data: the method has no way to know how many laps of unchanging
+content it silently sat through. Worse, if the terrain ever did change
+again after such a silent stretch, the next detected change would be
+attributed to "previous lap + 32", undercounting the true world column
+by an unknown multiple of 32. That did not happen in this particular
+run (nothing was ever detected past column 63, so nothing got
+mislabeled), but it is a real correctness risk for any future run where
+a long uniform stretch is followed by real variation.
+
+So, as of this session: Mario can survive far into the level by jumping
+at anything nearby, but confirming what is actually *at* those later
+world columns needs a tracking method that does not depend on content
+changing, for example reading a genuinely fresh copy of the buffer every
+frame and diffing against the ring-buffer's known write pattern rather
+than against remembered values, or cross-checking against `SCX` sampled
+correctly (mid-scanline, not at VBlank) once that is solved. Recorded as
+open work rather than pushed further this session.
+
 ## Open work
 
 - Pin the step/pyramid structure's solid tiles precisely (needs the
   sub-column-accurate probe described above; still not confirmed by
   direct collision, see the pyramid section).
-- Extend `tools/stitch_level_1_1.py`'s reach further: the walk/pause
-  rhythm is a heuristic that delays the next death, not a fix. A script
-  that detects enemies via OAM and reacts to them specifically (or that
-  tries many independent runs from further save-stated starting points
-  and merges their confirmed transitions) would go further and more
-  reliably than tuning `WALK_FRAMES`/`RELEASE_FRAMES` further.
+- Fix the tile-tracking blind spot: `tools/stitch_level_1_1.py` can now
+  survive arbitrarily far (jumps at anything nearby), but its
+  transition-watching method silently stalls across long uniform terrain
+  where the tracked value never visibly changes lap to lap (see the
+  "standing still doesn't save him" section above). Needs a way to track
+  world-column identity that does not depend on content changing, before
+  the long survival distance actually becomes long confirmed data.
 - Once stitching covers enough of the level, convert the confirmed grid
   into `Level`/`Solids` and wire it in behind the existing ROM gating,
   replacing the placeholder demo level.

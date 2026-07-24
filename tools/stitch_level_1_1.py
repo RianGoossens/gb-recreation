@@ -32,20 +32,27 @@ forward streaming and keep incrementing). This script watches for the
 respawn directly (Mario's screen X snapping back near its spawn value
 after the camera lock has engaged) and stops capturing there.
 
-To get past a hazard at all, this reads OAM every frame and releases
-Right whenever a non-Mario sprite is within DANGER_RADIUS pixels of
-Mario's on-screen X, resuming once it isn't. A jump-timing sweep against
-a save state right before the first hazard found that no jump height or
-timing cleared it while approaching at full running speed, but simply
-slowing down first (releasing Right for at least ~50 frames, no jump
-needed at all) did survive it. That points to hazards being moving
-enemies Mario needs to arrive past a different moment for, not obstacles
-that need clearing. Mario's own sprite always occupies OAM slots 3-6
-(confirmed across every OAM dump this session; not derived from an
-assumption), so those are excluded when scanning for danger. This reacts
-to whatever is actually on screen instead of blindly breaking stride on
-a fixed rhythm, and reaches world column 77 versus 64 for the earlier
-fixed-rhythm version.
+To get past a hazard, this reads OAM every frame: whenever a non-Mario
+sprite is within DANGER_RADIUS pixels of Mario's on-screen X, it releases
+Right and jumps (a stomp attempt, cooldown-limited). Mario's own sprite
+always occupies OAM slots 3-6 (confirmed across every OAM dump this
+session), so those are excluded when scanning for danger. Just releasing
+Right and waiting was tried first and does not work past the first
+hazard or so: an enemy that is already within range keeps closing in
+even while Mario stands still, so waiting only delays contact. Jumping
+at it instead let a run survive past world column 1880 without dying
+once, over a 15000-frame run.
+
+That survival distance outruns what the tile-tracking above can actually
+confirm. It only detects a slot's next lap when the tile *value*
+changes, so long uniform terrain (a long flat stretch of repeated ground
+tile, for example) produces no detected change and the tracked map
+silently stalls; a 630-column real run yielded only a 64-wide tracked
+map. This is not wrong data, everything captured is still a direct
+observation, but it means "how far Mario survived" and "how much level
+is actually confirmed" are two different numbers now, and the second one
+needs a tracking method that does not depend on content changing before
+it can catch up (see docs/reference/level-1-1.md).
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -60,7 +67,9 @@ OUT = Path("assets/extracted")
 MAP_BASE = 0x9800
 OAM_BASE = 0xFE00
 MARIO_OAM_SLOTS = {3, 4, 5, 6}
-DANGER_RADIUS = 120
+DANGER_RADIUS = 90
+STOMP_COOLDOWN = 30
+JUMP_HOLD = 10
 # Rows 0-1 are the status bar (score/coins/time), redrawn every frame
 # regardless of scroll; they are not level geometry, so they are excluded.
 HUD_ROWS = 2
@@ -103,16 +112,30 @@ def main():
     right_held = True
     locked_at = None
     stopped_at_frame = None
-    max_frames = 20000
+    max_frames = 5000
+    jump_cooldown = 0
+    a_held = 0
 
     for f in range(1, max_frames + 1):
         danger = nearby_danger(pb, pb.memory[0xC202])
-        if danger and right_held:
-            pb.button_release("right")
-            right_held = False
-        elif not danger and not right_held:
+        grounded = pb.memory[0xC20A]
+        if danger:
+            if right_held:
+                pb.button_release("right")
+                right_held = False
+            if grounded and jump_cooldown <= 0:
+                pb.button_press("a")
+                a_held = JUMP_HOLD
+                jump_cooldown = STOMP_COOLDOWN
+        elif not right_held:
             pb.button_press("right")
             right_held = True
+        if a_held > 0:
+            a_held -= 1
+            if a_held == 0:
+                pb.button_release("a")
+        if jump_cooldown > 0:
+            jump_cooldown -= 1
 
         pb.tick()
         x = pb.memory[0xC202]

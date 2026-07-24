@@ -98,8 +98,9 @@ tile his jump arc passes through with no effect on his motion is not.
   back down to column 15. This was previously described only vaguely (a
   loose list of tile IDs); the exact per-column shape above is new.
 
-  Solidity is still **not directly confirmed by collision**, and the
-  earlier "two captures of the same cell disagreed" finding is superseded:
+  (Solidity is now resolved, see below; kept here as the working log of
+  how it got there.) The earlier "two captures of the same cell
+  disagreed" finding is superseded:
   that was most likely the same `SCX`-sampling aliasing that caused the
   `x = 81` mystery above, not a sub-pixel column problem. Every practical
   jump tried this session (triggered at various points approaching the
@@ -548,6 +549,8 @@ work.
   own engine's gravity pinned to the cartridge first (a separate,
   previously-abandoned problem, see `physics.md`) so a cross-engine
   replay is not confounded by mismatched jump timing.
-- Once stitching covers enough of the level, convert the confirmed grid
-  into `Level`/`Solids` and wire it in behind the existing ROM gating,
-  replacing the placeholder demo level.
+- Extend the level conversion (`tools/convert_level_1_1_to_level_format.py`,
+  see the section above) past the opening screen, once the stitched
+  width beyond it is trustworthy enough to be worth converting, and wire
+  the result in behind the existing ROM gating, replacing the
+  placeholder demo level.

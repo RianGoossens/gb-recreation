@@ -51,7 +51,10 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
   - [x] Level data model: solids plus Mario spawn, with a human-editable ASCII loader
   - [~] Extract the scrolling World 1-1 tilemap from the ROM/emulator into level data
     - [x] Pin World 1-1's tile graphics source and the opening screen's background tilemap by observing emulator VRAM (mirrors the title-screen technique; reuses the title screen's existing tile blocks, see docs/reference/level-1-1.md)
-    - [ ] Classify which tile IDs are solid by observing Mario's actual collisions against each one while walking through
+    - [~] Classify which tile IDs are solid by observing Mario's actual collisions against each one while walking through
+      - [x] Ground (tile 96) confirmed solid and sky/background filler (tile 44) confirmed non-solid, by direct observation of the grounded flag and jump arcs (docs/reference/level-1-1.md)
+      - [ ] Pin the step/pyramid structure's solid tiles precisely (needs a sub-column-accurate probe; two captures of the same cell disagreed, see the doc)
+      - [ ] Get Mario past the early blockage in the opening screen (likely an enemy, not a wall) so the rest of the screen can be surveyed
     - [ ] Stitch the full scrolling width by walking through the whole level, recording tilemap and scroll per screen
     - [ ] Convert the extracted grid into `Level`/`Solids` and wire it in, ROM-gated
 - [x] Scrolling camera that follows Mario

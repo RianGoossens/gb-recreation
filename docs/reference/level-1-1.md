@@ -57,18 +57,51 @@ taken at face value.
 This captures only the 20x18 view visible at spawn; the level scrolls well
 past it.
 
+## Tile solidity: what is confirmed so far
+
+Method: force Mario to walk and jump through the opening screen (`SCX` stays
+`0` here, so the raw tilemap index at `(feet_row, x // 8)` is directly
+readable with no scroll math), and watch `0xC20A` (see `physics.md`) flip
+between grounded and airborne. A tile a resting Mario stands on is solid; a
+tile his jump arc passes through with no effect on his motion is not.
+
+- Tile `96` (the ground surface row, `row 16` for the whole opening screen):
+  **solid**. Directly observed: Mario's feet rest on it continuously
+  whenever `0xC20A == 1`.
+- Tile `44` (the blank sky/background filler, most of rows 0-15):
+  **non-solid**. Directly observed: it is the tile at every cell Mario's
+  jump arc passes through in open air with no collision effect.
+- Tile `97` (directly beneath `96`, the underground fill) is presumed solid
+  by level-design consistency (a ground block is solid all the way down),
+  but this has not been independently confirmed by a direct collision, since
+  Mario never touches it from below or the side on this screen. Flagging
+  this rather than asserting it as observed.
+- The mountain/pyramid background silhouette (tile `94` and neighbors) and
+  the small step structure Mario partially climbed (tiles including `54`,
+  `112`-`115`, `129`, `49`-`51`, `65`-`71`) are **not yet reliably
+  classified**. Two captures of the same cell during a jump onto the
+  structure read different tile IDs (`51` from a static pre-walk snapshot,
+  `54` from a capture taken mid-jump), which most likely means Mario's exact
+  pixel column did not match between the two reads rather than the tile
+  itself changing; a single feet-position snapshot per event is not precise
+  enough here. This needs a dedicated frame-by-frame probe that tracks
+  Mario's exact sub-column at the moment of landing, not the broad sweep
+  used for the ground/sky classification above.
+- Separately, in this scripted run Mario could not walk past on-screen
+  `x = 81` even with periodic jumps over ~1400 frames (the level never
+  actually scrolls: `SCX` stays at `0` the entire time). This is most likely
+  an enemy blocking the path by the palm tree seen in that section (side
+  contact with a Goomba-equivalent stops him without killing him outright
+  in this run), not a background tile wall, since no solid-looking tile sits
+  in his direct path at ground level. Left open rather than guessed at.
+
 ## Open work
 
-- Classify which tile IDs are solid (ground, blocks) versus decorative (sky,
-  clouds, background hills) by observing Mario's actual collisions, not by
-  guessing from the picture. `0xC20A` (see `physics.md`) is a clean grounded
-  flag (`1` touching solid ground, `0` airborne), confirmed by forcing a jump
-  and watching it flip exactly on takeoff and landing; it is ready to drive
-  this classification. What is still missing is a reliable mapping from
-  Mario's screen position plus `SCX` to the exact tilemap cell under his
-  feet once the camera starts scrolling and his on-screen position locks in
-  place; that calibration is the next concrete step, not a new RAM address
-  to find.
+- Pin the step/pyramid structure's solid tiles precisely (needs the
+  sub-column-accurate probe described above).
+- Get Mario past the early blockage (likely means avoiding or timing past
+  the enemy rather than just holding right) so the rest of the screen, and
+  eventually the scrolling sections beyond it, can be surveyed the same way.
 - Stitch the full scrolling width: walk through the whole level while
   recording the tilemap and scroll position per screen.
 - Convert the result into `Level`/`Solids` and wire it in behind the existing

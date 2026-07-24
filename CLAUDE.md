@@ -18,6 +18,8 @@ Preferred way to pin a ROM offset: observe, don't read assembly. Boot the verifi
 
 Shared boot sequences for these observation scripts live in `tools/sml_boot.py` (`boot_to_title`, `boot_to_gameplay`, `snapshot`/`restore` for save-state-based experiments). Use it instead of copy-pasting boot boilerplate into a new script. `restore` always ticks once after loading before sending input: a button pressed immediately after `load_state()` silently does not register, which cost a whole jump-timing sweep before it was caught.
 
+When a single formula does not fit an observed trace (a curve fit leaves a systematic, not random, residual pattern), do not tune the formula further; check whether the game exposes its own internal state byte for the thing you are trying to derive (a phase, a mode, a counter) and split the fit along that boundary instead. This is what finally cracked gravity/jump physics after three earlier sessions failed to fit one accelerating curve to a jump arc: splitting the trace at the frame `0xC207` (an already-known "rising/falling" byte) flipped state, rather than at whatever frame a formula implied, is what made the pieces fit cleanly (see `docs/reference/physics.md`). The game's own state is a stronger source of truth than a fit's shape.
+
 ## Communication and style rules (hard constraints)
 
 These are not preferences. Treat a violation as a bug.

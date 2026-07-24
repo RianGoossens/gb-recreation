@@ -24,14 +24,24 @@ register and no position estimate at all for correctness; dead reckoning
 is used only to report a human-readable progress figure and to detect the
 death/respawn below.
 
-A naive "hold Right forever" script eventually dies (an enemy collision
-observed at world column ~48 in the session that wrote this; see
-docs/reference/level-1-1.md) and respawns at the level start, which would
-otherwise reset the buffer back to its spawn contents and corrupt the
-slot-tracking above (the tracker would see the reload as more forward
-streaming and keep incrementing). This script watches for the respawn
-directly (Mario's screen X snapping back near its spawn value after the
-camera lock has engaged) and stops capturing there.
+A naive "hold Right forever" script dies to a hazard around world column
+48 (see docs/reference/level-1-1.md) and respawns at the level start,
+which would otherwise reset the buffer back to its spawn contents and
+corrupt the slot-tracking above (the tracker would see the reload as more
+forward streaming and keep incrementing). This script watches for the
+respawn directly (Mario's screen X snapping back near its spawn value
+after the camera lock has engaged) and stops capturing there.
+
+To get past that hazard at all, this walks in a "hold, then briefly let
+go" rhythm (WALK_FRAMES held, then RELEASE_FRAMES released, repeating)
+instead of holding Right the whole time. A jump-timing sweep against a
+save state right before the hazard found that no jump height or timing
+cleared it while approaching at full running speed, but simply slowing
+down first (releasing Right for at least ~50 frames, no jump needed at
+all) did survive it. That points to the hazard being a moving enemy
+Mario needs to arrive past a different moment for, not an obstacle that
+needs clearing, so periodically breaking stride is a reasonable general
+survival heuristic pending a script that reacts to hazards properly.
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -49,6 +59,8 @@ MAP_BASE = 0x9800
 HUD_ROWS = 2
 ROWS = 18
 COLS = 32
+WALK_FRAMES = 40
+RELEASE_FRAMES = 100
 
 
 def main():
@@ -70,11 +82,23 @@ def main():
             combined[(slot_wc[row][bx], row)] = slot_val[row][bx]
 
     pb.button_press("right")
+    right_held = True
+    cycle_frame = 0
     locked_at = None
     stopped_at_frame = None
-    max_frames = 5000
+    max_frames = 20000
 
     for f in range(1, max_frames + 1):
+        cycle_frame += 1
+        if right_held and cycle_frame >= WALK_FRAMES:
+            pb.button_release("right")
+            right_held = False
+            cycle_frame = 0
+        elif not right_held and cycle_frame >= RELEASE_FRAMES:
+            pb.button_press("right")
+            right_held = True
+            cycle_frame = 0
+
         pb.tick()
         x = pb.memory[0xC202]
 

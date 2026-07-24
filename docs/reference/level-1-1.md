@@ -253,17 +253,61 @@ Reading further, real level geometry there needs a run that survives
 longer, most likely a script that can react to the enemy that ends this
 one around world column 48.
 
+### Trying to jump past the enemy at column 48
+
+Used `pyboy`'s `save_state`/`load_state` to snapshot right before the
+hazard (frame 300) and replay many different jump timings from the same
+point without re-simulating the whole run each time. First attempt looked
+like a clean sweep across delay and hold length, but every single trial
+died identically, including ones that should obviously have cleared a
+normal Goomba-sized enemy. Checked the actual Y trajectory: `dy` stayed at
+exactly `0` for the entire run in every trial, meaning Mario never left
+the ground at all. The bug: pressing a button immediately after
+`load_state()`, with no `tick()` in between, does not register. Any
+future tool built on `save_state`/`load_state` needs at least one
+settle `tick()` before sending input, the same way `sml_boot.py` needs
+settle frames after boot and after pressing Start.
+
+With that fixed (confirmed via `grounded` actually leaving `1`), a sweep
+of 15 delays x 10 hold lengths (150 combinations, jump triggered anywhere
+from immediately to 42 frames after the snapshot, held 2 to 20 frames)
+still died in every single case. This matches the same physics problem
+found with the pyramid: at Mario's saturated running speed, a jump's
+horizontal travel covers more ground per frame of height gained than a
+one-tile-wide hazard allows, so there may be no jump at any height that
+clears it while approaching at full speed.
+
+Tried slowing down instead: releasing Right for a while before reaching
+the hazard, then resuming (with or without a jump). This survived, and
+**no jump was even needed**: releasing Right for at least ~50 frames and
+then just continuing was enough on its own. That means the hazard is
+almost certainly a moving enemy, not a fixed obstacle: slowing down
+changes which frame Mario arrives at its position, so he just needs to
+not be there at the same moment as the enemy, not clear it physically.
+
+`tools/stitch_level_1_1.py` now walks in a "hold Right for `WALK_FRAMES`,
+release for `RELEASE_FRAMES`, repeat" rhythm instead of holding Right the
+whole time, as a general survival heuristic. `WALK_FRAMES=40,
+RELEASE_FRAMES=100` reaches world column 64 before the next death (up
+from 48 holding Right continuously), confirmed reproducible. This is
+still a heuristic, not a fix: the run still eventually dies (just later),
+and the exact rhythm was picked from a small grid search, not derived
+from anything about the hazard itself. A script that actually detects
+enemies (via OAM, the same way this session found the one at column 48)
+and reacts to them specifically would be more robust than tuning a
+fixed walk/pause rhythm further.
+
 ## Open work
 
 - Pin the step/pyramid structure's solid tiles precisely (needs the
   sub-column-accurate probe described above; still not confirmed by
   direct collision, see the pyramid section).
-- Extend `tools/stitch_level_1_1.py`'s run past its first death: it needs
-  either a script that reacts to the enemy/hazard around world column 48
-  (jump over it, or generally survive contact) rather than only holding
-  Right, or a way to try many independent short runs from further and
-  further pre-set starting offsets and merge their confirmed transitions.
-- Once stitching survives past the first hazard, convert the confirmed
-  grid into `Level`/`Solids` and wire it in, ROM-gated.
-- Convert the result into `Level`/`Solids` and wire it in behind the existing
-  ROM gating, replacing the placeholder demo level.
+- Extend `tools/stitch_level_1_1.py`'s reach further: the walk/pause
+  rhythm is a heuristic that delays the next death, not a fix. A script
+  that detects enemies via OAM and reacts to them specifically (or that
+  tries many independent runs from further save-stated starting points
+  and merges their confirmed transitions) would go further and more
+  reliably than tuning `WALK_FRAMES`/`RELEASE_FRAMES` further.
+- Once stitching covers enough of the level, convert the confirmed grid
+  into `Level`/`Solids` and wire it in behind the existing ROM gating,
+  replacing the placeholder demo level.

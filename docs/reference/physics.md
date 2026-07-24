@@ -237,3 +237,23 @@ the way it does now, which is an engine change with its own tests, not a
 constant tweak to make quietly here. Recorded as a strong, verified lead for
 that task, including the exact traces and fitted values above to check any
 future implementation against.
+
+## Stomp bounce: attempted, not yet pinned
+
+Tried the same observation approach on `STOMP_BOUNCE`: script Mario to jump
+near the first World 1-1 enemy and read `0xC201`/`0xC207` around the moment
+of a kill, the same way the jump traces above were read. Detecting a kill by
+counting on-screen OAM slots outside Mario's own (confirmed fixed at slots
+3-6) works once filtered to on-screen Y values (`0 < y < 160`; an
+unfiltered count picks up stale data in unused slots and reports a constant
+20 "enemies" the whole run). But every kill this produced, across several
+trigger-distance and jump-hold combinations, sits inside a completely smooth
+jump arc with no anomaly in Y at the kill frame: no sudden reversal, no
+break in the descent, just an ordinary jump landing normally a dozen-plus
+frames later. That means the script is not actually landing a stomp, it is
+coincidentally jumping near a moment an enemy leaves OAM for some other
+reason (an off-screen despawn, most likely). Scripting a jump that reliably
+lands **on top of** a specific enemy, rather than just near one, needs
+tighter control over the horizontal approach distance and jump timing than
+this attempt used. Left open rather than forcing a bounce number out of
+data that does not show one.

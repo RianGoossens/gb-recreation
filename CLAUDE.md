@@ -16,6 +16,8 @@ Secondary reference: the `kaspermeerts/supermarioland` disassembly. It maps some
 
 Preferred way to pin a ROM offset: observe, don't read assembly. Boot the verified ROM in an emulator, capture the bytes at the memory address that holds the data you want (VRAM, OAM, wherever the game put it), then search the ROM file for that exact byte sequence (`tools/find_rom_offset.py`). The offset it is found at is correct by construction, including bank switching, with no need to trace through disassembly addresses or reason about which ROM bank was switched in. This caught a real bug: a bank-1 assumption for the title screen tile offsets looked plausible and decoded without error, but rendered the wrong tiles (63% match instead of 99.82%) until it was checked this way. Reach for the disassembly text only when this technique cannot apply (there is nothing loaded into observable memory yet, or the logic itself, not an address, is what is unclear).
 
+Shared boot sequences for these observation scripts live in `tools/sml_boot.py` (`boot_to_title`, `boot_to_gameplay`, `snapshot`/`restore` for save-state-based experiments). Use it instead of copy-pasting boot boilerplate into a new script. `restore` always ticks once after loading before sending input: a button pressed immediately after `load_state()` silently does not register, which cost a whole jump-timing sweep before it was caught.
+
 ## Communication and style rules (hard constraints)
 
 These are not preferences. Treat a violation as a bug.

@@ -47,9 +47,19 @@ matches the cartridge.
 - **Walking** (accel, friction, max walk speed): canonical, measured from the
   cartridge. See `docs/reference/physics.md` for the observation method
   (`tools/find_mario_speed.py`).
-- **Gravity, jump, stomp bounce**: still PROVISIONAL placeholders, not yet
-  measured from the cartridge. The same RAM-observation technique used for
-  walking applies; pinning them is open work.
+- **Gravity, jump**: still PROVISIONAL placeholders in `src/core/physics.rs`,
+  but the real shape is now measured, not just unmeasured: the cartridge runs
+  a three-regime state machine (near-constant speed while rising with the
+  jump button held, real deceleration after release, real acceleration while
+  falling), not the single continuous `GRAVITY` acceleration the engine
+  currently applies. See `docs/reference/physics.md` for the fitted values
+  and traces. Reimplementing it is an engine change (a phase switch in
+  `step_motion`, not a constant swap), tracked as open work in
+  `docs/GRAND_MASTER_PLAN.md`'s backlog.
+- **Stomp bounce**: still PROVISIONAL, and unlike gravity, not yet measured
+  either. An attempt to observe it the same way (react to a nearby enemy,
+  jump, read the trace around the kill) did not land a real stomp; see
+  `docs/reference/physics.md`.
 - **Levels**: the demo level, the example level, and the demo campaign are test
   fixtures, documentation, and placeholders. The real levels come from extracting
   the cartridge's geometry (ROM/emulator), which is open work. Shipping invented
@@ -64,7 +74,7 @@ matches the cartridge.
 
 ## Recommended next steps toward faithfulness
 
-1. Measure gravity, jump velocity, and stomp bounce against the cartridge and replace the placeholders.
+1. Implement the measured three-regime jump model in `step_motion` and replace the gravity/jump placeholders; measure stomp bounce (still open) and replace that placeholder too.
 2. Extract the real level geometry.
 3. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
 4. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.

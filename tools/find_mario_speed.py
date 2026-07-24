@@ -18,9 +18,8 @@ or disassembly lookup needed.
 Run: uv run tools/find_mario_speed.py
 """
 
-from pyboy import PyBoy
+from sml_boot import boot_to_gameplay
 
-ROM = "super_mario_land.gb"
 WRAM_START = 0xC000
 WRAM_END = 0xE000
 
@@ -30,18 +29,7 @@ def s8(b):
 
 
 def main():
-    pb = PyBoy(ROM, window="null")
-
-    for _ in range(600):
-        pb.tick()
-
-    pb.button_press("start")
-    for _ in range(10):
-        pb.tick()
-    pb.button_release("start")
-
-    for _ in range(300):
-        pb.tick()
+    pb = boot_to_gameplay()
 
     frames = []
     pb.button_press("right")

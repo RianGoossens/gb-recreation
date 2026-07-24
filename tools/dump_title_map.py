@@ -13,17 +13,14 @@ Run: uv run tools/dump_title_map.py
 """
 
 import sys
-from pyboy import PyBoy
 
-ROM = "super_mario_land.gb"
-BOOT_FRAMES = 600
+from sml_boot import boot_to_title
+
 COLS, ROWS = 20, 18
 
 
 def main():
-    pb = PyBoy(ROM, window="null")
-    for _ in range(BOOT_FRAMES):
-        pb.tick()
+    pb = boot_to_title()
 
     lcdc = pb.memory[0xFF40]
     scx = pb.memory[0xFF43]

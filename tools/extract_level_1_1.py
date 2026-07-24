@@ -22,13 +22,9 @@ import struct
 import sys
 from pathlib import Path
 
-from pyboy import PyBoy
+from sml_boot import boot_to_gameplay
 
-ROM = "super_mario_land.gb"
 OUT = Path("assets/extracted")
-BOOT_FRAMES = 600
-START_PRESS_FRAMES = 10
-GAMEPLAY_SETTLE_FRAMES = 300
 COLS, ROWS = 20, 18  # visible Game Boy tiles
 
 
@@ -47,17 +43,7 @@ def decode_tile(tile_bytes):
 
 
 def main():
-    pb = PyBoy(ROM, window="null")
-    for _ in range(BOOT_FRAMES):
-        pb.tick()
-
-    pb.button_press("start")
-    for _ in range(START_PRESS_FRAMES):
-        pb.tick()
-    pb.button_release("start")
-
-    for _ in range(GAMEPLAY_SETTLE_FRAMES):
-        pb.tick()
+    pb = boot_to_gameplay()
 
     lcdc = pb.memory[0xFF40]
     bgp = pb.memory[0xFF47]

@@ -110,7 +110,8 @@ Goal: expand from a vertical slice to coverage of the original game.
 - [ ] Remaining World 1 levels (the original's real geometry; ROM/copyright gated)
 - [x] A temporary demo campaign to exercise the multi-level flow (placeholder only, until the cartridge's real levels are extracted; shipping our own invented levels is NOT a project goal)
 - [x] Remaining enemy types for World 1 (added a hopping Fly alongside the Goomba; more can follow)
-- [x] Sound and music model: event model implemented (Game emits SoundEvents; frontend drains them). Tone playback is a documented frontend follow-up.
+- [x] Sound and music model: event model implemented (Game emits SoundEvents; frontend drains them)
+- [x] Tone playback: the `gui` frontend plays each SoundEvent as a square-wave beep via `cpal` (src/audio.rs). Frequencies are invented placeholders, not read from the APU; flagged as a stand-in in docs/reference/faithfulness.md.
 - [ ] Additional worlds, level by level
 - [ ] Bosses and special stages
 - [x] Blog posts per major addition (power-ups and polish post covers the star, superball, pause, one-way camera, sound; more per addition)

@@ -55,11 +55,19 @@ matches the cartridge.
   the cartridge's geometry (ROM/emulator), which is open work. Shipping invented
   levels is not a goal (see the end-goal note in CLAUDE.md).
 
+## Sound
+
+| Piece | Label | Notes |
+|-------|-------|-------|
+| Sound event model (`SoundEvent`, emitted by `Game`) | canonical | the game marks the same moments the cartridge would play a sound; see `src/sound.rs`. |
+| Tone playback (`sml::frontend::tone_for`, `src/audio.rs`, `gui` feature) | **stand-in** | each event plays an invented square-wave beep (frequency and duration picked for variety, not read from the APU). The cartridge's actual sound effect data (note sequences, duty cycles) has not been extracted. Replace with the real APU data once pinned. |
+
 ## Recommended next steps toward faithfulness
 
 1. Measure gravity, jump velocity, and stomp bounce against the cartridge and replace the placeholders.
 2. Extract the real level geometry.
 3. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
 4. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.
+5. Pin the cartridge's real sound effect data (APU registers/note data per event) and replace the invented tones in `src/audio.rs`.
 
 (Brick breaking and superball coin collection are already canonical, done.)

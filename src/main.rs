@@ -9,6 +9,9 @@ use std::process::ExitCode;
 
 use sml::render::{render_background, Framebuffer, Palette};
 
+#[cfg(feature = "gui")]
+mod audio;
+
 const DEFAULT_ROM: &str = "super_mario_land.gb";
 
 fn main() -> ExitCode {
@@ -364,6 +367,11 @@ fn run_game(args: &[String]) -> ExitCode {
     };
     window.set_target_fps(60);
 
+    let player = audio::AudioPlayer::try_new();
+    if player.is_none() {
+        eprintln!("no audio output device found; running muted");
+    }
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let mut held = Vec::new();
         if window.is_key_down(Key::Left) { held.push(GbKey::Left); }
@@ -375,8 +383,13 @@ fn run_game(args: &[String]) -> ExitCode {
         if window.is_key_down(Key::Enter) { held.push(GbKey::Enter); }
 
         session.step(buttons_from_held(held));
-        // A future audio backend would play these; for now they are discarded.
-        let _sounds = session.drain_sounds();
+        if let Some(player) = &player {
+            for event in session.drain_sounds() {
+                player.play(sml::frontend::tone_for(event));
+            }
+        } else {
+            session.drain_sounds();
+        }
 
         let argb = sml::frontend::to_argb(&session.render(), SCALE);
         if let Err(e) = window.update_with_buffer(&argb, win_w, win_h) {

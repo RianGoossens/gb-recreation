@@ -62,12 +62,40 @@ Read live from VRAM after booting ~600 frames (see `tools/extract_title.py`):
 | SCX, SCY | 0, 0 | no scroll, the visible 20x18 is the top-left of the map |
 | Unique tiles | 110 of 360 cells | the 20x18 screen reuses 110 distinct tiles |
 
-This resolves the open questions below. The extraction tool reads the visible
-grid, decodes each tile from VRAM with the signed addressing above, deduplicates
-them, and writes our tile-sheet and tile-map assets (gitignored).
+## ROM offsets for the title screen tile data
 
-## Earlier open questions (now answered above)
+The load routine is `GameState_0E` in the kaspermeerts/supermarioland
+disassembly (bank0.asm). Its copy instructions use CPU addresses like
+`ld hl, $791A`, which fall in the Game Boy's bank-switched window
+($4000-$7FFF). `GameState_0E` runs with ROM bank 2 switched in, so a CPU
+address `A` in that window is at ROM file offset `2*0x4000 + (A - 0x4000)`,
+not the raw value of `A`. A bank-1 assumption (file offset equals the CPU
+address) looks plausible but reads the wrong tiles: it happens to land on
+in-range, decodable tile data, so it fails silently, producing a garbled but
+technically valid-looking image rather than an error. It was caught by
+diffing against an emulator-rendered reference (99.82% shade match with the
+correct offsets, 63% with the bank-1 guess) and confirmed by dumping raw
+bytes from emulator VRAM after boot and locating them in the ROM file, which
+placed all four blocks in bank 2.
+
+| CPU addr | ROM file offset (bank 2) | VRAM destination | Size (bytes) | Tiles | Content |
+|----------|--------------------------|-------------------|---------------|-------|---------|
+| $5032 | 0x9032 | 0x9000 | 0x02C0 | 44 | Font, coins (signed indices 0x00-0x2B) |
+| $791A | 0xB91A | 0x9300 | 0x0500 | 80 | Menu/logo background (signed indices 0x30-0x7F) |
+| $7E1A | 0xBE1A | 0x8800 | 0x0170 | 23 | Additional tiles (signed indices 0x80-0x96) |
+| $4862 | 0x8862 | 0x8AC0 | 0x0010 | 1 | Mushroom sprite |
+
+The Rust extraction command (`sml extract-title`) reads these offsets directly
+from the ROM binary. No emulator is involved in extracting the tile graphics.
+The tilemap (20x18 VRAM tile indices) is embedded as a constant in
+`src/assets/title.rs`: the level-loading routine that generates it is not yet
+reimplemented, so the map was captured once from emulator VRAM
+(`tools/dump_title_map.py`) and is documented as a fixed property of this ROM
+rather than derived at runtime. Extracting it without an emulator, by
+reimplementing the level loader, is open work.
+
+## Earlier open questions (now answered)
 
 - Exact VRAM tile block used by the title screen (LCDC bit 4: 0x8000 unsigned addressing or 0x8800 signed). Answer: signed.
 - Which of the two tile maps holds the title layout. Answer: 0x9800.
-- Where in the ROM banks the title tiles and map are stored. Not needed: we take the tiles from VRAM as the game draws them, rather than chasing ROM offsets.
+- Where in the ROM banks the title tile graphics are stored. Answer: all in bank 2, see the ROM offsets table above. Extracted by `sml extract-title` directly from the ROM file. The tilemap layout is still a captured constant, not derived from the ROM at runtime (see above).

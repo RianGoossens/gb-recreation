@@ -19,6 +19,7 @@ fn main() -> ExitCode {
             verify_rom(path)
         }
         Some("extract-tiles") => extract_tiles(&args[1..]),
+        Some("extract-title") => extract_title_screen(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
         Some("run") => run_game(&args[1..]),
@@ -113,6 +114,62 @@ fn parse_number(s: &str) -> Option<usize> {
     }
 }
 
+/// `extract-title [outdir]` reads the verified ROM and extracts the title
+/// screen tiles and tilemap directly from known ROM offsets. No emulator
+/// involved: tile data is read from the ROM binary at addresses pinned from
+/// the kaspermeerts/supermarioland disassembly.
+///
+/// Output goes to `outdir` (default `assets/extracted/`):
+///   title.tiles   our SMLT tile-sheet format (deduplicated tiles + palette)
+///   title.tmap    our SMLM tile-map format (20x18 indices into the sheet)
+fn extract_title_screen(args: &[String]) -> ExitCode {
+    let outdir = args.first().map(String::as_str).unwrap_or("assets/extracted");
+    let out_path = std::path::Path::new(outdir);
+    if let Err(e) = std::fs::create_dir_all(out_path) {
+        eprintln!("could not create output directory {outdir}: {e}");
+        return ExitCode::FAILURE;
+    }
+
+    let (sheet, cells, cols, rows) = match sml::assets::title::extract_title(DEFAULT_ROM) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("title extraction failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let tiles_path = out_path.join("title.tiles");
+    if let Err(e) = sheet.save(&tiles_path) {
+        eprintln!("could not write {}: {e}", tiles_path.display());
+        return ExitCode::FAILURE;
+    }
+
+    // SMLM tilemap: magic, version, u16 width, u16 height, index bytes.
+    let mut map_blob = b"SMLM".to_vec();
+    map_blob.push(1); // version
+    map_blob.extend_from_slice(&(cols as u16).to_le_bytes());
+    map_blob.extend_from_slice(&(rows as u16).to_le_bytes());
+    map_blob.extend_from_slice(&cells);
+    let map_path = out_path.join("title.tmap");
+    if let Err(e) = std::fs::write(&map_path, &map_blob) {
+        eprintln!("could not write {}: {e}", map_path.display());
+        return ExitCode::FAILURE;
+    }
+
+    // PGM preview of the tile sheet.
+    let pgm_path = out_path.join("title.tiles.pgm");
+    if let Err(e) = std::fs::write(&pgm_path, sheet.to_pgm(16)) {
+        eprintln!("could not write {}: {e}", pgm_path.display());
+        return ExitCode::FAILURE;
+    }
+
+    println!("extracted title screen from ROM (no emulator):");
+    println!("  {} unique tiles -> {}", sheet.tiles.len(), tiles_path.display());
+    println!("  {}x{} tilemap   -> {}", cols, rows, map_path.display());
+    println!("  tile preview    -> {}", pgm_path.display());
+    ExitCode::SUCCESS
+}
+
 /// `screenshot <out.png>` renders one frame headlessly and writes a PNG.
 /// Until the title screen assets are extracted, this draws a demo scene so the
 /// render-to-image path can be exercised and eyeballed.
@@ -141,7 +198,7 @@ fn screenshot(args: &[String]) -> ExitCode {
 
 /// `render-title <out.png>` loads the extracted title-screen assets and renders
 /// them through our own pipeline to a PNG. The extracted assets are gitignored,
-/// so run `uv run tools/extract_title.py` first to produce them.
+/// so run `sml extract-title` first to produce them.
 fn render_title(args: &[String]) -> ExitCode {
     let out = match args {
         [out] => out,
@@ -155,7 +212,7 @@ fn render_title(args: &[String]) -> ExitCode {
         Ok(s) => s,
         Err(e) => {
             eprintln!("could not load title tiles: {e}");
-            eprintln!("run: uv run tools/extract_title.py");
+            eprintln!("run: cargo run -- extract-title");
             return ExitCode::FAILURE;
         }
     };
@@ -342,6 +399,7 @@ fn usage() {
     println!("  sml                                       print status");
     println!("  sml verify-rom [path]                     verify the ROM hashes");
     println!("  sml extract-tiles <offset> <count> <out>  decode ROM tiles to an asset file");
+    println!("  sml extract-title [outdir]                extract title screen from ROM");
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
     println!("  sml run [level.txt]                       play in a window (needs --features gui)");

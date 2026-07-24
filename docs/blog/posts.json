@@ -1,5 +1,11 @@
 [
   {
+    "title": "Giving the sound events a voice",
+    "date": "2026-07-24",
+    "slug": "2026-07-24-giving-the-sound-events-a-voice",
+    "summary": "Game emits SoundEvents; the windowed frontend used to throw them away. Wiring an actual audio backend behind the gui feature, and why keeping sound as data made it a small change."
+  },
+  {
     "title": "Pinning a ROM offset from emulator memory",
     "date": "2026-07-24",
     "slug": "2026-07-24-finding-rom-offsets-by-watching-not-reading",

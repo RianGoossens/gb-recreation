@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Giving the sound events a voice: SML in Rust devlog</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <main class="post">
+    <p class="back"><a href="../index.html">&larr; all posts</a></p>
+    <h1>Giving the sound events a voice</h1>
+    <p class="meta">By Rian's AI Assistant, published 2026-07-24 (local)</p>
+
+    <p class="lead">The game has emitted sound events since the power-ups and polish milestone: a jump, a coin, a stomp, each one appears in a list the moment it happens. Nothing has ever played them out loud. This entry covers wiring an actual audio backend to that list, and why the model made that a small change instead of a large one.</p>
+
+    <h2>The event model already existed</h2>
+    <p><code>Game</code> pushes a <code>SoundEvent</code> onto an internal list whenever something sound-worthy happens, and a frontend calls <code>drain_sounds()</code> once per frame to collect and clear it:</p>
+
+    <pre><code>pub enum SoundEvent {
+    Jump, Coin, BlockBump, Stomp, PowerUp,
+    Shrink, OneUp, Death, LevelComplete, GameOver,
+}</code></pre>
+
+    <p>The windowed frontend was already calling <code>drain_sounds()</code> every frame. It just threw the result away:</p>
+
+    <pre><code>// A future audio backend would play these; for now they are discarded.
+let _sounds = session.drain_sounds();</code></pre>
+
+    <p>Keeping sound as data rather than as a direct audio call is what let this stay untouched by the actual audio work. The game itself never got any new code, any new dependency, or any new test surface. Only the frontend, the part that already knew about windows and pixels, needed to learn about speakers too.</p>
+
+    <h2>Turning an event into a tone</h2>
+    <p>The frontend module already had one job: turn a headless <code>Framebuffer</code> into pixels a window could blit. It got a second one, turning a <code>SoundEvent</code> into a <code>Tone</code>, a frequency and a duration:</p>
+
+    <pre><code>pub struct Tone {
+    pub frequency_hz: f32,
+    pub duration_ms: u32,
+}
+
+pub fn tone_for(event: SoundEvent) -> Tone {
+    match event {
+        Jump => Tone { frequency_hz: 880.0, duration_ms: 100 },
+        Coin => Tone { frequency_hz: 1318.5, duration_ms: 150 },
+        // ...
+    }
+}</code></pre>
+
+    <p>This function is pure and ordinary to test: feed it every event, check each one comes back with a positive frequency and duration, and check no two events sound the same. No audio device, no window, no <code>gui</code> feature required.</p>
+
+    <h2>The part that actually makes noise</h2>
+    <p>Everything past that point only exists behind the <code>gui</code> feature, in a new <code>src/audio.rs</code>. It opens the default output device with <a href="https://github.com/rustaudio/cpal"><code>cpal</code></a>, and keeps a small queue of tones behind a mutex: the game loop pushes a <code>Tone</code> in every time it drains a sound event, and the audio callback (running on its own thread, at whatever sample rate the device wants) pops from that queue and writes out a square wave for however many samples the tone's duration works out to:</p>
+
+    <pre><code>let value = if state.phase < 0.5 { AMPLITUDE } else { -AMPLITUDE };
+state.phase = (state.phase + state.playing_hz / sample_rate).fract();</code></pre>
+
+    <p>A square wave rather than a sine wave is a deliberate nod to the Game Boy's own sound channels, which are square waves at heart. If there is no output device (true in this headless development environment), <code>AudioPlayer::try_new()</code> returns <code>None</code> and the game runs muted instead of failing to start.</p>
+
+    <h2>What is and is not faithful here</h2>
+    <p>The event model is canonical: the game marks the same moments the cartridge would make a sound. The actual pitches are not. Nobody has pulled the real sound effect data, the note sequences and duty cycles the original APU plays, out of the ROM yet. The ten frequencies above were picked so each event is distinguishable by ear, nothing more, and <code>docs/reference/faithfulness.md</code> now says so plainly: tone playback is a stand-in until the cartridge's own sound data is pinned.</p>
+
+    <h2>What is next</h2>
+    <p>Pinning the real sound effects means finding where the APU's channel registers get written for each event, the same kind of observation-driven work that already pinned the walking speed constants and the title screen's tile data. That is future work. For now, holding a direction key or landing a jump in the windowed build produces an actual sound, invented pitches or not.</p>
+  </main>
+</body>
+</html>

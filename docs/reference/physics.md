@@ -171,6 +171,29 @@ differ (11 vs 13) despite similar total distance: the two phases have
 slightly different constant speeds, not the same acceleration integrated
 over an asymmetric arc.
 
+### Refinement: the held rise is not velocity-triggered at all
+
+Checked directly whether "constant" really means constant: held A for a full
+50 frames without ever releasing, well past the usual apex. The apex still
+lands at frame 12, identical to every other max-hold trial. That rules out
+one reading of "held sustains the rise": it does not sustain it
+indefinitely, something ends it at a fixed frame regardless of the button.
+
+Fitting the held-rise segment as a quadratic (excluding the frame that has
+already turned) gives a small nonzero curvature, `accel(2a) = 0.0385
+px/frame^2`, consistent with the very flat linear fit found earlier, not a
+new number. But following that acceleration's own implied velocity to zero
+(`-b / 2a` from the fit) predicts roughly **61 frames** to naturally reach
+zero speed, nowhere near the observed 12-frame apex. So whatever ends the
+held rise at frame 12, it is not this small deceleration finally catching
+up to the velocity. It looks like a fixed maximum rise duration (a frame
+counter, not a velocity threshold), independent of the near-zero
+deceleration also present during the hold. Releasing early still cuts in
+before that counter runs out, triggering the separate, much stronger
+regime-2 deceleration documented above. Any future engine implementation
+needs both pieces: a small drift during the held rise, and a hard duration
+cap on top of it, not the fixed-duration cap alone and not the drift alone.
+
 ### The short-hold anomaly resolves: releasing A early starts real deceleration, it does not cut the rise short
 
 The previous attempt's open question was why an 8-frame hold gives a *later*
@@ -209,9 +232,12 @@ fall, consistent across every hold length tried.
 Three distinct regimes make up the jump, instead of a single `GRAVITY`
 constant:
 
-1. **Rising, A held**: near-constant upward speed (~2.1-2.3 px/frame), no
-   measurable deceleration. Looks like the classic "holding jump counters
-   gravity" convention used across Mario games.
+1. **Rising, A held**: near-constant upward speed (~2.1-2.3 px/frame), with
+   only a tiny residual deceleration (~0.04 px/frame², see the refinement
+   above). That drift is too small to be what ends the rise: this phase
+   ends at a fixed ~12-frame cap regardless of how long A is held, not when
+   the drift finally decays velocity to zero (which its own fit puts at
+   roughly 61 frames, never reached in practice).
 2. **Rising, A released (or otherwise not held)**: upward speed decays
    toward zero over several frames, a real deceleration.
 3. **Falling**: downward speed accelerates from ~0 at the apex to ~3

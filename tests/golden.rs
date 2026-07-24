@@ -51,3 +51,14 @@ fn game_after_walking_right_matches_golden() {
     }
     check_golden("tests/golden/game_walk_right.png", &encode(&game.render()));
 }
+
+#[test]
+fn game_mid_jump_matches_golden() {
+    let mut game = Game::new(Game::demo_level());
+    let mut buttons = sml::input::Buttons::default();
+    buttons.set(sml::input::Button::A, true);
+    for _ in 0..11 {
+        game.step(buttons);
+    }
+    check_golden("tests/golden/game_mid_jump.png", &encode(&game.render()));
+}

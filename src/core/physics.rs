@@ -13,8 +13,23 @@
 //! so the original's speed unit is 1/6 pixel and a capped speed of 6 is
 //! exactly 1 pixel per frame. Converted to our subpixel scale (256 per
 //! pixel): accel and friction are both `round(256 / 6) = 43`, and the walking
-//! cap is `256` (1 px/frame). Gravity and jump values are still provisional;
-//! see the plan.
+//! cap is `256` (1 px/frame).
+//!
+//! Jumping (`JUMP_VELOCITY`, `RISE_DRIFT`, `MAX_RISE_FRAMES`, `JUMP_CUT`,
+//! `GRAVITY`) is pinned the same way (see `docs/reference/physics.md`), by
+//! reading `0xC201` (Y position) and `0xC207` (an internal rise/fall phase
+//! byte) frame by frame through several jumps. The cartridge's jump is not
+//! one continuously-accelerating parabola; it is three regimes: rising with
+//! the button held decelerates only a tiny, near-negligible amount
+//! (`RISE_DRIFT`) for up to a fixed frame count (`MAX_RISE_FRAMES`); if the
+//! button is released before that count is up, a real, much stronger
+//! deceleration takes over (`JUMP_CUT`); falling accelerates for real
+//! (`GRAVITY`), a different rate again. The frame count running out while
+//! still held is its own, distinct case, not routed through `JUMP_CUT`: the
+//! traced data shows a one-frame flip straight to falling there, so it is
+//! modeled as a direct velocity reset in `apply_vertical_accel`, not a slow
+//! decay. `STOMP_BOUNCE` is still an unmeasured placeholder; an attempt to
+//! observe it did not land a clean trace, see physics.md.
 
 use super::entity::{pixels, Mario};
 use super::level::{Solids, TILE};
@@ -27,15 +42,30 @@ pub const WALK_ACCEL: i32 = 43;
 pub const FRICTION: i32 = 43;
 /// Cap on horizontal speed while walking.
 pub const MAX_WALK_SPEED: i32 = 256;
-/// Downward acceleration per frame.
-pub const GRAVITY: i32 = 40;
+/// Downward acceleration per frame while falling. Derived from total fall
+/// distance and duration (about 25px over about 13 frames from rest at the
+/// apex), a sturdier measure than differentiating the noisy per-frame
+/// quadratic fits in physics.md, whose fall-phase residuals ran up to 1.6px
+/// and undershot this once actually simulated end to end.
+pub const GRAVITY: i32 = 76;
 /// Cap on downward speed, so falling does not tunnel through thin floors.
 pub const MAX_FALL_SPEED: i32 = 640;
-/// Upward speed given at the start of a jump.
-pub const JUMP_VELOCITY: i32 = 700;
-/// Releasing the jump button early clamps any remaining rise to this, giving
-/// short hops when tapped and full jumps when held.
-pub const JUMP_CUT: i32 = 200;
+/// Upward speed given at the start of a jump, and held roughly steady
+/// (see `RISE_DRIFT`) for as long as the button stays held within
+/// `MAX_RISE_FRAMES`.
+pub const JUMP_VELOCITY: i32 = 602;
+/// Tiny deceleration applied each frame while rising with the button held.
+/// On its own this would take about 61 frames to decay to zero; it never
+/// gets the chance, because `MAX_RISE_FRAMES` cuts the held rise short first.
+pub const RISE_DRIFT: i32 = 10;
+/// How many frames a held rise can last before it is cut off regardless of
+/// the button still being held.
+pub const MAX_RISE_FRAMES: i32 = 12;
+/// Deceleration applied once the rise is no longer sustained by a held
+/// button within `MAX_RISE_FRAMES` (either released early, or the cap ran
+/// out). Real and far stronger than `RISE_DRIFT`, which is what gives a
+/// tapped jump a short hop and a held jump a full-height one.
+pub const JUMP_CUT: i32 = 29;
 /// Upward speed Mario gets from stomping an enemy.
 pub const STOMP_BOUNCE: i32 = 500;
 
@@ -70,12 +100,8 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids, t: &Tun
     resolve_horizontal(mario, solids);
 
     apply_jump(mario, buttons, t);
+    apply_vertical_accel(mario, buttons, t);
 
-    // Gravity only builds up while airborne. Resting on a solid keeps vy at 0,
-    // so Mario sits still instead of nudging into the floor every frame.
-    if !mario.on_ground {
-        mario.vy = (mario.vy + t.gravity).min(t.max_fall_speed);
-    }
     mario.y += mario.vy;
     resolve_vertical(mario, solids);
 
@@ -86,8 +112,7 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids, t: &Tun
 }
 
 /// Start a jump on the frame the jump button is pressed while grounded. Holding
-/// the button does not re-jump (a latch guards that). Releasing early while
-/// still rising cuts the jump short, which gives variable jump height.
+/// the button does not re-jump (a latch guards that).
 fn apply_jump(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
     let jump = buttons.is_held(Button::A);
 
@@ -95,12 +120,36 @@ fn apply_jump(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
         mario.vy = -t.jump_velocity;
         mario.on_ground = false;
         mario.jump_latched = true;
+        mario.rise_frames = 0;
     }
     if !jump {
         mario.jump_latched = false;
-        if mario.vy < -t.jump_cut {
-            mario.vy = -t.jump_cut;
-        }
+    }
+}
+
+/// Three regimes, not one constant acceleration (see the module doc comment
+/// and `docs/reference/physics.md`): a near-flat rise while the button is
+/// held, capped at a fixed frame count; a real deceleration if released
+/// before that cap; and a real acceleration while falling. The cap running
+/// out while still held is not the same event as an early release: the
+/// traced data shows a one-frame flip straight to falling there (no gradual
+/// decay first), so it is modeled as a direct reset, not a slow decay.
+fn apply_vertical_accel(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
+    if mario.on_ground {
+        return;
+    }
+    let rising = mario.vy < 0;
+    let holding_jump = buttons.is_held(Button::A);
+
+    if rising && holding_jump && mario.rise_frames < t.max_rise_frames {
+        mario.rise_frames += 1;
+        mario.vy += t.rise_drift;
+    } else if rising && holding_jump {
+        mario.vy = 0;
+    } else if rising {
+        mario.vy += t.jump_cut;
+    } else {
+        mario.vy = (mario.vy + t.gravity).min(t.max_fall_speed);
     }
 }
 
@@ -233,18 +282,20 @@ mod tests {
 
     #[test]
     fn physics_constants_are_pinned() {
-        // Walking is pinned to observed emulator RAM (see the module doc
-        // comment); gravity/jump are still provisional. This test is a
-        // tripwire: if a constant changes, it is a deliberate act, not an
-        // accident. Update the expected values here in the same commit that
-        // retunes them.
+        // Walking and jumping are both pinned to observed emulator RAM now
+        // (see the module doc comment); stomp bounce is still an unmeasured
+        // placeholder. This test is a tripwire: if a constant changes, it is
+        // a deliberate act, not an accident. Update the expected values here
+        // in the same commit that retunes them.
         assert_eq!(WALK_ACCEL, 43);
         assert_eq!(FRICTION, 43);
         assert_eq!(MAX_WALK_SPEED, 256);
-        assert_eq!(GRAVITY, 40);
+        assert_eq!(GRAVITY, 76);
         assert_eq!(MAX_FALL_SPEED, 640);
-        assert_eq!(JUMP_VELOCITY, 700);
-        assert_eq!(JUMP_CUT, 200);
+        assert_eq!(JUMP_VELOCITY, 602);
+        assert_eq!(RISE_DRIFT, 10);
+        assert_eq!(MAX_RISE_FRAMES, 12);
+        assert_eq!(JUMP_CUT, 29);
         assert_eq!(STOMP_BOUNCE, 500);
     }
 
@@ -338,6 +389,49 @@ mod tests {
         // Still holding A in the air must not relaunch.
         step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
         assert!(m.vy > vy_after_first, "gravity should reduce upward speed, not reset it");
+    }
+
+    #[test]
+    fn held_rise_is_cut_off_by_frame_count_not_by_decay() {
+        // Holding A well past MAX_RISE_FRAMES must still end the rise: the
+        // real cartridge does this too (see physics.md), the drift alone
+        // would take dozens of frames to reach zero on its own. Once the cap
+        // kicks in, JUMP_CUT's real deceleration takes over and reaches zero
+        // in a handful more frames, same as a real jump's total arc length.
+        let (mut m, solids) = resting_on_floor();
+        for i in 0..MAX_RISE_FRAMES {
+            step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
+            assert!(m.vy < 0, "frame {i}: should still be rising while under the cap");
+        }
+        for _ in 0..40 {
+            step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
+            if m.vy >= 0 {
+                return;
+            }
+        }
+        panic!("past the cap, held or not, the rise should have ended within 40 more frames");
+    }
+
+    #[test]
+    fn releasing_early_decelerates_faster_than_the_held_drift() {
+        // Tap: release immediately after takeoff.
+        let (mut tap, solids) = resting_on_floor();
+        step_motion(&mut tap, held(Button::A), &solids, &Tuning::default());
+        let tap_vy_at_takeoff = tap.vy;
+        step_motion(&mut tap, Buttons::default(), &solids, &Tuning::default());
+        let tap_delta = tap.vy - tap_vy_at_takeoff;
+
+        // Hold: keep A down for the same second frame.
+        let (mut hold, solids2) = resting_on_floor();
+        step_motion(&mut hold, held(Button::A), &solids2, &Tuning::default());
+        let hold_vy_at_takeoff = hold.vy;
+        step_motion(&mut hold, held(Button::A), &solids2, &Tuning::default());
+        let hold_delta = hold.vy - hold_vy_at_takeoff;
+
+        assert!(
+            tap_delta > hold_delta,
+            "releasing early should decelerate faster than the held drift: tap_delta={tap_delta} hold_delta={hold_delta}"
+        );
     }
 
     #[test]

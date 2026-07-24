@@ -47,15 +47,17 @@ matches the cartridge.
 - **Walking** (accel, friction, max walk speed): canonical, measured from the
   cartridge. See `docs/reference/physics.md` for the observation method
   (`tools/find_mario_speed.py`).
-- **Gravity, jump**: still PROVISIONAL placeholders in `src/core/physics.rs`,
-  but the real shape is now measured, not just unmeasured: the cartridge runs
+- **Gravity, jump**: canonical, measured and implemented. The cartridge runs
   a three-regime state machine (near-constant speed while rising with the
-  jump button held, real deceleration after release, real acceleration while
-  falling), not the single continuous `GRAVITY` acceleration the engine
-  currently applies. See `docs/reference/physics.md` for the fitted values
-  and traces. Reimplementing it is an engine change (a phase switch in
-  `step_motion`, not a constant swap), tracked as open work in
-  `docs/GRAND_MASTER_PLAN.md`'s backlog.
+  jump button held, capped at a fixed frame count; real deceleration if
+  released before that cap; real acceleration while falling), not one
+  continuous `GRAVITY` acceleration, and `step_motion` in
+  `src/core/physics.rs` now models it that way (`apply_vertical_accel`).
+  Not pixel-perfect: the fitted constants were checked by simulating a
+  full jump end to end and comparing against the traced arc (about 26px
+  peak, landing around frame 26, versus the real 24-25px over ~24 frames),
+  not derived and shipped untested. See `docs/reference/physics.md` for the
+  fitted values, traces, and the correction made while implementing it.
 - **Stomp bounce**: still PROVISIONAL, and unlike gravity, not yet measured
   either. An attempt to observe it the same way (react to a nearby enemy,
   jump, read the trace around the kill) did not land a real stomp; see
@@ -74,7 +76,7 @@ matches the cartridge.
 
 ## Recommended next steps toward faithfulness
 
-1. Implement the measured three-regime jump model in `step_motion` and replace the gravity/jump placeholders; measure stomp bounce (still open) and replace that placeholder too.
+1. Measure stomp bounce (still open; gravity and jump are now measured and implemented) and replace that placeholder.
 2. Extract the real level geometry.
 3. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
 4. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.

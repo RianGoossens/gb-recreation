@@ -44,6 +44,11 @@ pub struct Mario {
     /// True while the jump button is held after a jump started, so holding it
     /// does not trigger a second jump. Cleared when the button is released.
     pub jump_latched: bool,
+    /// Frames spent rising since the current jump started, while the button
+    /// is still held. The held rise is capped at a fixed frame count rather
+    /// than by its own (much smaller) deceleration ever reaching zero; see
+    /// `docs/reference/physics.md`. Reset to 0 on takeoff.
+    pub rise_frames: i32,
     /// Cleared when Mario takes a fatal hit. The game turns this back on when it
     /// respawns him.
     pub alive: bool,
@@ -67,6 +72,7 @@ impl Mario {
             on_ground: false,
             power: Power::Small,
             jump_latched: false,
+            rise_frames: 0,
             alive: true,
             invuln: 0,
             invincible: 0,

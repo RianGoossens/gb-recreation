@@ -6,8 +6,8 @@
 //! recompile. The defaults are the values pinned in the physics module.
 
 use crate::core::physics::{
-    FRICTION, GRAVITY, JUMP_CUT, JUMP_VELOCITY, MAX_FALL_SPEED, MAX_WALK_SPEED, STOMP_BOUNCE,
-    WALK_ACCEL,
+    FRICTION, GRAVITY, JUMP_CUT, JUMP_VELOCITY, MAX_FALL_SPEED, MAX_RISE_FRAMES, MAX_WALK_SPEED,
+    RISE_DRIFT, STOMP_BOUNCE, WALK_ACCEL,
 };
 
 /// The starting value of the level timer.
@@ -21,6 +21,8 @@ pub struct Tuning {
     pub gravity: i32,
     pub max_fall_speed: i32,
     pub jump_velocity: i32,
+    pub rise_drift: i32,
+    pub max_rise_frames: i32,
     pub jump_cut: i32,
     pub stomp_bounce: i32,
     pub timer_start: u32,
@@ -35,6 +37,8 @@ impl Default for Tuning {
             gravity: GRAVITY,
             max_fall_speed: MAX_FALL_SPEED,
             jump_velocity: JUMP_VELOCITY,
+            rise_drift: RISE_DRIFT,
+            max_rise_frames: MAX_RISE_FRAMES,
             jump_cut: JUMP_CUT,
             stomp_bounce: STOMP_BOUNCE,
             timer_start: DEFAULT_TIMER_START,
@@ -66,6 +70,8 @@ impl Tuning {
                 "gravity" => t.gravity = parse_i()?,
                 "max_fall_speed" => t.max_fall_speed = parse_i()?,
                 "jump_velocity" => t.jump_velocity = parse_i()?,
+                "rise_drift" => t.rise_drift = parse_i()?,
+                "max_rise_frames" => t.max_rise_frames = parse_i()?,
                 "jump_cut" => t.jump_cut = parse_i()?,
                 "stomp_bounce" => t.stomp_bounce = parse_i()?,
                 "timer_start" => t.timer_start = parse_u()?,
@@ -101,6 +107,13 @@ mod tests {
     fn from_text_ignores_comments_and_blanks() {
         let t = Tuning::from_text("\n  # just a comment\n\ngravity=50  # inline comment\n").unwrap();
         assert_eq!(t.gravity, 50);
+    }
+
+    #[test]
+    fn from_text_overrides_the_rise_knobs() {
+        let t = Tuning::from_text("rise_drift = 5\nmax_rise_frames = 20\n").unwrap();
+        assert_eq!(t.rise_drift, 5);
+        assert_eq!(t.max_rise_frames, 20);
     }
 
     #[test]

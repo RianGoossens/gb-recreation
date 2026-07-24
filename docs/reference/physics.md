@@ -70,6 +70,11 @@ that airborne quirk. Checked directly rather than assumed.
 
 ## Still to pin
 
+This section is the working log, kept in the order it was actually found.
+Gravity, jump velocity, and jump cut got pinned and implemented further
+down ("Implemented, with one more correction along the way"); only stomp
+bounce is still open by the end of this document.
+
 Gravity, jump velocity, jump cut, and stomp bounce are still provisional
 placeholders. Forcing a jump (hold A, release, let Mario land) and diffing
 WRAM the same way found Mario's vertical state cluster, right next to the
@@ -253,16 +258,42 @@ clean upward trend). The fall is reliably faster to accelerate than the
 released rise is to decelerate, by roughly 30-50% in every trial. Two
 separate constants, not one shared `GRAVITY` reused in both directions.
 
-This is a real structural finding. It does not become a shipped
-`GRAVITY`/`JUMP_VELOCITY`/`JUMP_CUT` number today: those constants assume a
-single continuous-acceleration model, and this data describes the
-three-regime state machine above instead. Implementing this properly means
-changing `step_motion` to switch behavior on an explicit rise/fall phase
-(mirroring `0xC207`) rather than adding one constant every airborne frame
-the way it does now, which is an engine change with its own tests, not a
-constant tweak to make quietly here. Recorded as a strong, verified lead for
-that task, including the exact traces and fitted values above to check any
-future implementation against.
+This is a real structural finding.
+
+### Implemented, with one more correction along the way
+
+`step_motion` (`src/core/physics.rs`) now models the three regimes directly,
+via `apply_vertical_accel`, instead of one `GRAVITY` added every airborne
+frame. Simulating the new model end to end (a scripted max-hold jump over a
+flat floor, checked outside the test suite before committing) caught one
+more thing this document had wrong: routing the frame-cap expiry through
+`JUMP_CUT`, the same as an early release, produced a jump that rose to about
+40px and took roughly 17 extra frames to decelerate before falling, nothing
+like the real 24px/24-frame arc. The real trace already showed why, and it
+had been read past the first time: at the cap (frame 12 in every held-past
+trial), the delta flips from `-2` straight to `+1` in one frame, with no
+intermediate values the way an early release shows. That is not a slow
+decay reaching zero, it is an abrupt reset. The engine now models the
+cap-expiry-while-held case as a direct `vy = 0`, separately from the
+early-release case (which still decelerates gradually via `JUMP_CUT`), and
+simulating that reproduces the real arc closely: about 26px peak (real:
+24-25px) landing around frame 26 (real: 24).
+
+`GRAVITY` itself also changed from the value first written here. The
+per-trial quadratic fits for the fall phase had residuals up to 1.6px, the
+noisiest of the fits in this document, and simulating with that value
+undershot the real fall considerably (an 18-frame fall instead of ~13).
+Total distance over total duration (about 25px over about 13 frames from
+rest at the apex) is a sturdier measure for a noisy short segment than
+differentiating it twice, and solving `d = 0.5 g t^2` gives **0.296
+px/frame²** (76 in our subpixel units), which is what shipped. `JUMP_CUT`
+kept its quadratic-fit value (consistent within 0.008 px/frame² across
+three trials, a tighter fit than the fall phase, more trustworthy as is).
+
+None of this is pixel-perfect: it is close to the traced shape, checked by
+actually running it, not derived and shipped untested. `MAX_FALL_SPEED`
+(the tunneling-prevention cap, separate from any of this) was not
+re-examined and is still the old placeholder.
 
 ## Stomp bounce: attempted, not yet pinned
 

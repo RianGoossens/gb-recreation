@@ -61,7 +61,8 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 - [x] Mario entity: position, velocity, facing, sprite
 - [x] Input mapping (keyboard to Game Boy buttons)
 - [x] Walking physics: acceleration, max speed, friction (constants sourced from reference)
-  - [x] Verify walking constants against the emulator/disassembly (accel, friction, max walk speed measured from WRAM via tools/find_mario_speed.py; gravity/jump/stomp still provisional)
+  - [x] Verify walking constants against the emulator/disassembly (accel, friction, max walk speed measured from WRAM via tools/find_mario_speed.py)
+  - [x] Verify gravity/jump constants against the emulator (a three-regime state machine, not one acceleration; measured via WRAM plus the internal rise/fall phase byte, implemented in `step_motion`; see docs/reference/physics.md). Stomp bounce is still provisional, an attempt to measure it did not land a clean trace.
 - [x] Gravity and ground collision against the tilemap
 - [x] Jump physics (initial velocity, variable height)
 - [x] Animation states: idle, walk, jump
@@ -134,4 +135,4 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 - The ROM in the tree passes the hash check (verified 2026-07-22).
 - Keep physics constants cited to the reference so behavior is defensible.
 - Revisit module boundaries at the end of each milestone during self-improvement.
-- Jump physics redesign (not yet started): `docs/reference/physics.md` now has strong, phase-register-confirmed evidence that the cartridge's vertical motion is not one continuous `GRAVITY` acceleration but three regimes (near-constant speed while rising with A held, real deceleration once A is released while still rising, real acceleration while falling). Implementing it needs more than a velocity-threshold state machine, though: holding A confirmed to a full 50-frame test still ends the rise at a fixed ~12-frame cap, not when its own tiny residual deceleration would organically reach zero (which its own fit puts at ~61 frames, never reached). So the held-rise phase needs a frame counter alongside the velocity model, not velocity alone. `step_motion` in `src/core/physics.rs` still uses the single-acceleration model. Implementing the three-regime version, with the exact per-frame traces in physics.md as a reference to check it against, is real follow-up work, not a quiet constant tweak.
+- Jump physics redesign: done. `step_motion` (`src/core/physics.rs`) now models the three measured regimes (near-constant held rise capped by a frame count, real deceleration on early release, real acceleration while falling) instead of one continuous `GRAVITY` acceleration. See `docs/reference/physics.md` for the traces, fits, and a correction made while implementing (the frame-cap-while-held case turned out to be a direct reset, not routed through the release-deceleration constant). Stomp bounce is still unmeasured and is the one remaining provisional physics constant.

@@ -502,14 +502,28 @@ all (right held continuously, grounded the whole time), the pure case
 estimate advanced from column 39 to column 126 over those 700 frames,
 87 columns, which is 696 pixels, almost exactly 1 px/frame at saturated
 speed, matching known physics precisely with no jump involved to
-confound it. So the grounded case is well confirmed. What is still
-genuinely open is only the airborne-freeze assumption's accuracy across
-many real jump events, which this cross-check could not cleanly test
-without our own engine actually reproducing the cartridge's jump timing.
-That no longer waits on measuring gravity: the real jump shape is now
-pinned (a three-regime state machine, not one continuous acceleration,
-see `physics.md`). It waits on implementing that model in `step_motion`,
-tracked in `GRAND_MASTER_PLAN.md`'s backlog.
+confound it. So the grounded case is well confirmed.
+
+### Retried after the jump physics redesign: the gap narrowed
+
+`step_motion` now implements the measured three-regime jump model instead
+of a placeholder (see `physics.md` and `GRAND_MASTER_PLAN.md`'s backlog),
+which shrinks the confound above without eliminating it. Recorded a fresh
+500-frame button log the same way (react to nearby sprites, jump, same
+`DANGER_RADIUS`/cooldown as `stitch_level_1_1.py`) and replayed it through
+the updated engine on a flat test level.
+
+The PyBoy position estimate reached column 58 (471.5px) after 500 frames.
+Our engine's replay of the identical button sequence reached column 67
+(541px), a 14.7% gap. Smaller than the original 1000-frame attempt's 17%,
+but still real, consistent with the implemented jump being close to the
+traced shape without matching it exactly (about 26 frames per jump versus
+the cartridge's about 24, see `physics.md`): 170 of the 500 frames in this
+run were spent airborne, and a few extra frames of continued rightward
+walking per jump adds up over that many jump events. The airborne-freeze
+position estimate itself was not re-examined this round; narrowing the
+remaining ~15% gap further needs the jump timing itself narrowed first,
+not another look at the position-tracking side.
 
 ## A real, loadable level from the opening screen
 

@@ -14,6 +14,8 @@ Faithfulness is a working rule, not just an aim. Reproduce what is in Super Mari
 
 Secondary reference: the `kaspermeerts/supermarioland` disassembly. It maps some of the original assembly, physics constants, and memory layout. Lean on it as little as possible: prefer building clean Rust from observed behavior, tests, and screenshots against a real emulator. Reach for the disassembly only to settle a specific number or mechanic you cannot pin down otherwise, and cite what you take.
 
+Preferred way to pin a ROM offset: observe, don't read assembly. Boot the verified ROM in an emulator, capture the bytes at the memory address that holds the data you want (VRAM, OAM, wherever the game put it), then search the ROM file for that exact byte sequence (`tools/find_rom_offset.py`). The offset it is found at is correct by construction, including bank switching, with no need to trace through disassembly addresses or reason about which ROM bank was switched in. This caught a real bug: a bank-1 assumption for the title screen tile offsets looked plausible and decoded without error, but rendered the wrong tiles (63% match instead of 99.82%) until it was checked this way. Reach for the disassembly text only when this technique cannot apply (there is nothing loaded into observable memory yet, or the logic itself, not an address, is what is unclear).
+
 ## Communication and style rules (hard constraints)
 
 These are not preferences. Treat a violation as a bug.

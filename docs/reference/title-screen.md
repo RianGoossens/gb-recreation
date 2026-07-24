@@ -64,19 +64,24 @@ Read live from VRAM after booting ~600 frames (see `tools/extract_title.py`):
 
 ## ROM offsets for the title screen tile data
 
-The load routine is `GameState_0E` in the kaspermeerts/supermarioland
-disassembly (bank0.asm). Its copy instructions use CPU addresses like
-`ld hl, $791A`, which fall in the Game Boy's bank-switched window
-($4000-$7FFF). `GameState_0E` runs with ROM bank 2 switched in, so a CPU
-address `A` in that window is at ROM file offset `2*0x4000 + (A - 0x4000)`,
-not the raw value of `A`. A bank-1 assumption (file offset equals the CPU
-address) looks plausible but reads the wrong tiles: it happens to land on
-in-range, decodable tile data, so it fails silently, producing a garbled but
-technically valid-looking image rather than an error. It was caught by
-diffing against an emulator-rendered reference (99.82% shade match with the
-correct offsets, 63% with the bank-1 guess) and confirmed by dumping raw
-bytes from emulator VRAM after boot and locating them in the ROM file, which
-placed all four blocks in bank 2.
+These four offsets are independently reproducible with no disassembly
+reading: run `tools/find_rom_offset.py <vram_addr> <length>` for each VRAM
+destination below (600 frames in, the title screen is up) and it reports the
+same ROM offsets by searching the ROM file for the exact bytes the emulator
+loaded into memory. That is how they were confirmed here.
+
+They also happen to be documented in the kaspermeerts/supermarioland
+disassembly (bank0.asm, `GameState_0E`), whose copy instructions use CPU
+addresses like `ld hl, $791A`. Those addresses fall in the Game Boy's
+bank-switched window ($4000-$7FFF), and `GameState_0E` runs with ROM bank 2
+switched in, so a CPU address `A` there is at ROM file offset
+`2*0x4000 + (A - 0x4000)`, not the raw value of `A`. A first pass at this
+assumed bank 1 (file offset equals the CPU address): it looked plausible and
+decoded without error, since it landed on other real, in-range tile data, but
+it rendered the wrong tiles (63% match against an emulator reference instead
+of 99.82%). Reading the disassembly text gave the wrong bank; the
+observe-and-search method above gave the right one directly, which is why it
+is the preferred technique (see CLAUDE.md).
 
 | CPU addr | ROM file offset (bank 2) | VRAM destination | Size (bytes) | Tiles | Content |
 |----------|--------------------------|-------------------|---------------|-------|---------|

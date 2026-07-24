@@ -1,5 +1,11 @@
 [
   {
+    "title": "World 1-1 was never stuck",
+    "date": "2026-07-24",
+    "slug": "2026-07-24-world-1-1-was-never-stuck",
+    "summary": "A frozen screen position, a scroll register stuck at zero, and an unavoidable enemy. All three looked like bugs. Watching the emulator instead of trusting single reads resolved every one of them."
+  },
+  {
     "title": "Giving the sound events a voice",
     "date": "2026-07-24",
     "slug": "2026-07-24-giving-the-sound-events-a-voice",

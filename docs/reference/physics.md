@@ -101,3 +101,29 @@ minimum at the jump's apex, then back up to the peak at landing. That is
 the same "height above ground" signal already noted for `0xC208`, not a
 subpixel velocity accumulator. No new lead found; gravity and jump
 velocity are still unpinned.
+
+Tried a different angle: instead of needing per-frame subpixel velocity,
+measure aggregate jump kinematics (whole-pixel peak height, whole-frame
+timing) and solve for gravity/initial velocity algebraically, since
+those two are measurable precisely even from whole-pixel data. Holding
+`A` for 12 or more frames gives an identical, reproducible result every
+time: a 24px peak, reached 11 frames after takeoff, landing 24 frames
+after takeoff (so 13 frames falling). Shorter holds are not simply a
+smaller version of the same arc: holding 8 frames gives a *later* apex
+(frame 16) than holding 12+ frames (frame 11) despite a similar peak
+height (23px vs 24px), which a simple "hold cuts the rise short" model
+does not explain.
+
+That rules out treating this as solved. Two things are still tangled
+together and this session did not separate them: the max-hold case's
+rise (11 frames) not matching its fall (13 frames) could mean the
+cartridge really does use a faster fall than rise (a common Mario
+convention, and our own engine's single-constant `GRAVITY` does not
+model that), or it could just as easily be a frame or two of lag between
+Y actually returning to ground level and the grounded flag catching up,
+with no asymmetric physics involved at all. Deriving new `GRAVITY`,
+`JUMP_VELOCITY`, or `JUMP_CUT` values from this data was deliberately
+not done: the short-hold anomaly above means the underlying model isn't
+understood well enough yet to trust a derived number over the existing,
+tested placeholder. Recorded as a data point for the next attempt, not
+as a fix.

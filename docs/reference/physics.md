@@ -206,26 +206,34 @@ fall, consistent across every hold length tried.
 
 ### Combined picture
 
-Three distinct regimes, not one `GRAVITY` constant:
+Three distinct regimes make up the jump, instead of a single `GRAVITY`
+constant:
 
 1. **Rising, A held**: near-constant upward speed (~2.1-2.3 px/frame), no
    measurable deceleration. Looks like the classic "holding jump counters
    gravity" convention used across Mario games.
 2. **Rising, A released (or otherwise not held)**: upward speed decays
-   toward zero over several frames, a real deceleration. This is presumably
-   the same constant as regime 3's acceleration, just acting against an
-   existing upward velocity instead of from rest; not yet checked whether
-   the magnitudes match.
+   toward zero over several frames, a real deceleration.
 3. **Falling**: downward speed accelerates from ~0 at the apex to ~3
    px/frame by landing, consistently across every hold length tested.
 
-This is a real structural finding, not just narrowed data, but it still does
-not become a `GRAVITY`/`JUMP_VELOCITY`/`JUMP_CUT` number today: those
-constants assume a single continuous-acceleration model, and this data says
-the real shape is the three-regime state machine above. Implementing this
-properly means changing `step_motion` to switch behavior on an explicit
-rise/fall phase (mirroring `0xC207`) rather than adding one constant every
-airborne frame the way it does now, which is an engine change with its own
-tests, not a constant tweak to make quietly here. Recorded as a strong,
-verified lead for that task, including the exact traces above to check any
+Checked directly whether regimes 2 and 3 share one acceleration magnitude
+(fitting a quadratic separately to each phase's segment, for the hold=3,
+5, and 8 traces): they do not. Regime 2's deceleration fits consistently
+around **0.11-0.12 px/frame²** across all three trials (max residual under
+0.8px), while regime 3's fall acceleration fits consistently around
+**0.14-0.17 px/frame²** (max residual under 1.6px, noisier but still a
+clean upward trend). The fall is reliably faster to accelerate than the
+released rise is to decelerate, by roughly 30-50% in every trial. Two
+separate constants, not one shared `GRAVITY` reused in both directions.
+
+This is a real structural finding. It does not become a shipped
+`GRAVITY`/`JUMP_VELOCITY`/`JUMP_CUT` number today: those constants assume a
+single continuous-acceleration model, and this data describes the
+three-regime state machine above instead. Implementing this properly means
+changing `step_motion` to switch behavior on an explicit rise/fall phase
+(mirroring `0xC207`) rather than adding one constant every airborne frame
+the way it does now, which is an engine change with its own tests, not a
+constant tweak to make quietly here. Recorded as a strong, verified lead for
+that task, including the exact traces and fitted values above to check any
 future implementation against.

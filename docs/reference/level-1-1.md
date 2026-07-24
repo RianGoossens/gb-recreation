@@ -263,10 +263,11 @@ died identically, including ones that should obviously have cleared a
 normal Goomba-sized enemy. Checked the actual Y trajectory: `dy` stayed at
 exactly `0` for the entire run in every trial, meaning Mario never left
 the ground at all. The bug: pressing a button immediately after
-`load_state()`, with no `tick()` in between, does not register. Any
-future tool built on `save_state`/`load_state` needs at least one
-settle `tick()` before sending input, the same way `sml_boot.py` needs
-settle frames after boot and after pressing Start.
+`load_state()`, with no `tick()` in between, does not register. Fixed
+structurally rather than left as a footnote to rediscover: `sml_boot.py`
+now has `snapshot(pb)`/`restore(pb, state_bytes)` helpers, and `restore`
+always ticks once before returning, so this cannot bite a future tool
+built on top of it the way it bit this session.
 
 With that fixed (confirmed via `grounded` actually leaving `1`), a sweep
 of 15 delays x 10 hold lengths (150 combinations, jump triggered anywhere

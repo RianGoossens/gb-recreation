@@ -14,6 +14,8 @@ Not a runnable tool itself: import it from another `uv run` script, e.g.
 `from sml_boot import boot_to_gameplay`.
 """
 
+import io
+
 from pyboy import PyBoy
 
 ROM = "super_mario_land.gb"
@@ -40,3 +42,24 @@ def boot_to_gameplay(rom=ROM):
     for _ in range(GAMEPLAY_SETTLE_FRAMES):
         pb.tick()
     return pb
+
+
+def snapshot(pb):
+    """Save pb's current state to an in-memory bytes object."""
+    buf = io.BytesIO()
+    pb.save_state(buf)
+    return buf.getvalue()
+
+
+def restore(pb, state_bytes):
+    """Load a snapshot taken with snapshot(), and settle before input.
+
+    A button pressed immediately after load_state(), with no tick() in
+    between, does not register (found the hard way: an entire jump-timing
+    sweep silently never jumped at all, confirmed by Y position staying
+    perfectly flat through every trial, before this fix). Always tick once
+    after loading before pressing anything.
+    """
+    buf = io.BytesIO(state_bytes)
+    pb.load_state(buf)
+    pb.tick()

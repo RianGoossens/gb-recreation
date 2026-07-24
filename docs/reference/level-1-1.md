@@ -76,17 +76,50 @@ tile his jump arc passes through with no effect on his motion is not.
   but this has not been independently confirmed by a direct collision, since
   Mario never touches it from below or the side on this screen. Flagging
   this rather than asserting it as observed.
-- The mountain/pyramid background silhouette (tile `94` and neighbors) and
-  the small step structure Mario partially climbed (tiles including `54`,
-  `112`-`115`, `129`, `49`-`51`, `65`-`71`) are **not yet reliably
-  classified**. Two captures of the same cell during a jump onto the
-  structure read different tile IDs (`51` from a static pre-walk snapshot,
-  `54` from a capture taken mid-jump), which most likely means Mario's exact
-  pixel column did not match between the two reads rather than the tile
-  itself changing; a single feet-position snapshot per event is not precise
-  enough here. This needs a dedicated frame-by-frame probe that tracks
-  Mario's exact sub-column at the moment of landing, not the broad sweep
-  used for the ground/sky classification above.
+- The elevated block staircase above the ground row (rows 9-15, roughly
+  columns 0-15) is now precisely mapped from the static spawn tilemap
+  (`SCX = 0`, safe to read directly). Full grid, `(column, row): tile`,
+  reading down each ascending/descending side from the ground up:
+
+  ```
+  row  9:                          col8=54  col9=94
+  row 10:                 col7=54           col10=94
+  row 11:        col5=129 col6=54                    col11=94
+  row 12:        col5=54                                      col12=94
+  row 13: col2=54 col3=94 col4=54           col9=50 col10=51           col13=94
+  row 14: col1=112 col2=113        col4=94  col7=50 col8=51 col9=49           col14=94
+  row 15: col0=54 col1=114 col2=115        col5=94  col7=49    col9=49              col15=94
+  row 16: ground (tile 96) under all of it
+  ```
+
+  It is a symmetric pyramid: a rising staircase from column 0 up to a peak
+  around columns 8-9 (tile `94` tracing the outer diagonal edge on both
+  sides, `54`/`112`-`115`/`49`-`51`/`129` filling in the step faces), then
+  back down to column 15. This was previously described only vaguely (a
+  loose list of tile IDs); the exact per-column shape above is new.
+
+  Solidity is still **not directly confirmed by collision**, and the
+  earlier "two captures of the same cell disagreed" finding is superseded:
+  that was most likely the same `SCX`-sampling aliasing that caused the
+  `x = 81` mystery above, not a sub-pixel column problem. Every practical
+  jump tried this session (triggered at various points approaching the
+  staircase, held for 1-4 frames, starting from a dead stop or a full run)
+  either failed to leave the ground at all or cleared the entire structure
+  in one arc without ever registering a landing on it. Concretely, with a
+  minimal jump (`A` held 2 frames) from a standing start, Mario's arc peaks
+  at only 10px of height right around column 7-8 and is already descending
+  again by the time he is back over solid ground past column 9; the
+  staircase's own steps range from 8px (column 7) up to 56px (columns 8-9)
+  above the ground, and by the frame his height matches a given step's
+  surface, his forward speed has already carried him past that column. A
+  full running jump only makes this worse (more horizontal distance
+  covered per frame of height gained). So this structure cannot be
+  collision-tested by jumping into it from a normal rightward run; it
+  would need either a slower approach (partial run, not saturated speed)
+  or a controlled fall from directly above a specific column. Until one of
+  those confirms it, treat it as solid by level-design consistency (it is
+  drawn as a stacked-block staircase, the same convention used everywhere
+  else in the series), the same caveat already applied to tile `97`.
 - **Resolved**: the on-screen freeze at `x = 81` is not a blockage. It is
   the standard mid-screen camera lock, the same behavior as the NES Mario
   games: once Mario reaches roughly the horizontal center of the screen,

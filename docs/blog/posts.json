@@ -1,5 +1,11 @@
 [
   {
+    "title": "Gravity is not one number",
+    "date": "2026-07-24",
+    "slug": "2026-07-24-gravity-is-not-one-number",
+    "summary": "Three sessions of trying to fit a jump to one accelerating curve failed for a reason: it isn't one. Splitting the trace at the apex, and the game's own phase byte confirming the split, reveals three distinct speed regimes instead."
+  },
+  {
     "title": "The pyramid was never solid",
     "date": "2026-07-24",
     "slug": "2026-07-24-the-pyramid-was-never-solid",

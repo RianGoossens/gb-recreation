@@ -13,6 +13,11 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install gui feature system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-cursor0 libwayland-dev libasound2-dev
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -28,3 +33,9 @@ jobs:
 
       - name: Test
         run: cargo test --verbose
+
+      - name: Build gui feature
+        run: cargo build --verbose --features gui
+
+      - name: Test gui feature
+        run: cargo test --verbose --features gui

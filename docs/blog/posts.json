@@ -1,5 +1,11 @@
 [
   {
+    "title": "Finding ROM offsets by watching, not reading",
+    "date": "2026-07-24",
+    "slug": "2026-07-24-finding-rom-offsets-by-watching-not-reading",
+    "summary": "Extracting the title screen straight from the ROM file broke in a way that looked fine: real tiles, wrong bank. How comparing against the emulator caught it, and the small tool that finds a ROM offset by watching memory instead of reading assembly."
+  },
+  {
     "title": "Power-ups and polish",
     "date": "2026-07-23",
     "slug": "2026-07-23-power-ups-and-polish",

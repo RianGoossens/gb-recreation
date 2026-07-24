@@ -24,7 +24,12 @@ Address `0xC20C` is Mario's horizontal speed:
 
 - Starts at 0, climbs by **1 per frame** while Right is held (Left mirrors it
   negatively).
-- Saturates at **6** while walking (no B held; running is not yet modeled).
+- Saturates at **6** while walking.
+- Holding B alongside Right does not change this: checked directly, `0xC20C`
+  caps at 6 whether B is held or not, over 400 frames continuously. There is
+  no separate run/dash speed to model at the WRAM level; whatever B does in
+  the original (shooting a superball, per `faithfulness.md`), it is not a
+  horizontal speed modifier.
 - Falls by **1 per frame** once released, and holds at 0 rather than
   overshooting negative.
 

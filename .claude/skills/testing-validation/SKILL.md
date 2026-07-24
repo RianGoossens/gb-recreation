@@ -55,3 +55,20 @@ The game exposes a headless screenshot command (see README). Use it during devel
 - `cargo test` is green.
 - New behavior has at least one test that would fail if the behavior broke.
 - For visual work, a golden-image or screenshot check exists and passed.
+
+## Simulate a new physics/behavior model before committing it, not just after
+
+Unit tests check what they were written to check; they will not catch a
+model that is internally consistent but shaped wrong. When implementing a
+constant or a model derived from observation (a physics regime, a state
+machine), before committing: build a throwaway scripted scenario (an
+`examples/*.rs`, or a `cargo test -- --nocapture` with prints), run it, and
+compare the actual shape against the traced reference the constants came
+from. Delete the scratch file once satisfied; do not commit it. This caught
+two real bugs implementing the jump physics redesign that passing unit
+tests alone did not: a regime routed through the wrong constant (produced a
+40px jump instead of the traced 24px), and a fall-acceleration constant
+whose per-trial fit looked fine in isolation but undershot once the full
+arc was actually simulated (see `docs/reference/physics.md`). Checking
+"does it compile and pass its own tests" is not the same question as "does
+running it look like the thing it was supposed to reproduce."

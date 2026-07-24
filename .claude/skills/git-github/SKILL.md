@@ -64,6 +64,8 @@ git commit -m "feat(scope): summary"
 git push -u origin HEAD
 ```
 
+The push is not optional or something to ask permission for mid-task: CLAUDE.md pre-authorizes it as a standing part of this workflow (see its "Git and commits" section). A run that ends with commits sitting only in the local tree, unpushed, is not finished. Push at the end of each task (or each self-contained batch of tasks in a chained run), same as the commit itself.
+
 Before committing, run the tests (see the testing-validation skill). Do not commit a red tree unless the commit is explicitly a checkpoint and says so.
 
 ## Pull requests (when working on a shared branch)

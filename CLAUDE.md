@@ -41,7 +41,7 @@ These are not preferences. Treat a violation as a bug.
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`, `ci:`).
 - Commit often. Branch per vertical slice or task. Merge back when a slice is playable.
 - Never include Anthropic emails or Anthropic attribution in commits. No `Co-Authored-By` for the assistant. Author is always Rian Goossens <rian.goossens@gmail.com>.
-- See `.claude/skills/git-github` for the full workflow.
+- Pushing to `origin main` is a standing, pre-authorized part of this workflow, not a separate action to hold back on or ask about mid-task. A task or blog post is not done while it only exists as a local commit; push it. See `.claude/skills/git-github` for the full workflow.
 
 ## The ROM
 

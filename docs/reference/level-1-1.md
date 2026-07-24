@@ -312,17 +312,36 @@ almost certainly a moving enemy, not a fixed obstacle: slowing down
 changes which frame Mario arrives at its position, so he just needs to
 not be there at the same moment as the enemy, not clear it physically.
 
-`tools/stitch_level_1_1.py` now walks in a "hold Right for `WALK_FRAMES`,
-release for `RELEASE_FRAMES`, repeat" rhythm instead of holding Right the
-whole time, as a general survival heuristic. `WALK_FRAMES=40,
-RELEASE_FRAMES=100` reaches world column 64 before the next death (up
-from 48 holding Right continuously), confirmed reproducible. This is
-still a heuristic, not a fix: the run still eventually dies (just later),
-and the exact rhythm was picked from a small grid search, not derived
-from anything about the hazard itself. A script that actually detects
-enemies (via OAM, the same way this session found the one at column 48)
-and reacts to them specifically would be more robust than tuning a
-fixed walk/pause rhythm further.
+`tools/stitch_level_1_1.py` first walked in a "hold Right for
+`WALK_FRAMES`, release for `RELEASE_FRAMES`, repeat" rhythm instead of
+holding Right the whole time, as a general survival heuristic.
+`WALK_FRAMES=40, RELEASE_FRAMES=100` reached world column 64 before the
+next death (up from 48 holding Right continuously), confirmed
+reproducible. Still a heuristic, not a fix: the run still eventually
+died, and the exact rhythm was picked from a small grid search, not
+derived from anything about the hazard itself.
+
+Replaced that with real OAM-based reaction: every frame, scan all 40
+sprite slots except Mario's own (slots 3-6, confirmed fixed across every
+OAM dump this session), release Right whenever another sprite is within
+`DANGER_RADIUS` pixels of Mario's on-screen X, and resume once clear. A
+radius/pause grid search found survival kept improving as the radius grew
+(16 through 200px), plateauing at world column 77 for radius 120 and
+above (further radius stopped helping, an actual hazard-detection
+ceiling rather than a tuning artifact). This is real reacting to what is
+on screen, not a blind rhythm, and reaches world position 77 versus the
+rhythm's 64.
+
+That is a genuine methodology improvement, but the two numbers are not a
+strict apples-to-apples win: the *confirmed streamed tile data* the
+reactive run actually captured only reached world column 60 (a 61-wide
+map), slightly less than the rhythm-based run's 64-wide result. Reaching
+a further world position does not automatically mean the ring buffer
+streamed further data in by the time of death; the two clocks (Mario's
+position and the buffer's own streaming) do not move in lockstep,
+especially once the walk pattern isn't a steady rhythm. Both figures are
+real and both are recorded so a future session comparing runs is not
+misled by only one of them.
 
 ## Open work
 

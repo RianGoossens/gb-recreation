@@ -32,16 +32,20 @@ forward streaming and keep incrementing). This script watches for the
 respawn directly (Mario's screen X snapping back near its spawn value
 after the camera lock has engaged) and stops capturing there.
 
-To get past that hazard at all, this walks in a "hold, then briefly let
-go" rhythm (WALK_FRAMES held, then RELEASE_FRAMES released, repeating)
-instead of holding Right the whole time. A jump-timing sweep against a
-save state right before the hazard found that no jump height or timing
-cleared it while approaching at full running speed, but simply slowing
-down first (releasing Right for at least ~50 frames, no jump needed at
-all) did survive it. That points to the hazard being a moving enemy
-Mario needs to arrive past a different moment for, not an obstacle that
-needs clearing, so periodically breaking stride is a reasonable general
-survival heuristic pending a script that reacts to hazards properly.
+To get past a hazard at all, this reads OAM every frame and releases
+Right whenever a non-Mario sprite is within DANGER_RADIUS pixels of
+Mario's on-screen X, resuming once it isn't. A jump-timing sweep against
+a save state right before the first hazard found that no jump height or
+timing cleared it while approaching at full running speed, but simply
+slowing down first (releasing Right for at least ~50 frames, no jump
+needed at all) did survive it. That points to hazards being moving
+enemies Mario needs to arrive past a different moment for, not obstacles
+that need clearing. Mario's own sprite always occupies OAM slots 3-6
+(confirmed across every OAM dump this session; not derived from an
+assumption), so those are excluded when scanning for danger. This reacts
+to whatever is actually on screen instead of blindly breaking stride on
+a fixed rhythm, and reaches world column 77 versus 64 for the earlier
+fixed-rhythm version.
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -54,13 +58,27 @@ from sml_boot import boot_to_gameplay
 
 OUT = Path("assets/extracted")
 MAP_BASE = 0x9800
+OAM_BASE = 0xFE00
+MARIO_OAM_SLOTS = {3, 4, 5, 6}
+DANGER_RADIUS = 120
 # Rows 0-1 are the status bar (score/coins/time), redrawn every frame
 # regardless of scroll; they are not level geometry, so they are excluded.
 HUD_ROWS = 2
 ROWS = 18
 COLS = 32
-WALK_FRAMES = 40
-RELEASE_FRAMES = 100
+
+
+def nearby_danger(pb, mario_x):
+    for i in range(40):
+        if i in MARIO_OAM_SLOTS:
+            continue
+        base = OAM_BASE + i * 4
+        y, x = pb.memory[base], pb.memory[base + 1]
+        if y == 0 or y >= 160:
+            continue
+        if abs(x - mario_x) <= DANGER_RADIUS:
+            return True
+    return False
 
 
 def main():
@@ -83,21 +101,18 @@ def main():
 
     pb.button_press("right")
     right_held = True
-    cycle_frame = 0
     locked_at = None
     stopped_at_frame = None
     max_frames = 20000
 
     for f in range(1, max_frames + 1):
-        cycle_frame += 1
-        if right_held and cycle_frame >= WALK_FRAMES:
+        danger = nearby_danger(pb, pb.memory[0xC202])
+        if danger and right_held:
             pb.button_release("right")
             right_held = False
-            cycle_frame = 0
-        elif not right_held and cycle_frame >= RELEASE_FRAMES:
+        elif not danger and not right_held:
             pb.button_press("right")
             right_held = True
-            cycle_frame = 0
 
         pb.tick()
         x = pb.memory[0xC202]

@@ -89,18 +89,29 @@ tile his jump arc passes through with no effect on his motion is not.
   used for the ground/sky classification above.
 - Separately, in this scripted run Mario could not walk past on-screen
   `x = 81` even with periodic jumps over ~1400 frames (the level never
-  actually scrolls: `SCX` stays at `0` the entire time). This is most likely
-  an enemy blocking the path by the palm tree seen in that section (side
-  contact with a Goomba-equivalent stops him without killing him outright
-  in this run), not a background tile wall, since no solid-looking tile sits
-  in his direct path at ground level. Left open rather than guessed at.
+  actually scrolls: `SCX` stays at `0` the entire time). An enemy blocking
+  him was the first guess, but that does not hold up: dumping OAM at the
+  stuck position shows only Mario's own sprite (four entries forming a
+  16x16 sprite, `x` 66-81), no separate enemy nearby. The horizontal speed
+  register (`0xC20C`, see `physics.md`) stays pinned at its maximum (`6`)
+  the entire time he is stuck, meaning the game's own walk logic still
+  thinks he is moving at full speed; only his displayed position refuses to
+  advance. That rules out a plain "walked into a wall and stopped" story
+  too (which would usually show speed decaying, not holding at max), and
+  the background stays visually static (no scroll) rather than the camera
+  picking up his motion instead. None of the three explanations tried so
+  far account for all three observations at once. Left open rather than
+  guessed at.
 
 ## Open work
 
+- Work out what is actually happening at the `x = 81` blockage (see above);
+  none of "enemy contact", "wall collision", or "camera lock, world still
+  advancing" fully explain the combination of a maxed speed register, a
+  frozen displayed position, and an unmoving background all at once.
 - Pin the step/pyramid structure's solid tiles precisely (needs the
   sub-column-accurate probe described above).
-- Get Mario past the early blockage (likely means avoiding or timing past
-  the enemy rather than just holding right) so the rest of the screen, and
+- Get Mario past the early blockage so the rest of the screen, and
   eventually the scrolling sections beyond it, can be surveyed the same way.
 - Stitch the full scrolling width: walk through the whole level while
   recording the tilemap and scroll position per screen.

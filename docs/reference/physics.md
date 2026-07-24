@@ -114,16 +114,20 @@ smaller version of the same arc: holding 8 frames gives a *later* apex
 height (23px vs 24px), which a simple "hold cuts the rise short" model
 does not explain.
 
-That rules out treating this as solved. Two things are still tangled
-together and this session did not separate them: the max-hold case's
-rise (11 frames) not matching its fall (13 frames) could mean the
-cartridge really does use a faster fall than rise (a common Mario
-convention, and our own engine's single-constant `GRAVITY` does not
-model that), or it could just as easily be a frame or two of lag between
-Y actually returning to ground level and the grounded flag catching up,
-with no asymmetric physics involved at all. Deriving new `GRAVITY`,
-`JUMP_VELOCITY`, or `JUMP_CUT` values from this data was deliberately
-not done: the short-hold anomaly above means the underlying model isn't
-understood well enough yet to trust a derived number over the existing,
-tested placeholder. Recorded as a data point for the next attempt, not
-as a fix.
+That rules out treating this as solved, but one of the two tangled
+possibilities is now settled: the grounded flag does not lag Y position.
+The full per-frame trace for the max-hold case shows the trajectory
+overshoot the ground by 1px at frame 23 (`y = 135`, one past the
+ground's `134`), then land cleanly at frame 24 (`y = 134`,
+`grounded = 1`) the very next frame, exactly the ordinary discretization
+of a falling object crossing a threshold between two frames, not a
+multi-frame detection delay. So the 11-frame rise versus 13-frame fall
+is real timing, not a measurement artifact: this cartridge's jump
+genuinely takes longer to fall than it took to rise, for whatever reason
+(likely a faster-fall convention, but not confirmed as such). That still
+leaves the short-hold anomaly (an 8-frame hold's apex arriving later
+than a 12-frame hold's) unexplained, and deriving new `GRAVITY`,
+`JUMP_VELOCITY`, or `JUMP_CUT` values from partial data was deliberately
+not done: the underlying model isn't understood well enough yet to trust
+a derived number over the existing, tested placeholder. Recorded as
+narrowed data for the next attempt, not as a fix.

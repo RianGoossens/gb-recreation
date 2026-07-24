@@ -132,8 +132,20 @@ tile his jump arc passes through with no effect on his motion is not.
   standing high jump with Right released throughout the flight (not just
   before it) is the untried next variant, though at that point he is
   jumping mostly straight up and might just come back down in front of the
-  structure rather than onto it. Left as still-unconfirmed rather than
-  forced.
+  structure rather than onto it.
+
+  Tried that too: a pure standing jump (Right never pressed during the
+  flight at all) has zero horizontal drift and lands exactly where it
+  launched, so it can only ever land in front of or already past the
+  structure, never on it, confirmed across six launch positions. Adding a
+  short Right tap (1-3 frames) at takeoff to get a small controlled hop
+  instead jumps discretely between whole columns (a 1-frame tap barely
+  moves him at all, a 2-frame tap already carries 1-2 columns), with no
+  granularity fine enough caught to land on the narrow step surfaces in
+  between, across 72 more combinations of launch position, tap length, and
+  jump height. Left as still-unconfirmed rather than forced; a genuinely
+  different method (a controlled fall from directly above a column) is
+  the only untried approach left.
 - **Resolved**: the on-screen freeze at `x = 81` is not a blockage. It is
   the standard mid-screen camera lock, the same behavior as the NES Mario
   games: once Mario reaches roughly the horizontal center of the screen,

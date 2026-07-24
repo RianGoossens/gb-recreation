@@ -222,15 +222,48 @@ Recording scroll/position per screen the way the plan describes needs one
 of these; walking into the first hazard and extrapolating past it does
 not work.
 
+## Stitching: a working approach
+
+`tools/stitch_level_1_1.py` replaces the dead-reckoning-plus-guessing
+attempt above with something that does not need to guess at all. Every
+frame, it directly compares each of the 32 ring-buffer columns against its
+own value from the previous frame. The buffer only ever streams forward
+(never rewritten with older data), so a slot's world-column identity
+starts at its raw buffer index (true at spawn, confirmed against the
+static opening-screen tilemap) and increases by exactly 32 every time
+that slot's value actually changes. This needs no scroll register and no
+position estimate for correctness, only continuous per-frame observation;
+dead reckoning is kept only to report readable progress and to detect the
+death/respawn from the earlier section (stops capturing the moment
+`0xC202` leaves `81` after the camera lock, same signature as before).
+
+Running it (holding Right only, no jump, so it dies at the same enemy as
+before around frame 338) produces a confirmed map out to world column 63,
+not just the ~26 columns available from the static spawn snapshot. Every
+cell in that output is a real, directly observed value, either the spawn
+snapshot itself or an actually-witnessed transition, never a guess. The
+result is patchy past column 32: columns 32-58 still read blank (`44`) at
+the point capture stopped, while columns 59-63 already show real ground
+(tile `96`). That is not a claim about level geometry (a 27-tile gap
+would be an unusual level design); it just means the game had streamed
+those five particular buffer slots (aliasing to 59-63) with new content
+by frame 338, but had not yet refreshed the other columns in that stretch
+(they still held their spawn-time content, most of it blank/unloaded).
+Reading further, real level geometry there needs a run that survives
+longer, most likely a script that can react to the enemy that ends this
+one around world column 48.
+
 ## Open work
 
 - Pin the step/pyramid structure's solid tiles precisely (needs the
-  sub-column-accurate probe described above).
-- Find a reliable per-frame read of the real scroll amount (the naive
-  once-per-frame `SCX` read is aliased by the status-bar split, see above;
-  `0xC20B` is an unconfirmed lead) so the scrolling sections can be
-  surveyed the same way the opening screen was.
-- Stitch the full scrolling width: walk through the whole level while
-  recording the tilemap and scroll position per screen.
+  sub-column-accurate probe described above; still not confirmed by
+  direct collision, see the pyramid section).
+- Extend `tools/stitch_level_1_1.py`'s run past its first death: it needs
+  either a script that reacts to the enemy/hazard around world column 48
+  (jump over it, or generally survive contact) rather than only holding
+  Right, or a way to try many independent short runs from further and
+  further pre-set starting offsets and merge their confirmed transitions.
+- Once stitching survives past the first hazard, convert the confirmed
+  grid into `Level`/`Solids` and wire it in, ROM-gated.
 - Convert the result into `Level`/`Solids` and wire it in behind the existing
   ROM gating, replacing the placeholder demo level.

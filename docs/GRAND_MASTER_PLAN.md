@@ -54,7 +54,7 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 - [x] Mario entity: position, velocity, facing, sprite
 - [x] Input mapping (keyboard to Game Boy buttons)
 - [x] Walking physics: acceleration, max speed, friction (constants sourced from reference)
-  - [ ] Verify walking constants against the emulator/disassembly (current values are provisional placeholders)
+  - [x] Verify walking constants against the emulator/disassembly (accel, friction, max walk speed measured from WRAM via tools/find_mario_speed.py; gravity/jump/stomp still provisional)
 - [x] Gravity and ground collision against the tilemap
 - [x] Jump physics (initial velocity, variable height)
 - [x] Animation states: idle, walk, jump

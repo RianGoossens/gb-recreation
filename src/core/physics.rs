@@ -3,10 +3,18 @@
 //! All values are in subpixels (see [`entity::SUBPIXEL`]). Velocity is
 //! subpixels per frame, acceleration is subpixels per frame per frame.
 //!
-//! The constants here are PROVISIONAL. They give movement that reads correctly
-//! (build up speed, cap out, coast to a stop) but are not yet the original
-//! game's exact numbers. Pinning those to the reference is its own plan task,
-//! so treat these as placeholders behind named constants, easy to swap.
+//! Walking (`WALK_ACCEL`, `FRICTION`, `MAX_WALK_SPEED`) is pinned to the real
+//! game: `tools/find_mario_speed.py` boots the ROM, holds Right, and snapshots
+//! WRAM every frame. Address `0xC20C` is Mario's horizontal speed: it climbs
+//! by 1 per frame, caps at 6, and falls by 1 per frame once Right is
+//! released, holding at 0 rather than going negative. Correlating it against
+//! Mario's on-screen X (address `0xC202`, before the camera starts scrolling)
+//! shows one whole pixel is covered for every 6 units of accumulated speed,
+//! so the original's speed unit is 1/6 pixel and a capped speed of 6 is
+//! exactly 1 pixel per frame. Converted to our subpixel scale (256 per
+//! pixel): accel and friction are both `round(256 / 6) = 43`, and the walking
+//! cap is `256` (1 px/frame). Gravity and jump values are still provisional;
+//! see the plan.
 
 use super::entity::{pixels, Mario};
 use super::level::{Solids, TILE};
@@ -14,11 +22,11 @@ use crate::input::{Button, Buttons};
 use crate::tuning::Tuning;
 
 /// Horizontal acceleration while a direction is held.
-pub const WALK_ACCEL: i32 = 24;
+pub const WALK_ACCEL: i32 = 43;
 /// Deceleration applied when no direction is held.
-pub const FRICTION: i32 = 16;
+pub const FRICTION: i32 = 43;
 /// Cap on horizontal speed while walking.
-pub const MAX_WALK_SPEED: i32 = 320;
+pub const MAX_WALK_SPEED: i32 = 256;
 /// Downward acceleration per frame.
 pub const GRAVITY: i32 = 40;
 /// Cap on downward speed, so falling does not tunnel through thin floors.
@@ -225,12 +233,14 @@ mod tests {
 
     #[test]
     fn physics_constants_are_pinned() {
-        // These are provisional placeholders. This test is a tripwire: if a
-        // constant changes, it is a deliberate act, not an accident. Update the
-        // expected values here in the same commit that retunes them.
-        assert_eq!(WALK_ACCEL, 24);
-        assert_eq!(FRICTION, 16);
-        assert_eq!(MAX_WALK_SPEED, 320);
+        // Walking is pinned to observed emulator RAM (see the module doc
+        // comment); gravity/jump are still provisional. This test is a
+        // tripwire: if a constant changes, it is a deliberate act, not an
+        // accident. Update the expected values here in the same commit that
+        // retunes them.
+        assert_eq!(WALK_ACCEL, 43);
+        assert_eq!(FRICTION, 43);
+        assert_eq!(MAX_WALK_SPEED, 256);
         assert_eq!(GRAVITY, 40);
         assert_eq!(MAX_FALL_SPEED, 640);
         assert_eq!(JUMP_VELOCITY, 700);

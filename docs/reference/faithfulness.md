@@ -44,9 +44,12 @@ matches the cartridge.
 
 ## Physics and levels
 
-- **Movement constants** (walk accel, friction, gravity, jump, stomp bounce,
-  speeds): PROVISIONAL placeholders, not measured from the cartridge. Pinning
-  them to the original (by observing an emulator or the disassembly) is open work.
+- **Walking** (accel, friction, max walk speed): canonical, measured from the
+  cartridge. See `docs/reference/physics.md` for the observation method
+  (`tools/find_mario_speed.py`).
+- **Gravity, jump, stomp bounce**: still PROVISIONAL placeholders, not yet
+  measured from the cartridge. The same RAM-observation technique used for
+  walking applies; pinning them is open work.
 - **Levels**: the demo level, the example level, and the demo campaign are test
   fixtures, documentation, and placeholders. The real levels come from extracting
   the cartridge's geometry (ROM/emulator), which is open work. Shipping invented
@@ -54,7 +57,7 @@ matches the cartridge.
 
 ## Recommended next steps toward faithfulness
 
-1. Measure the movement constants against the cartridge and replace the placeholders.
+1. Measure gravity, jump velocity, and stomp bounce against the cartridge and replace the placeholders.
 2. Extract the real level geometry.
 3. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
 4. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.

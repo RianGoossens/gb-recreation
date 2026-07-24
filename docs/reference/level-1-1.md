@@ -150,12 +150,24 @@ tile his jump arc passes through with no effect on his motion is not.
 - What this means for extraction: reading `SCX` once per frame right after
   `tick()` is not reliable for driving the tilemap-read formula once
   scrolling starts, since it is usually reading the HUD-row value, not the
-  playfield value. `0xC20B` is an unconfirmed lead for a cleaner source: it
-  climbs through many distinct values per frame with almost no drops over
-  a long run of continuous rightward walking, which looks like a
-  sub-pixel/world-position accumulator rather than the aliased `SCX`
-  read. Not yet confirmed against known scroll amounts; needs its own
-  probe before the stitching subtask relies on it.
+  playfield value. `0xC20B` was checked as a possible cleaner source (it
+  climbs by 1 every frame while walking right, with no resets) but it is
+  **ruled out**: it also climbs by 1 every frame while Mario stands still
+  holding Right against nothing (spawn, no movement at all), and it does
+  not move at all if Right is never pressed. That is an input-hold-duration
+  counter, unrelated to world position, not a scroll accumulator. The real
+  per-frame scroll value still needs a way to read `SCX` at the moment the
+  playfield rows are drawn rather than at VBlank, for example a `pyboy`
+  `hook_register` breakpoint on the game's own SCX-write routine, or
+  computing world position by dead reckoning from Mario's known,
+  deterministic walk-speed curve (spawn position plus accumulated speed
+  per frame) instead of reading scroll hardware at all. The dead-reckoning
+  approach is what let this session read the pyramid's tile grid correctly
+  past the point where sprite position freezes (see above); it should
+  carry over to full-level stitching too, as long as the level's
+  underlying tilemap buffer already holds the columns being dead-reckoned
+  into (still unverified beyond column 19, the edge of the initially
+  loaded screen).
 - The old "an enemy might be blocking him" theory is also fully retired:
   OAM at the stuck screen position only ever showed Mario's own sprite
   (four entries, `x` 66-81), and there is no blockage to explain since

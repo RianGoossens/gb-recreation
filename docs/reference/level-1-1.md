@@ -173,6 +173,44 @@ tile his jump arc passes through with no effect on his motion is not.
   (four entries, `x` 66-81), and there is no blockage to explain since
   nothing is actually blocked.
 
+## First attempt at stitching: what breaks
+
+The background tilemap buffer at `0x9800` is 32 columns wide (a ring
+buffer), and at spawn it is not just the visible 20-column screen: reading
+the full 32 columns shows real level data out to column 26 (ground, the
+mountain silhouette, and a stray `129` tile past the pyramid), with columns
+27-31 still blank (`44`, not streamed in yet). So the game preloads about
+7 columns beyond what's on screen, not the whole level.
+
+A first stitching attempt combined dead reckoning (`world_x = 81 + frames
+since the camera lock engaged`, the same trick that worked for the pyramid
+grid) with periodic full-32-column reads of the ring buffer, converting
+each buffer column to a world column by picking whichever wraparound
+(`buffer_col + 32*k`) landed closest to the dead-reckoned estimate. This
+produced a plausible-looking combined map extending to world column 266,
+but it is **wrong** past roughly column 26: Mario silently dies and
+respawns at spawn partway through the run (confirmed directly: `0xC202`
+snaps from `81` back to `50` at frame 338, and again at frame 678, both
+times with `grounded == 0`, consistent with falling into a pit). The
+script never presses jump, so once the level's real geometry beyond the
+preloaded columns includes a gap in the ground row, he falls straight
+through it. Dead reckoning has no way to know this happened and keeps
+counting world position upward regardless, so the respawn's tilemap (the
+same real column 0-26 content, since the level restarts) gets stamped
+into the combined map under increasingly wrong, ever-larger world-column
+numbers. The repeating pattern this produces (identical 32-column blocks
+recurring every ~32 columns out to 266) is exactly what that bug looks
+like, not real level content.
+
+What this means for the real stitching task: it needs either (a) a script
+that actually plays past hazards (jumps over pits and enemies, not just
+holds Right), or (b) explicit detection of the spawn-reset signature
+(`0xC202` dropping back near its spawn value) so a naive dead-reckoning
+run can at least discard corrupted data after a death instead of silently
+mislabeling it. Recording scroll/position per screen the way the plan
+describes needs one of these; walking off the edge of a cliff and
+extrapolating past it does not work.
+
 ## Open work
 
 - Pin the step/pyramid structure's solid tiles precisely (needs the

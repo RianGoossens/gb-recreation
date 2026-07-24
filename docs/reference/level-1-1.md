@@ -61,7 +61,14 @@ past it.
 
 - Classify which tile IDs are solid (ground, blocks) versus decorative (sky,
   clouds, background hills) by observing Mario's actual collisions, not by
-  guessing from the picture.
+  guessing from the picture. `0xC20A` (see `physics.md`) is a clean grounded
+  flag (`1` touching solid ground, `0` airborne), confirmed by forcing a jump
+  and watching it flip exactly on takeoff and landing; it is ready to drive
+  this classification. What is still missing is a reliable mapping from
+  Mario's screen position plus `SCX` to the exact tilemap cell under his
+  feet once the camera starts scrolling and his on-screen position locks in
+  place; that calibration is the next concrete step, not a new RAM address
+  to find.
 - Stitch the full scrolling width: walk through the whole level while
   recording the tilemap and scroll position per screen.
 - Convert the result into `Level`/`Solids` and wire it in behind the existing

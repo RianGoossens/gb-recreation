@@ -59,5 +59,21 @@ deliberate act.
 ## Still to pin
 
 Gravity, jump velocity, jump cut, and stomp bounce are still provisional
-placeholders. The same technique should apply: watch the vertical speed
-register the same way, across a jump and a fall.
+placeholders. Forcing a jump (hold A, release, let Mario land) and diffing
+WRAM the same way found Mario's vertical state cluster, right next to the
+horizontal one:
+
+| Address | Behavior observed |
+|---------|--------------------|
+| `0xC201` | Mario's Y pixel position. Decreases while rising, increases while falling, flat while grounded. |
+| `0xC20A` | Grounded flag: `1` while touching solid ground, `0` while airborne. Flips to `0` the frame a jump starts and back to `1` the frame Mario lands. |
+| `0xC207` | Vertical phase: `0` grounded, `1` rising, `2` falling. |
+| `0xC208` | Climbs from 0 during the rise, peaks at the apex, falls back to 0 during descent. Looks like a height-above-ground counter rather than a raw speed; not yet interpreted with confidence. |
+
+`0xC201`'s per-frame deltas during a jump are not a clean constant step
+(unlike the horizontal speed register), so gravity and jump velocity are not
+pinned yet from this alone; a byte-level Y position loses the subpixel detail
+that would show the true per-frame acceleration. The grounded flag
+(`0xC20A`) is clean enough to use directly for the tile-collision
+classification subtask in `level-1-1.md` without waiting on gravity to be
+pinned.

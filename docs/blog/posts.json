@@ -1,5 +1,11 @@
 [
   {
+    "title": "Shipping the real jump",
+    "date": "2026-07-24",
+    "slug": "2026-07-24-shipping-the-real-jump",
+    "summary": "Measuring the cartridge's three-regime jump and simulating it in the engine turned out to be different jobs. Running the first attempt caught a wrong branch and a fall acceleration that undershot once actually tested end to end."
+  },
+  {
     "title": "Gravity is not one number",
     "date": "2026-07-24",
     "slug": "2026-07-24-gravity-is-not-one-number",

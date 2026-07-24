@@ -476,6 +476,38 @@ and fixed either way; whether the resulting distance figure is itself
 trustworthy at this scale has not been independently cross-checked, and
 should not be treated as settled.
 
+### An attempted cross-check, and a confound it ran into
+
+Tried settling this by recording the exact per-frame button sequence
+the reactive walker produced over 1000 frames, then replaying that exact
+sequence through our own engine on a flat, obstacle-free test level,
+which has independently-pinned walking physics (see `physics.md`).
+Comparing the two after those 1000 frames: the PyBoy position estimate
+said world column 126, our engine's replay landed at column 105, a real
+17% gap, not a rounding difference.
+
+That gap is not clean evidence against the position estimate, though,
+because the comparison has a confound: our engine's gravity and jump
+timing are still unpinned placeholders (see "still to pin" in
+`physics.md`), so a jump in our engine does not necessarily last the
+same number of frames as a jump in the real cartridge. Replaying a
+button schedule recorded against the real game's jump timing through an
+engine with different jump timing will diverge for that reason alone,
+with no bug in the position estimate required to explain it.
+
+Isolated a jump-free stretch to sidestep the confound entirely: frames
+300-1000 of the same recorded run involved no danger and no jumping at
+all (right held continuously, grounded the whole time), the pure case
+`0xC20C` integration was already known to handle correctly. The position
+estimate advanced from column 39 to column 126 over those 700 frames,
+87 columns, which is 696 pixels, almost exactly 1 px/frame at saturated
+speed, matching known physics precisely with no jump involved to
+confound it. So the grounded case is well confirmed. What is still
+genuinely open is only the airborne-freeze assumption's accuracy across
+many real jump events, which this cross-check could not cleanly test
+without first pinning our own engine's gravity to the cartridge, itself
+a separate, previously-abandoned problem (see `physics.md`).
+
 ## A real, loadable level from the opening screen
 
 `tools/convert_level_1_1_to_level_format.py` turns the opening 20x18
@@ -508,13 +540,14 @@ work.
   full lap. A tile that never visibly changes still can't be positively
   distinguished from "not yet streamed in" versus "genuinely repeated
   and correctly inferred" without independent verification.
-- Independently cross-check the position estimate's accuracy at scale:
-  the 5000-frame run's reported world column ~626 has not been verified
-  against ground truth (real screenshots looked nearly identical across
-  much of that run, consistent with either genuinely uniform terrain or
-  a remaining position bug; see the correction above). Comparing against
-  a manually walked, screenshot-verified short reference stretch would
-  settle this before trusting the tool at larger distances.
+- Narrow the remaining position-estimate uncertainty further: the
+  grounded-only case is now well confirmed (matches expected 1 px/frame
+  exactly over a 700-frame jump-free stretch, see the cross-check
+  section above), but the airborne-freeze assumption's accuracy across
+  many real jump events is still open, and cleanly testing it needs our
+  own engine's gravity pinned to the cartridge first (a separate,
+  previously-abandoned problem, see `physics.md`) so a cross-engine
+  replay is not confounded by mismatched jump timing.
 - Once stitching covers enough of the level, convert the confirmed grid
   into `Level`/`Solids` and wire it in behind the existing ROM gating,
   replacing the placeholder demo level.

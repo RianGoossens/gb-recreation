@@ -61,6 +61,13 @@ These three live in `src/core/physics.rs`, cited there, and pinned by
 `physics_constants_are_pinned` in the same file so a future change is a
 deliberate act.
 
+Worth noting given a later discovery in this file's own history (see
+`0xC20C` not holding horizontal speed while airborne, in
+`level-1-1.md`'s stitching section): `find_mario_speed.py` never presses
+jump at all, only holds and releases Right, so these three constants
+were measured entirely from grounded behavior and are not affected by
+that airborne quirk. Checked directly rather than assumed.
+
 ## Still to pin
 
 Gravity, jump velocity, jump cut, and stomp bounce are still provisional

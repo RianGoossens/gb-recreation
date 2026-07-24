@@ -131,3 +131,101 @@ than a 12-frame hold's) unexplained, and deriving new `GRAVITY`,
 not done: the underlying model isn't understood well enough yet to trust
 a derived number over the existing, tested placeholder. Recorded as
 narrowed data for the next attempt, not as a fix.
+
+### A real lead: this looks like two constant-velocity phases, not one accelerating curve
+
+The previous attempts assumed the jump is a single continuously-accelerating
+parabola (constant gravity, like our engine models it) and tried to fit that
+shape to the max-hold trace. It does not fit: a least-squares parabola over
+the whole 24-frame trace leaves residuals up to 4px with a systematic pattern
+(the fit under-curves in the middle), meaning the real curve has less
+curvature there than a single parabola allows.
+
+Splitting the same trace at the apex (frame 11) and fitting each half
+separately tells a different story. The rise (frames 0-11) fits a **straight
+line** far better than a parabola: slope -2.13 px/frame, max residual 1.39px,
+versus a quadratic fit whose curvature term is nearly zero (`g = 2a ~= 0.04`,
+indistinguishable from no acceleration at all). The fall (frames 11-24) is
+the same shape the other way: slope +1.99 px/frame, residuals dominated by
+what looks like subpixel rounding noise rather than curvature.
+
+This was not just a fit artifact. Recording `0xC207` (the already-documented
+vertical phase byte: 0 grounded, 1 rising, 2 falling) alongside Y in the same
+run shows it flips from 1 to 2 at exactly frame 12, the same frame the Y
+delta changes sign. The game's own internal state agrees with what the
+curve-fitting found independently:
+
+```
+frame  y    dy  grounded  phase
+   10  112  -2  0         1
+   11  110  -2  0         1
+   12  111  +1  0         2   <- phase flips here, delta flips sign here
+   13  113  +2  0         2
+```
+
+So the model is closer to two constant vertical speeds (roughly 2.2 px/frame
+up, 2.1 px/frame down) with a hard switch at the apex, than to one continuous
+`GRAVITY` acceleration applied every frame the way `src/core/physics.rs`
+currently does it. That would also explain why the rise/fall frame counts
+differ (11 vs 13) despite similar total distance: the two phases have
+slightly different constant speeds, not the same acceleration integrated
+over an asymmetric arc.
+
+### The short-hold anomaly resolves: releasing A early starts real deceleration, it does not cut the rise short
+
+The previous attempt's open question was why an 8-frame hold gives a *later*
+apex (frame 16) than a 12+ frame hold (frame 11), which a simple "holding
+cuts the rise short" model cannot explain. Recording the full per-frame
+trace with early releases (hold 3, 5, and 8 frames, same method as above)
+answers it:
+
+```
+hold=3:  frame  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15(phase->2)
+         dy    +0 -3 -3 -2 +0 -2 -1 -1 -1 +0 -1 +0 -1 +0 +0 +0
+hold=8:  frame  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16(phase->2)
+         dy    +0 -3 -3 -2 +0 -4 -2 -2 -2 -1 -1 -1 -1 -1 +0 -1 +1
+```
+
+While A is held and Mario is rising, upward speed holds roughly steady
+(matching the max-hold trace's constant ~2.1-2.3 px/frame). The moment A is
+released, the speed does not stay put and does not simply stop: it decays
+step by step toward zero over several more frames (`-2, -1, -1, -1, 0, -1,
+0, -1, 0, 0` for the hold=3 case), and only once it actually reaches zero
+does `0xC207` flip to falling (phase 2). Releasing earlier means more frames
+of decay before reaching zero, hence a later apex, exactly the anomaly the
+previous attempt found and could not explain. This is a real deceleration
+being applied once the button is not held, not a fixed-length rise being
+truncated.
+
+The fall phase (`0xC207 == 2`) also is not the constant speed the single
+max-hold trace suggested; that trace's linear fit was flattered by having
+only 12 noisy samples. All four traces (hold 3, 5, 8, 15) show the same
+shape once falling: speed starts near 0 right after the phase flip and
+climbs step by step to roughly 3 px/frame by landing, a real accelerating
+fall, consistent across every hold length tried.
+
+### Combined picture
+
+Three distinct regimes, not one `GRAVITY` constant:
+
+1. **Rising, A held**: near-constant upward speed (~2.1-2.3 px/frame), no
+   measurable deceleration. Looks like the classic "holding jump counters
+   gravity" convention used across Mario games.
+2. **Rising, A released (or otherwise not held)**: upward speed decays
+   toward zero over several frames, a real deceleration. This is presumably
+   the same constant as regime 3's acceleration, just acting against an
+   existing upward velocity instead of from rest; not yet checked whether
+   the magnitudes match.
+3. **Falling**: downward speed accelerates from ~0 at the apex to ~3
+   px/frame by landing, consistently across every hold length tested.
+
+This is a real structural finding, not just narrowed data, but it still does
+not become a `GRAVITY`/`JUMP_VELOCITY`/`JUMP_CUT` number today: those
+constants assume a single continuous-acceleration model, and this data says
+the real shape is the three-regime state machine above. Implementing this
+properly means changing `step_motion` to switch behavior on an explicit
+rise/fall phase (mirroring `0xC207`) rather than adding one constant every
+airborne frame the way it does now, which is an engine change with its own
+tests, not a constant tweak to make quietly here. Recorded as a strong,
+verified lead for that task, including the exact traces above to check any
+future implementation against.

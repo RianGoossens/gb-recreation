@@ -381,27 +381,57 @@ run (nothing was ever detected past column 63, so nothing got
 mislabeled), but it is a real correctness risk for any future run where
 a long uniform stretch is followed by real variation.
 
-So, as of this session: Mario can survive far into the level by jumping
-at anything nearby, but confirming what is actually *at* those later
-world columns needs a tracking method that does not depend on content
-changing, for example reading a genuinely fresh copy of the buffer every
-frame and diffing against the ring-buffer's known write pattern rather
-than against remembered values, or cross-checking against `SCX` sampled
-correctly (mid-scanline, not at VBlank) once that is solved. Recorded as
-open work rather than pushed further this session.
+### Fixing the mislabeling risk
+
+The undercounting risk above is now fixed. `0xC20C` (horizontal speed,
+1/6-pixel units) is integrated every single frame into a running
+subpixel position counter, real hardware state rather than an assumed
+speed, so it keeps advancing correctly through jumps, pauses, and the
+screen-position freeze alike. When a slot's tile value does change, its
+new world column is now picked as the nearest multiple of 32 to that
+precise position estimate, not a blind "+32 from whatever it was
+labeled before". A stale label from an undetected repeat can no longer
+propagate: each detected change gets its lap number from position
+directly.
+
+That fix itself needed a second correction: "nearest multiple of 32"
+picked a small negative column (`-5`) for a high buffer index (27)
+evaluated very early in the run, before Mario had traveled far, because
+`-5` was numerically closer to the position estimate at that point than
+the correct `27`. The level cannot have negative columns, and a slot's
+world column cannot legitimately regress once established, so the
+picker now rejects any candidate below the slot's current value (or 0)
+and takes the next viable lap instead of whichever is numerically
+closest.
+
+Rerunning the 5000-frame survive-and-stitch pass with both fixes gives a
+clean 141-wide map (world columns 0-140) with 45 of those columns
+actually confirmed (the rest still blank, not yet streamed in during
+this run): columns 0-26 solid ground matching the already-verified
+static grid, a gap at 27-31 (still unloaded as of this run, consistent
+with earlier findings), then a sparse scatter of confirmed columns
+further out (32-33, 59-70, 103-106, 139-140) with everything between
+still unobserved. No garbage or inconsistent values anywhere in the
+output. The blind spot on genuinely uniform terrain remains by nature
+(if a tile's value never changes there is nothing to detect, whichever
+method is used), but the fix removes the risk of that blind spot
+corrupting data that comes after it.
 
 ## Open work
 
 - Pin the step/pyramid structure's solid tiles precisely (needs the
   sub-column-accurate probe described above; still not confirmed by
   direct collision, see the pyramid section).
-- Fix the tile-tracking blind spot: `tools/stitch_level_1_1.py` can now
-  survive arbitrarily far (jumps at anything nearby), but its
-  transition-watching method silently stalls across long uniform terrain
-  where the tracked value never visibly changes lap to lap (see the
-  "standing still doesn't save him" section above). Needs a way to track
-  world-column identity that does not depend on content changing, before
-  the long survival distance actually becomes long confirmed data.
+- Improve coverage on genuinely uniform terrain: `tools/stitch_level_1_1.py`
+  can survive arbitrarily far and now numbers detected transitions
+  correctly (see "fixing the mislabeling risk" above), but a tile that
+  never visibly changes lap to lap still can't be detected by a
+  value-watching method at all, by nature. A 5000-frame run confirmed
+  only 45 of 141 possible columns. Needs a way to positively confirm a
+  world column even when its content repeats, for example diffing
+  against the ring buffer's known write timing rather than remembered
+  values, before this becomes dense coverage rather than a sparse
+  scatter.
 - Once stitching covers enough of the level, convert the confirmed grid
   into `Level`/`Solids` and wire it in behind the existing ROM gating,
   replacing the placeholder demo level.

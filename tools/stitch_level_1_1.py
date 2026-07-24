@@ -43,16 +43,27 @@ even while Mario stands still, so waiting only delays contact. Jumping
 at it instead let a run survive past world column 1880 without dying
 once, over a 15000-frame run.
 
-That survival distance outruns what the tile-tracking above can actually
-confirm. It only detects a slot's next lap when the tile *value*
-changes, so long uniform terrain (a long flat stretch of repeated ground
-tile, for example) produces no detected change and the tracked map
-silently stalls; a 630-column real run yielded only a 64-wide tracked
-map. This is not wrong data, everything captured is still a direct
-observation, but it means "how far Mario survived" and "how much level
-is actually confirmed" are two different numbers now, and the second one
-needs a tracking method that does not depend on content changing before
-it can catch up (see docs/reference/level-1-1.md).
+That survival distance outran what the tile-tracking used to be able to
+confirm: watching only for a slot's value to change stalls silently
+across long uniform terrain (a long flat stretch of repeated ground
+tile, for example), where nothing ever looks different lap to lap.
+Fixed by tracking Mario's true world position precisely instead of
+periodically: 0xC20C (his horizontal speed, in 1/6-pixel units, see
+physics.md) is integrated every single frame into a running subpixel
+counter, which keeps advancing correctly through jumps, pauses, and the
+screen-position freeze alike, since it reads real hardware state rather
+than assuming a fixed speed. When a slot's tile value does change, its
+new world column is picked as the nearest multiple of 32 (relative to
+the slot's buffer index) to that precise position estimate, not a blind
+"+32 from whatever it was labeled before". That closes the mislabeling
+risk a blind increment would have if a long unchanging stretch skipped
+several real laps before the next detected change: the new value gets
+the correct lap number outright, from position, not from a possibly
+stale label.
+
+The blind spot on totally uniform terrain remains by nature (if nothing
+ever changes, there is nothing to detect, whichever method is used), but
+it no longer risks mislabeling whatever comes after such a stretch.
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -90,6 +101,21 @@ def nearby_danger(pb, mario_x):
     return False
 
 
+def nearest_world_col(bx, position_estimate, min_wc):
+    """Nearest multiple-of-32 (relative to bx) to a precise position
+    estimate, used only when a real value change was just observed.
+    Never returns less than min_wc: the level cannot have negative
+    columns, and a slot's world column cannot legitimately regress once
+    established, so out-of-range candidates are rejected in favor of the
+    next viable lap rather than picked for being numerically closer."""
+    k = round((position_estimate - bx) / COLS)
+    wc = bx + COLS * k
+    while wc < min_wc:
+        k += 1
+        wc = bx + COLS * k
+    return wc
+
+
 def main():
     pb = boot_to_gameplay()
 
@@ -115,6 +141,11 @@ def main():
     max_frames = 5000
     jump_cooldown = 0
     a_held = 0
+    # Precise world position, integrated every frame from the real
+    # horizontal speed register (1/6-pixel units, see physics.md), not
+    # sampled periodically. Keeps advancing correctly through jumps,
+    # pauses, and the screen-position freeze alike.
+    world_x_subpixel = x_spawn * 6
 
     for f in range(1, max_frames + 1):
         danger = nearby_danger(pb, pb.memory[0xC202])
@@ -139,6 +170,8 @@ def main():
 
         pb.tick()
         x = pb.memory[0xC202]
+        world_x_subpixel += pb.memory[0xC20C]
+        position_estimate = world_x_subpixel // 6 // 8  # -> world column
 
         if locked_at is None and x == 81 and f > 10:
             locked_at = f
@@ -151,11 +184,13 @@ def main():
             new_vals = read_row(row)
             for bx in range(COLS):
                 if new_vals[bx] != slot_val[row][bx]:
-                    slot_wc[row][bx] += COLS
+                    slot_wc[row][bx] = nearest_world_col(
+                        bx, position_estimate, slot_wc[row][bx] + 1
+                    )
                     slot_val[row][bx] = new_vals[bx]
                     combined[(slot_wc[row][bx], row)] = new_vals[bx]
 
-    world_x_reached = x_spawn if locked_at is None else 81 + ((stopped_at_frame or max_frames) - locked_at)
+    world_x_reached = world_x_subpixel // 6
     pb.button_release("right")
     pb.stop()
 

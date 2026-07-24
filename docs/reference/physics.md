@@ -77,3 +77,15 @@ that would show the true per-frame acceleration. The grounded flag
 (`0xC20A`) is clean enough to use directly for the tile-collision
 classification subtask in `level-1-1.md` without waiting on gravity to be
 pinned.
+
+Checked again for a subpixel companion register (the same relationship
+`0xC20C` has to `0xC202` for horizontal movement): a WRAM scan for a byte
+whose delta is itself roughly constant during a jump (a true velocity
+signature, one derivative up from a position) turned up `0xC00C` and
+`0xC010`, but they turned out to be exact mirrors of each other and of
+the already-documented `0xC208` shape: pinned at a sentinel value
+(`-128`) while grounded, jumping to a peak on takeoff, easing down to a
+minimum at the jump's apex, then back up to the peak at landing. That is
+the same "height above ground" signal already noted for `0xC208`, not a
+subpixel velocity accumulator. No new lead found; gravity and jump
+velocity are still unpinned.

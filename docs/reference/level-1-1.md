@@ -488,10 +488,9 @@ said world column 126, our engine's replay landed at column 105, a real
 17% gap, not a rounding difference.
 
 That gap is not clean evidence against the position estimate, though,
-because the comparison has a confound: our engine's gravity and jump
-timing are still unpinned placeholders (see "still to pin" in
-`physics.md`), so a jump in our engine does not necessarily last the
-same number of frames as a jump in the real cartridge. Replaying a
+because the comparison has a confound: our engine's jump timing does not
+match the cartridge's, so a jump in our engine does not necessarily last
+the same number of frames as a jump in the real cartridge. Replaying a
 button schedule recorded against the real game's jump timing through an
 engine with different jump timing will diverge for that reason alone,
 with no bug in the position estimate required to explain it.
@@ -506,8 +505,11 @@ speed, matching known physics precisely with no jump involved to
 confound it. So the grounded case is well confirmed. What is still
 genuinely open is only the airborne-freeze assumption's accuracy across
 many real jump events, which this cross-check could not cleanly test
-without first pinning our own engine's gravity to the cartridge, itself
-a separate, previously-abandoned problem (see `physics.md`).
+without our own engine actually reproducing the cartridge's jump timing.
+That no longer waits on measuring gravity: the real jump shape is now
+pinned (a three-regime state machine, not one continuous acceleration,
+see `physics.md`). It waits on implementing that model in `step_motion`,
+tracked in `GRAND_MASTER_PLAN.md`'s backlog.
 
 ## A real, loadable level from the opening screen
 

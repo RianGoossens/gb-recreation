@@ -87,46 +87,55 @@ tile his jump arc passes through with no effect on his motion is not.
   enough here. This needs a dedicated frame-by-frame probe that tracks
   Mario's exact sub-column at the moment of landing, not the broad sweep
   used for the ground/sky classification above.
-- Separately, in this scripted run Mario could not walk past on-screen
-  `x = 81` even with periodic jumps over ~1400 frames (the level never
-  actually scrolls: `SCX` stays at `0` the entire time). An enemy blocking
-  him was the first guess, but that does not hold up: dumping OAM at the
-  stuck position shows only Mario's own sprite (four entries forming a
-  16x16 sprite, `x` 66-81), no separate enemy nearby. The horizontal speed
-  register (`0xC20C`, see `physics.md`) stays pinned at its maximum (`6`)
-  the entire time he is stuck, meaning the game's own walk logic still
-  thinks he is moving at full speed; only his displayed position refuses to
-  advance. That rules out a plain "walked into a wall and stopped" story
-  too (which would usually show speed decaying, not holding at max), and
-  the background stays visually static (no scroll) rather than the camera
-  picking up his motion instead. None of the three explanations tried so
-  far account for all three observations at once. Left open rather than
-  guessed at.
-- One more data point: PyBoy ships a built-in game-specific wrapper for SML
-  with a `level_progress` reading (not something this project reads from or
-  cites as a source of truth, used here only as an independent sanity
-  check). It keeps climbing for roughly 120 more frames after `0xC202`
-  freezes at `81`, then it plateaus too, at the same time `0xC202` is still
-  flat. So there is real further world advancement after the on-screen
-  freeze, for a while, and then a genuine stop, which is at odds with the
-  screenshots at frame 100 and frame 200 looking pixel-identical (no visible
-  scroll happened in that window despite `level_progress` moving during
-  part of it). This does not resolve the mystery, it narrows it: something
-  keeps Mario moving in the world for a bit after he stops moving on
-  screen, without a visible camera shift, before everything genuinely
-  stops. Worth another look with a dedicated session, ideally with the
-  window rendered live rather than only sampled at two points in time.
+- **Resolved**: the on-screen freeze at `x = 81` is not a blockage. It is
+  the standard mid-screen camera lock, the same behavior as the NES Mario
+  games: once Mario reaches roughly the horizontal center of the screen,
+  the game stops moving his sprite and scrolls the world past him instead.
+  Direct proof: holding Right for 1200 frames with no jumping at all keeps
+  `0xC202` (Mario's screen X) pinned at `81` the entire time, but a
+  frame-by-frame screenshot diff shows the background visibly and
+  continuously changing from frame 150 onward (`diff bbox` covers nearly
+  the full 160x136 playfield below the status bar, at every one of frames
+  150/300/450/600/900/1200 against a frame-50 baseline). The world is
+  genuinely scrolling; Mario's sprite just does not move on screen anymore
+  once the lock engages.
+- The earlier "the level never actually scrolls, `SCX` stays at `0`" claim
+  from an earlier pass was a measurement artifact, not a real freeze.
+  Sampling `0xFF43` (SCX) once per frame right after `pb.tick()` mostly
+  reads `0`, because SML splits the screen with a mid-scanline STAT
+  interrupt: the status bar rows render with `SCX = 0` and the playfield
+  rows render with the real scroll value, and the register gets reset back
+  to `0` for the next frame's status bar before a once-per-frame VBlank
+  sample sees it. Sampling more frames caught the real value leaking
+  through on some frames: cross-checking many single-frame reads of
+  `0xFF43` during this run showed it briefly reading small then steadily
+  larger nonzero values (`2`, `8`, `16`, `24`, ... up to `224` over several
+  hundred frames) on the frames where the sample raced ahead of the reset,
+  climbing at roughly the same 1 pixel/frame rate as Mario's saturated walk
+  speed. That is consistent with real, continuous scrolling, not a stuck
+  register.
+- What this means for extraction: reading `SCX` once per frame right after
+  `tick()` is not reliable for driving the tilemap-read formula once
+  scrolling starts, since it is usually reading the HUD-row value, not the
+  playfield value. `0xC20B` is an unconfirmed lead for a cleaner source: it
+  climbs through many distinct values per frame with almost no drops over
+  a long run of continuous rightward walking, which looks like a
+  sub-pixel/world-position accumulator rather than the aliased `SCX`
+  read. Not yet confirmed against known scroll amounts; needs its own
+  probe before the stitching subtask relies on it.
+- The old "an enemy might be blocking him" theory is also fully retired:
+  OAM at the stuck screen position only ever showed Mario's own sprite
+  (four entries, `x` 66-81), and there is no blockage to explain since
+  nothing is actually blocked.
 
 ## Open work
 
-- Work out what is actually happening at the `x = 81` blockage (see above);
-  none of "enemy contact", "wall collision", or "camera lock, world still
-  advancing" fully explain the combination of a maxed speed register, a
-  frozen displayed position, and an unmoving background all at once.
 - Pin the step/pyramid structure's solid tiles precisely (needs the
   sub-column-accurate probe described above).
-- Get Mario past the early blockage so the rest of the screen, and
-  eventually the scrolling sections beyond it, can be surveyed the same way.
+- Find a reliable per-frame read of the real scroll amount (the naive
+  once-per-frame `SCX` read is aliased by the status-bar split, see above;
+  `0xC20B` is an unconfirmed lead) so the scrolling sections can be
+  surveyed the same way the opening screen was.
 - Stitch the full scrolling width: walk through the whole level while
   recording the tilemap and scroll position per screen.
 - Convert the result into `Level`/`Solids` and wire it in behind the existing

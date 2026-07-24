@@ -53,9 +53,9 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
     - [x] Pin World 1-1's tile graphics source and the opening screen's background tilemap by observing emulator VRAM (mirrors the title-screen technique; reuses the title screen's existing tile blocks, see docs/reference/level-1-1.md)
     - [~] Classify which tile IDs are solid by observing Mario's actual collisions against each one while walking through
       - [x] Ground (tile 96) confirmed solid and sky/background filler (tile 44) confirmed non-solid, by direct observation of the grounded flag and jump arcs (docs/reference/level-1-1.md)
+      - [x] Resolved the "stuck at x=81" mystery: not a blockage, it is the standard mid-screen camera lock (confirmed via frame-by-frame screenshot diffs showing the background scrolling continuously while Mario's screen position stays pinned). No enemy, no wall; the earlier "SCX stays 0" finding was a sampling artifact from the status bar's mid-frame STAT split (docs/reference/level-1-1.md)
       - [ ] Pin the step/pyramid structure's solid tiles precisely (needs a sub-column-accurate probe; two captures of the same cell disagreed, see the doc)
-      - [ ] Get Mario past the early blockage in the opening screen (likely an enemy, not a wall) so the rest of the screen can be surveyed
-    - [ ] Stitch the full scrolling width by walking through the whole level, recording tilemap and scroll per screen
+    - [ ] Find a reliable per-frame read of the real scroll amount (naive once-per-frame SCX is aliased by the status-bar split; `0xC20B` is an unconfirmed lead, see the doc), then stitch the full scrolling width by walking through the whole level, recording tilemap and scroll per screen
     - [ ] Convert the extracted grid into `Level`/`Solids` and wire it in, ROM-gated
 - [x] Scrolling camera that follows Mario
 - [x] Mario entity: position, velocity, facing, sprite

@@ -49,21 +49,43 @@ across long uniform terrain (a long flat stretch of repeated ground
 tile, for example), where nothing ever looks different lap to lap.
 Fixed by tracking Mario's true world position precisely instead of
 periodically: 0xC20C (his horizontal speed, in 1/6-pixel units, see
-physics.md) is integrated every single frame into a running subpixel
-counter, which keeps advancing correctly through jumps, pauses, and the
-screen-position freeze alike, since it reads real hardware state rather
-than assuming a fixed speed. When a slot's tile value does change, its
-new world column is picked as the nearest multiple of 32 (relative to
-the slot's buffer index) to that precise position estimate, not a blind
-"+32 from whatever it was labeled before". That closes the mislabeling
-risk a blind increment would have if a long unchanging stretch skipped
-several real laps before the next detected change: the new value gets
-the correct lap number outright, from position, not from a possibly
-stale label.
+physics.md) is integrated every frame into a running subpixel counter.
+When a slot's tile value does change, its new world column is picked as
+the nearest multiple of 32 (relative to the slot's buffer index) to that
+precise position estimate, not a blind "+32 from whatever it was
+labeled before". That closes the mislabeling risk a blind increment
+would have if a long unchanging stretch skipped several real laps
+before the next detected change: the new value gets the correct lap
+number outright, from position, not from a possibly stale label.
 
-The blind spot on totally uniform terrain remains by nature (if nothing
-ever changes, there is nothing to detect, whichever method is used), but
-it no longer risks mislabeling whatever comes after such a stretch.
+0xC20C is only trustworthy for this while Mario is grounded (0xC20A ==
+1). Checked directly: it does not hold horizontal speed at all while
+airborne, it climbs unboundedly, one unit per frame, well past the
+walking cap of 6, for as long as a jump lasts, some other counter
+reusing the address mid-flight. Integrating it regardless of grounded
+state was tried first and badly inflated the position estimate, since
+this tool's own stomp-reaction jumps often; caught by a sanity check
+against real screenshots showing almost no visual change over a span
+the buggy estimate claimed covered hundreds of tiles. Fixed by only
+reading 0xC20C while grounded and, while airborne, continuing to add
+whatever speed was last read on the ground (horizontal motion is not
+affected by jumping, confirmed both in physics.md and by on-screen X
+advancing at a steady 1 px/frame through a jump when already at max
+speed beforehand).
+
+The blind spot on totally uniform terrain is now also addressed, within
+a stated confidence level rather than by direct observation alone.
+Measured how far ahead of Mario's precise position a freshly detected
+transition's world column typically sits during ongoing (not initial)
+streaming: 0 to about 17 tiles across 84 sampled transitions, well under
+a full 32-tile lap. So if a slot has gone more than a full lap
+(STALE_LAPS) without a detected change, the buffer would almost
+certainly have refreshed it by now if its content were going to differ;
+its current bytes are inferred to be a genuine repeat, and its label is
+advanced to the current lap without waiting for a value change. This is
+an inference from a measured margin, not a direct observation the way a
+detected change is, and is reported separately in the output so it is
+never confused with directly-confirmed data.
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -81,6 +103,7 @@ MARIO_OAM_SLOTS = {3, 4, 5, 6}
 DANGER_RADIUS = 90
 STOMP_COOLDOWN = 30
 JUMP_HOLD = 10
+STALE_LAPS = 1  # a full 32-tile lap of no detected change before inferring a repeat
 # Rows 0-1 are the status bar (score/coins/time), redrawn every frame
 # regardless of scroll; they are not level geometry, so they are excluded.
 HUD_ROWS = 2
@@ -130,6 +153,7 @@ def main():
     slot_wc = [[bx for bx in range(COLS)] for _ in range(ROWS)]
     slot_val = [read_row(row) for row in range(ROWS)]
     combined = {}
+    inferred = set()
     for row in range(HUD_ROWS, ROWS):
         for bx in range(COLS):
             combined[(slot_wc[row][bx], row)] = slot_val[row][bx]
@@ -142,10 +166,22 @@ def main():
     jump_cooldown = 0
     a_held = 0
     # Precise world position, integrated every frame from the real
-    # horizontal speed register (1/6-pixel units, see physics.md), not
-    # sampled periodically. Keeps advancing correctly through jumps,
-    # pauses, and the screen-position freeze alike.
+    # horizontal speed register (1/6-pixel units, see physics.md). Only
+    # trustworthy while grounded: 0xC20C does not hold horizontal speed
+    # while airborne at all (confirmed directly: it climbs unboundedly,
+    # 1 unit/frame, well past the walking cap of 6, for as long as a jump
+    # lasts, some other counter reusing the address mid-flight). While
+    # airborne this instead keeps adding whatever speed was last read on
+    # the ground, since horizontal motion is not affected by jumping
+    # (established in physics.md; also directly observed: on-screen X
+    # advances at a steady 1 px/frame through a jump when already at max
+    # speed beforehand). Blindly integrating 0xC20C regardless of
+    # grounded state was tried first and produced a wildly inflated
+    # position during this tool's own frequent stomp-jumps, caught by a
+    # sanity check against real screenshots showing almost no visual
+    # change over a span this claimed covered hundreds of tiles.
     world_x_subpixel = x_spawn * 6
+    last_grounded_speed = 0
 
     for f in range(1, max_frames + 1):
         danger = nearby_danger(pb, pb.memory[0xC202])
@@ -170,7 +206,10 @@ def main():
 
         pb.tick()
         x = pb.memory[0xC202]
-        world_x_subpixel += pb.memory[0xC20C]
+        grounded = pb.memory[0xC20A]
+        if grounded:
+            last_grounded_speed = pb.memory[0xC20C]
+        world_x_subpixel += last_grounded_speed
         position_estimate = world_x_subpixel // 6 // 8  # -> world column
 
         if locked_at is None and x == 81 and f > 10:
@@ -189,6 +228,19 @@ def main():
                     )
                     slot_val[row][bx] = new_vals[bx]
                     combined[(slot_wc[row][bx], row)] = new_vals[bx]
+                    inferred.discard((slot_wc[row][bx], row))
+                elif position_estimate - slot_wc[row][bx] > STALE_LAPS * COLS:
+                    # No detected change in over a full lap: the buffer
+                    # would almost certainly have refreshed this slot by
+                    # now if its content were going to differ (measured
+                    # margin: 0-17 tiles during ongoing streaming, well
+                    # under one lap). Infer a genuine repeat rather than
+                    # leave it stuck; marked as inferred, not observed.
+                    slot_wc[row][bx] = nearest_world_col(
+                        bx, position_estimate, slot_wc[row][bx] + 1
+                    )
+                    combined[(slot_wc[row][bx], row)] = slot_val[row][bx]
+                    inferred.add((slot_wc[row][bx], row))
 
     world_x_reached = world_x_subpixel // 6
     pb.button_release("right")
@@ -201,6 +253,10 @@ def main():
             f"camera lock, treated as a death/respawn, not a real further scroll"
         )
     print(f"safely captured up to world column ~{world_x_reached // 8}")
+    print(
+        f"{len(combined) - len(inferred)} cells directly observed, "
+        f"{len(inferred)} inferred as repeats (not directly reconfirmed)"
+    )
 
     max_col = max(k[0] for k in combined)
     min_col = min(k[0] for k in combined)

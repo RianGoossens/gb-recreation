@@ -417,21 +417,62 @@ output. The blind spot on genuinely uniform terrain remains by nature
 method is used), but the fix removes the risk of that blind spot
 corrupting data that comes after it.
 
+### Correction: that position estimate was itself wrong
+
+The "141-wide map, 45 confirmed columns" result above is superseded.
+`0xC20C` does not hold horizontal speed while airborne at all: checked
+directly, it climbs unboundedly, one unit per frame, well past the
+walking cap of 6, for as long as a jump lasts, some other counter
+reusing the same address mid-flight (confirmed: `0xC20C` read 48 the
+frame a jump started and climbed to 87 by 39 frames later, with
+`0xC202` frozen at the camera lock the whole time). The 5000-frame run
+above used the stomp-reaction from the previous section, which jumps
+often, so its position estimate was integrating this bogus climbing
+value on every one of those jumps and came out inflated. It reported
+"safely captured up to world column ~720"; a sanity check against real
+screenshots at four points across that same run showed almost no
+visual change between three of them, which is what caught this.
+
+Fixed by only trusting `0xC20C` while grounded (`0xC20A == 1`) and,
+while airborne, continuing to add whatever speed was last read on the
+ground instead (horizontal motion is not affected by jumping, per
+`physics.md`, and was already directly observed holding at a steady 1
+px/frame through a jump when Mario was already at max speed before
+leaving the ground). Rerunning with this fix gives world column ~626
+for the same 5000-frame budget, only a modest reduction from the buggy
+720, not the large drop expected if most of that distance had been
+jump-inflated noise.
+
+That leaves a genuine open question, stated plainly rather than
+resolved by assumption: is 626 close to Mario's real travel distance, or
+is the level's terrain here uniform enough for a long stretch that a
+screenshot taken at two different real positions would look nearly
+identical anyway (which the tile data so far is consistent with: row 16
+reads solid ground tile `96` almost everywhere it has any confirmed
+value at all)? Both are plausible. The airborne-speed bug is confirmed
+and fixed either way; whether the resulting distance figure is itself
+trustworthy at this scale has not been independently cross-checked, and
+should not be treated as settled.
+
 ## Open work
 
 - Pin the step/pyramid structure's solid tiles precisely (needs the
   sub-column-accurate probe described above; still not confirmed by
   direct collision, see the pyramid section).
 - Improve coverage on genuinely uniform terrain: `tools/stitch_level_1_1.py`
-  can survive arbitrarily far and now numbers detected transitions
-  correctly (see "fixing the mislabeling risk" above), but a tile that
-  never visibly changes lap to lap still can't be detected by a
-  value-watching method at all, by nature. A 5000-frame run confirmed
-  only 45 of 141 possible columns. Needs a way to positively confirm a
-  world column even when its content repeats, for example diffing
-  against the ring buffer's known write timing rather than remembered
-  values, before this becomes dense coverage rather than a sparse
-  scatter.
+  can survive arbitrarily far and now numbers detected transitions from
+  a position estimate that only trusts `0xC20C` while grounded (see the
+  correction above), plus a repeat-inference step for slots stale over a
+  full lap. A tile that never visibly changes still can't be positively
+  distinguished from "not yet streamed in" versus "genuinely repeated
+  and correctly inferred" without independent verification.
+- Independently cross-check the position estimate's accuracy at scale:
+  the 5000-frame run's reported world column ~626 has not been verified
+  against ground truth (real screenshots looked nearly identical across
+  much of that run, consistent with either genuinely uniform terrain or
+  a remaining position bug; see the correction above). Comparing against
+  a manually walked, screenshot-verified short reference stretch would
+  settle this before trusting the tool at larger distances.
 - Once stitching covers enough of the level, convert the confirmed grid
   into `Level`/`Solids` and wire it in behind the existing ROM gating,
   replacing the placeholder demo level.

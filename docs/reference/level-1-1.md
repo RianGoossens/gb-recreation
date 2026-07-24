@@ -120,6 +120,20 @@ tile his jump arc passes through with no effect on his motion is not.
   those confirms it, treat it as solid by level-design consistency (it is
   drawn as a stacked-block staircase, the same convention used everywhere
   else in the series), the same caveat already applied to tile `97`.
+
+  Tried the "release Right first" trick that worked for the world-column-48
+  hazard (see the stitching section below): released Right for 50-90
+  frames to let speed decay to 0, then jumped with only 0-20 frames of
+  re-acceleration first. Still landed past the structure every time. The
+  reason is different from the hazard case: Right stays held through the
+  whole ~30+ frame flight, so Mario's horizontal speed ramps right back up
+  to near-saturation *during* the jump regardless of how slow he was at
+  takeoff, covering enough distance to clear the structure anyway. A
+  standing high jump with Right released throughout the flight (not just
+  before it) is the untried next variant, though at that point he is
+  jumping mostly straight up and might just come back down in front of the
+  structure rather than onto it. Left as still-unconfirmed rather than
+  forced.
 - **Resolved**: the on-screen freeze at `x = 81` is not a blockage. It is
   the standard mid-screen camera lock, the same behavior as the NES Mario
   games: once Mario reaches roughly the horizontal center of the screen,

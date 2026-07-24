@@ -102,6 +102,20 @@ tile his jump arc passes through with no effect on his motion is not.
   picking up his motion instead. None of the three explanations tried so
   far account for all three observations at once. Left open rather than
   guessed at.
+- One more data point: PyBoy ships a built-in game-specific wrapper for SML
+  with a `level_progress` reading (not something this project reads from or
+  cites as a source of truth, used here only as an independent sanity
+  check). It keeps climbing for roughly 120 more frames after `0xC202`
+  freezes at `81`, then it plateaus too, at the same time `0xC202` is still
+  flat. So there is real further world advancement after the on-screen
+  freeze, for a while, and then a genuine stop, which is at odds with the
+  screenshots at frame 100 and frame 200 looking pixel-identical (no visible
+  scroll happened in that window despite `level_progress` moving during
+  part of it). This does not resolve the mystery, it narrows it: something
+  keeps Mario moving in the world for a bit after he stops moving on
+  screen, without a visible camera shift, before everything genuinely
+  stops. Worth another look with a dedicated session, ideally with the
+  window rendered live rather than only sampled at two points in time.
 
 ## Open work
 

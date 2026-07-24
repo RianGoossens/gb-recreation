@@ -25,15 +25,24 @@ Screenshots of the running game are fine to include in blog posts as commentary,
 2. Capture screenshots with the game's headless screenshot command. Save curated ones under `docs/blog/media/` (committed via Git LFS).
 3. Create `docs/blog/posts/YYYY-MM-DD-slug.html` from the template below.
 4. Add an entry to `docs/blog/posts.json` (title, date, slug, one-line summary).
-5. Verify the home page lists it and the post opens.
-6. Commit (`docs(blog): ...`) and push. The Pages workflow deploys it.
+5. Run the AI-ism check below against the new file. Fix every hit before moving on; do not eyeball this from memory, a manual read missed the post's own title being the exact banned pattern once already.
+6. Verify the home page lists it and the post opens.
+7. Commit (`docs(blog): ...`) and push. The Pages workflow deploys it.
+
+### AI-ism check (run before committing, on the post file itself)
+
+```sh
+grep -nE ', not [A-Za-z]|not [A-Za-z]+ but [A-Za-z]|is not [^.]*\.[[:space:]]*It is|not a [a-z]+, (it'"'"'s|it is)' docs/blog/posts/YYYY-MM-DD-slug.html
+```
+
+Any hit is a candidate for the "not X, it is Y" / "X, not Y" antithesis pattern and needs a look, including in the `<title>` and `<h1>`/`<h2>` lines, not just body paragraphs. This is the exact construction that slipped through once as the whole framing device of a post title ("watching, not reading" in the `<title>`, `<h1>`, and an `<h2>`) and once as a split-sentence version ("is not X. It is Y.") that an earlier, narrower comma-only check missed. Grep the file, not memory.
 
 ## Post rules
 
 - Voice: plain and direct by default. Explain what was built and how. Personality is fine in small doses, but it has to be earned by the subject. Implementing basic physics or a coin counter does not call for grand or whimsical language; describe it plainly.
 - Avoid AI writing tics. In particular:
-  - No "it is not X, it is Y" (and its cousins: "not a bug, a feature", "X is not what you see, Y is what it thinks in"). State the thing directly instead of setting up a contrast for effect.
-  - No two-part antithesis sentences written for rhythm ("Small Mario plays for his life, big Mario plays for his size"). Cut them.
+  - No "it is not X, it is Y" (and its cousins: "not a bug, a feature", "X is not what you see, Y is what it thinks in"), whether written as one sentence with a comma or split across two ("It is not X. It is Y."). State the thing directly instead of setting up a contrast for effect.
+  - No two-part antithesis sentences written for rhythm ("Small Mario plays for his life, big Mario plays for his size"). Cut them. This includes the post's own title and headings: a title built on "X, not Y" (for example "watching, not reading") is the same tic, just load-bearing, and is easy to miss because it reads as a clean headline instead of a sentence.
   - No fluffy or whimsical figures of speech where a plain sentence works ("a breath away", "a promise that a mistake will cost less", "the game finally knows how to make noise"). Say what happened.
   - Do not lean on "quietly", "honest", "the nice thing", "the whole point", "it turns out" as filler.
 - Fancy language must be earned. If a sentence would read as bizarre said out loud about a small technical task, rewrite it plainly.

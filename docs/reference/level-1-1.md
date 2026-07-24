@@ -143,9 +143,31 @@ tile his jump arc passes through with no effect on his motion is not.
   moves him at all, a 2-frame tap already carries 1-2 columns), with no
   granularity fine enough caught to land on the narrow step surfaces in
   between, across 72 more combinations of launch position, tap length, and
-  jump height. Left as still-unconfirmed rather than forced; a genuinely
-  different method (a controlled fall from directly above a column) is
-  the only untried approach left.
+  jump height.
+
+  **Resolved, and the other direction from the working assumption**: the
+  pyramid is not solid. Built `tools/convert_level_1_1_to_level_format.py`
+  to turn this opening screen into a real, loadable level for our own
+  engine (see the stitching section below for why this exists at all),
+  first marking the pyramid tiles solid per the "presumed by level-design
+  consistency" note above. Loading that level and holding Right in our
+  own engine, Mario does not walk at all: he oscillates in place right at
+  his spawn column, immediately blocked, for the entire test. That
+  directly contradicts every one of the dozens of real-emulator traces
+  taken this session showing him walk freely from spawn (column 6) all
+  the way to the camera lock (column 10) and beyond, with zero collision
+  event ever observed along the way. Marking the pyramid tiles non-solid
+  instead and rerunning the same test, Mario walks at a smooth, steady
+  1 px/frame the whole way, matching the real game exactly. The
+  level-design-consistency presumption was wrong: these tiles look like a
+  solid staircase but do not collide like one, at least not against
+  Mario's horizontal movement near the ground. `SOLID_TILES` in the
+  conversion tool now only includes `96` and `97`; the pyramid tiles are
+  treated as non-solid background, and the resulting level matches
+  observed reality far better than the presumption did. This does not
+  rule out the pyramid being solid from *above* (a fall onto its top
+  surface, never tested), only that it does not act as a wall against
+  the horizontal approach every real trace this session actually used.
 - **Resolved**: the on-screen freeze at `x = 81` is not a blockage. It is
   the standard mid-screen camera lock, the same behavior as the NES Mario
   games: once Mario reaches roughly the horizontal center of the screen,
@@ -454,11 +476,31 @@ and fixed either way; whether the resulting distance figure is itself
 trustworthy at this scale has not been independently cross-checked, and
 should not be treated as settled.
 
+## A real, loadable level from the opening screen
+
+`tools/convert_level_1_1_to_level_format.py` turns the opening 20x18
+screen into a plain-text level our own engine already knows how to load
+(`Level::from_file`, see `docs/reference/level-format.md`): solid tiles
+become `#`, everything else `.`, Mario's spawn becomes `M`. It writes to
+`assets/extracted/level_1_1_opening.txt`, gitignored like the rest of
+`assets/extracted/`, generated on demand from the verified ROM rather
+than committed, since this data is both partial (one screen) and mixes
+directly-confirmed and presumed tile classifications.
+
+This is what caught the pyramid's solidity being wrong (see the pyramid
+section above): loading the converted level in our own engine and
+actually walking it surfaced a contradiction with real gameplay that
+reading tile IDs and reasoning about them never would have. Building the
+level and playing it, even headlessly, is now part of how this kind of
+presumption gets checked, not just an eventual output of the extraction
+work.
+
 ## Open work
 
-- Pin the step/pyramid structure's solid tiles precisely (needs the
-  sub-column-accurate probe described above; still not confirmed by
-  direct collision, see the pyramid section).
+- Confirm whether the pyramid is solid from above (a fall onto its top
+  surface was never tested, only the horizontal approach every trace
+  this session used; see the pyramid section for what already ruled out
+  "solid against a horizontal approach").
 - Improve coverage on genuinely uniform terrain: `tools/stitch_level_1_1.py`
   can survive arbitrarily far and now numbers detected transitions from
   a position estimate that only trusts `0xC20C` while grounded (see the

@@ -46,7 +46,10 @@ playing it faithfully.
 | Question block gives a coin | canonical | |
 | Power block gives mushroom/flower by size | canonical | matches SML's size-based item |
 | Brick block | canonical | big/fire Mario breaks it; small Mario bumps it |
-| Score, lives, timer, time-out death | canonical | point values not yet matched to the cartridge |
+| Score, lives, timer, time-out death | canonical | |
+| Stomp worth 100 points | canonical | measured off the cartridge's status bar (`tools/measure_scores.py`) |
+| Coin worth 100 points | canonical | measured the same way. The cartridge bumps the coin counter one frame before the score |
+| Power-up worth 1000 points | **stand-in** | unmeasured; no run has reached a power-up on the cartridge yet |
 
 ## Physics and levels
 
@@ -89,7 +92,7 @@ playing it faithfully.
 1. Extract the real level geometry.
 2. Replace the Fly with a real SML enemy (Nokobon). Gating it keeps the default build faithful, but the enemy roster is still one short.
 3. Pin the cartridge's real sound effect data (APU registers/note data per event) and replace the invented tones in `src/audio.rs`.
-4. Match the cartridge's point values (a stomp is 100, seen directly in the
-   status bar while measuring the bounce; the rest are unchecked).
+4. Measure the power-up's point value, the only scoring number still
+   unchecked. Stomps and coins are pinned at 100 each.
 
 (Brick breaking and superball coin collection are already canonical, done.)

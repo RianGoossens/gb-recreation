@@ -21,8 +21,19 @@ use crate::render::{render_background, Framebuffer, Palette, TileMap};
 use crate::sound::SoundEvent;
 use crate::tiles::Tile;
 
-/// How long star invincibility lasts, in frames. Provisional.
+/// How long star invincibility lasts, in frames. Provisional, and the star
+/// is not in Super Mario Land at all (see docs/reference/faithfulness.md).
 const STAR_DURATION: u32 = 600;
+
+/// Points for defeating an enemy. Measured from the cartridge by reading the
+/// status bar across a real stomp (`tools/measure_scores.py`).
+pub const STOMP_POINTS: u32 = 100;
+/// Points for a coin. Measured the same way. The cartridge bumps the coin
+/// counter one frame before the score, which is why the tool pairs the two
+/// events instead of expecting them on the same frame.
+pub const COIN_POINTS: u32 = 100;
+/// Points for a power-up. Still unmeasured: no run has reached one yet.
+pub const POWERUP_POINTS: u32 = 1000;
 
 fn solid_tile(color_index: u8) -> Tile {
     Tile {
@@ -409,14 +420,14 @@ impl Game {
             }
         }
         if plowed {
-            self.score += 100;
+            self.score += STOMP_POINTS;
             self.sounds.push(SoundEvent::Stomp);
         }
         if stomped {
             self.mario.vy = -self.tuning.stomp_bounce;
             self.mario.on_ground = false;
             self.mario.bouncing = true;
-            self.score += 100;
+            self.score += STOMP_POINTS;
             self.sounds.push(SoundEvent::Stomp);
         }
         // A stomp in the same frame saves Mario from a simultaneous side hit.
@@ -471,7 +482,7 @@ impl Game {
             }
         }
         if hits > 0 {
-            self.score += 100 * hits;
+            self.score += STOMP_POINTS * hits;
             self.sounds.push(SoundEvent::Stomp);
         }
         let mut i = 0;
@@ -625,7 +636,7 @@ impl Game {
                     self.mario.power = Power::Fire;
                 }
             }
-            self.score += 1000;
+            self.score += POWERUP_POINTS;
             self.sounds.push(SoundEvent::PowerUp);
         }
     }
@@ -641,7 +652,7 @@ impl Game {
 
     fn gain_coin(&mut self) {
         self.coins_collected += 1;
-        self.score += 100;
+        self.score += COIN_POINTS;
         self.sounds.push(SoundEvent::Coin);
         if self.coins_collected >= 100 {
             self.coins_collected -= 100;
@@ -1281,6 +1292,18 @@ mod tests {
             game.step(Buttons::default());
         }
         assert_eq!(game.timer, start - 1);
+    }
+
+    #[test]
+    fn point_values_are_pinned() {
+        // Measured off the cartridge's status bar (tools/measure_scores.py):
+        // a stomp and a coin are both worth 100. A tripwire, same as the
+        // physics constants: change these deliberately, in the commit that
+        // measures the new value.
+        assert_eq!(STOMP_POINTS, 100);
+        assert_eq!(COIN_POINTS, 100);
+        // Not measured yet: no run has reached a power-up on the cartridge.
+        assert_eq!(POWERUP_POINTS, 1000);
     }
 
     #[test]

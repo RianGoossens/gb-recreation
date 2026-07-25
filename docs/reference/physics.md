@@ -325,3 +325,19 @@ lands **on top of** a specific enemy, rather than just near one, needs
 tighter control over the horizontal approach distance and jump timing than
 this attempt used. Left open rather than forcing a bounce number out of
 data that does not show one.
+
+A second attempt tried much closer trigger distances (4-14px instead of
+10-30px) with short taps (2-6 frames) instead of long holds, on the theory
+that the earlier attempts' jumps were arcing clear over the enemy instead
+of landing on it, plus an explicit check for the real signature of a
+stomp (Y reversing from falling to rising within a frame or two of the
+kill) rather than just an OAM count dropping. Every kill across 24
+combinations still shows no reversal: most sit at `y=134, grounded`, Y not
+moving at all around the kill frame, meaning these are not even mid-air
+events, let alone stomps. Two attempts now agree the reactive
+jump-when-near approach is not landing real contact with the enemy at
+all, in two different ways (arcing over it; not really being airborne at
+the moment of the "kill"). A third approach would need a ground-truth
+signal independent of OAM presence, such as the score counter (not yet
+pinned, see `faithfulness.md`) incrementing on a real stomp, rather than
+another tuning pass on jump distance and timing.

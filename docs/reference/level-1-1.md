@@ -688,6 +688,96 @@ would need a walker that can deliberately drop into a gap rather than one
 whose only ideas are Right, jump and wait. Untested, and stated as the
 leading hypothesis rather than a finding.
 
+## The level data is in the ROM, and the format is mostly decoded
+
+Prompted by Rian (issue 5): playing the game to discover the level caps at
+however far a scripted run survives, and the geometry should be in the
+cartridge. It is.
+
+### Ruling out the easy possibilities first
+
+`tools/find_level_data.py` searched the 64K ROM for the live tilemap in
+every direct form. No row of it appears. No column appears. None of the 19
+distinct 2x2 tile blocks on the opening screen appears. A sweep of all 256
+constant offsets applied to the tile indices changes none of that. So the
+level is not stored as tiles laid out the way they are drawn.
+
+A density scan for the 21 non-filler tile IDs the opening screen uses put
+the busiest 64-byte windows in bank 2 (0x0A9B0 at 47/64 bytes, 0x0ACC0 at
+37/64). Hexdumping there showed an obvious repeating delimiter: `fe`, then
+`53 40`, which are tiles 83 and 64, the two at the top of every column on
+screen.
+
+### The format
+
+    0xFE                      start of a column
+    (row << 4) | count        place `count` tiles starting at `row`
+    <count tile bytes>        tile ids, top to bottom
+    ...                       more runs
+                              (until the next 0xFE)
+
+Anything no run covers is the background filler, tile 44. `0xFE` cannot be
+confused with a run header, since row 15 with a count of 14 would run off
+the bottom of a 16-row column.
+
+Worked example, the level's third column:
+
+```
+fe 02 53 40 b1 5e e2 60 61
+   02          row 0, 2 tiles:  83, 64
+      53 40
+         b1    row 11, 1 tile:  94
+            5e
+               e2  row 14, 2 tiles: 96, 97
+                  60 61
+```
+
+World 1-1's records start at ROM offset **0x0A2BD**, pinned by the one tile
+run on the opening screen that is unique in the whole ROM (`36 71 73`, the
+54/113/115 of the pyramid's second column) and stepping back two records.
+
+### Verified, and where it stops
+
+`tools/decode_level.py --verify` compares the decode against the running
+game. The first **20 columns match exactly**, all 16 rows, every tile.
+
+One bug worth recording, because it looked correct for a while: splitting
+the byte stream on every `0xFE` works for 47 columns and then breaks, since
+a tile id can itself be `0xFE` and a `0xFE` inside a run is data. Parsing
+strictly forward, consuming exactly what each run header asks for, is
+correct.
+
+From column 20 the decode desynchronises. The ROM record at column 20 is
+`fe 02 53 40 b5 52 52 52 60 61`, which decodes to tiles 82,82,82 at rows
+11-13; the running game draws a plain empty column there. Column 21's
+record contains tile 232, which the game does not draw until around world
+column 68. So the decoder runs ahead of the game: at least one control code
+or record form is still unaccounted for. Finding it is the remaining work,
+and it is worth far more than any further improvement to the walker.
+
+### The scroll measurement, confirmed a third way
+
+Rian's other point on issue 5 was that the level might not have repeated at
+all, and that the camera simply had not scrolled yet. Checked directly, by
+counting how many times the game rewrites a column of its own tilemap ring
+buffer (it writes one column per column of scroll, and that is the game's
+own bookkeeping, entirely independent of the pixel measurement):
+
+| measured scroll | buffer column rewrites |
+|-----------------|------------------------|
+| 5 columns | 6 |
+| 10 columns | 11 |
+| 20 columns | 21 |
+| 40 columns | 39 |
+
+The camera genuinely scrolled, so the repeat at 40 columns is real level
+content. The original evidence for it was weak though, and that criticism
+stands: it rested on two screenshots looking alike, with none of the frames
+in between examined. The intermediate frames (`tools/measure_scroll.py`
+captures them) show the scene diverging to a mean absolute pixel difference
+of about 20 out of 255 and coming back to 1.9 at exactly 320px. That, plus
+the rewrite counts, is what the claim should have rested on.
+
 ## A real, loadable level from the opening screen
 
 `tools/convert_level_1_1_to_level_format.py` turns the opening 20x18

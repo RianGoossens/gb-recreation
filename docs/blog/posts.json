@@ -1,5 +1,11 @@
 [
   {
+    "title": "World 1-1 in fifteen pointers",
+    "date": "2026-07-25",
+    "slug": "2026-07-25-world-1-1-in-fifteen-pointers",
+    "summary": "The column format was only half of it. A level is a list of 16-bit pointers, one per 20-column screen, and World 1-1 reuses three of its fifteen. That explains the repeat the last post treated as a trap, and all 300 columns now decode from the ROM matching the running game on every one."
+  },
+  {
     "title": "The level was in the cartridge all along",
     "date": "2026-07-25",
     "slug": "2026-07-25-the-level-was-in-the-cartridge",

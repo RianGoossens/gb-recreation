@@ -2,7 +2,7 @@
 
 A native, readable Rust reproduction of the Game Boy game Super Mario Land. Not an emulator: the game logic, physics, and rendering are reimplemented as clean Rust you can read and modify to build your own levels and mechanics.
 
-Status: workspace bootstrap. Game development is tracked in [docs/GRAND_MASTER_PLAN.md](docs/GRAND_MASTER_PLAN.md) and driven one task at a time.
+Status: playable end to end (title, a level, win/game-over, back to title), with a moddable level format and tuning system. Game development is tracked in [docs/GRAND_MASTER_PLAN.md](docs/GRAND_MASTER_PLAN.md) and driven one task at a time; the real cartridge's level geometry is still open work (see the plan's Milestone 6).
 
 Live dev blog: https://riangoossens.github.io/gb-recreation/
 
@@ -35,9 +35,16 @@ cargo run --release --features gui -- run
 
 Controls: arrow keys move, X jumps (Z is the B button), Escape quits.
 
+Play a custom level (see [docs/reference/level-format.md](docs/reference/level-format.md)),
+optionally with a custom tuning file that retunes the physics without a recompile:
+
+```sh
+cargo run --release --features gui -- run levels/example.txt [tuning.txt]
+```
+
 Without the feature, the binary still offers the headless commands below
-(`verify-rom`, `extract-tiles`, `screenshot`, `render-title`). See `sml` with
-no arguments for the list.
+(`verify-rom`, `extract-tiles`, `screenshot`, `render-title`, `play`). See
+`sml` with no arguments for the list.
 
 ## Running the tests
 
@@ -49,13 +56,19 @@ CI runs `cargo test` on every push (see [.github/workflows/ci.yml](.github/workf
 
 ## Generating screenshots
 
-The game exposes a headless screenshot path so any state can be rendered to a PNG without opening a window. This is used for visual testing and for the dev blog.
+The game exposes headless screenshot paths so any state can be rendered to a PNG without opening a window. This is used for visual testing and for the dev blog.
 
 ```sh
-cargo run --release -- screenshot --state title --out shot.png
-```
+# a fixed built-in demo scene
+cargo run --release -- screenshot shot.png
 
-(The exact subcommands are added as the corresponding milestones land; see the plan.)
+# the title screen, from extracted assets (run extract-title first)
+cargo run --release -- render-title shot.png
+
+# actual gameplay: hold buttons for N frames, then capture the frame
+# (works with a custom level and tuning file too, see docs/reference/level-format.md)
+cargo run --release -- play shot.png 90 right+a levels/example.txt
+```
 
 ## Verifying the ROM
 

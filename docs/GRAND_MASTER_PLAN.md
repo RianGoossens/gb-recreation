@@ -123,7 +123,7 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 
 - [x] Human-editable level format and loader
 - [x] Documentation and an example custom level
-- [x] Hooks or data-driven config for tuning mechanics
+- [x] Hooks or data-driven config for tuning mechanics: `Tuning::from_text` existed and was tested but was never actually reachable from the CLI, and `Session` silently discarded custom tuning on every level transition or restart. Fixed: `run`/`play` both accept an optional tuning file, `Session` carries and reapplies it, and the key reference lives in `docs/reference/level-format.md` (previously nowhere but one blog post's two-line example)
 - [x] Blog post: build your own level
 
 ---

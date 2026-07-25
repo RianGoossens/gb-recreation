@@ -1,5 +1,11 @@
 [
   {
+    "title": "Landing a stomp on purpose",
+    "date": "2026-07-25",
+    "slug": "2026-07-25-landing-a-stomp-on-purpose",
+    "summary": "The last unmeasured physics constant. Two attempts failed because they asked the sprite table whether a stomp had happened; the third asked the game's own phase byte, landed 61 real stomps from one save state, and found that a bounce decays like a released jump even with the button held."
+  },
+  {
     "title": "A promise the code did not keep",
     "date": "2026-07-25",
     "slug": "2026-07-25-a-promise-the-code-did-not-keep",

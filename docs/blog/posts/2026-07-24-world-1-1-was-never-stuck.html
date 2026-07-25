@@ -26,12 +26,12 @@
     </div>
 
     <h2>The wrong lead</h2>
-    <p>The first pass at this checked the background scroll register, <code>SCX</code>, once a frame right after stepping the emulator. It read zero, every single frame, for as long as anyone waited. Combined with Mario's on-screen X pinned at 81, the obvious conclusion was that the level had stopped scrolling entirely: a wall, an invisible collision box, something blocking him.</p>
+    <p>The Game Boy scrolls a level by shifting the whole background image left and right behind a fixed screen window, and one hardware register controls how far: <code>SCX</code>, a single byte the game overwrites every frame to move the world under Mario. The first pass at this checked that register once a frame, right after stepping the emulator. It read zero, every single frame, for as long as anyone waited. Combined with Mario's on-screen X pinned at 81, the obvious conclusion was that the level had stopped scrolling entirely: a wall, an invisible collision box, something blocking him.</p>
 
-    <p>That conclusion was wrong, and the register read was the reason why. World 1-1's status bar at the top of the screen doesn't scroll with the level. The game achieves that with a mid-frame trick: it changes <code>SCX</code> partway down the screen, using one value for the status bar rows and another for the playfield. By the time a script samples the register once at the end of the frame, the status bar's write has already happened, and it reads zero almost every time. The real scroll value was there; the sampling was just looking at the wrong instant.</p>
+    <p>That conclusion was wrong, and the register read was the reason why. World 1-1's status bar at the top of the screen doesn't scroll with the level. The game achieves that by changing <code>SCX</code> partway down the screen, mid-frame: one value for the status bar rows, a different one for the playfield underneath. By the time a script samples the register once at the end of the frame, the status bar's write has already happened, and it reads zero almost every time. The real scroll value was there; the sampling was just looking at the wrong instant.</p>
 
     <h2>What actually happens</h2>
-    <p>The fix wasn't a better register read, it was to stop trusting a single frame at all. Take two screenshots several hundred frames apart and diff them pixel by pixel instead:</p>
+    <p>The fix had nothing to do with reading the register better: it meant not trusting a single frame at all. Take two screenshots several hundred frames apart and diff them pixel by pixel instead:</p>
 
     <pre><code>diff = ImageChops.difference(frame_50, frame_600)
 diff.getbbox()  # (0, 9, 160, 136), not None</code></pre>

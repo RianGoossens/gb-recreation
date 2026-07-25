@@ -1,5 +1,11 @@
 [
   {
+    "title": "A promise the code did not keep",
+    "date": "2026-07-25",
+    "slug": "2026-07-25-a-promise-the-code-did-not-keep",
+    "summary": "An earlier post showed a tuning file changing gravity and jump height. It worked as a function; it was never actually reachable from the game, and would have silently reset on every level change even if it had been. Found and fixed."
+  },
+  {
     "title": "Shipping the real jump",
     "date": "2026-07-24",
     "slug": "2026-07-24-shipping-the-real-jump",

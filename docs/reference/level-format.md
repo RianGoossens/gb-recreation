@@ -90,6 +90,7 @@ jump_velocity = 900
 # play it in a window (needs the gui feature); tuning.txt is optional
 cargo run --features gui -- run levels/example.txt [tuning.txt]
 
-# render a frame headlessly to a PNG (great for sharing a screenshot)
-cargo run -- play shot.png 1 "" levels/example.txt
+# render a frame headlessly to a PNG (great for sharing a screenshot);
+# tuning.txt is optional here too
+cargo run -- play shot.png 1 "" levels/example.txt [tuning.txt]
 ```

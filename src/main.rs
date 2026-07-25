@@ -250,19 +250,28 @@ fn play(args: &[String]) -> ExitCode {
     use sml::core::level::Level;
     use sml::game::Game;
     use sml::input::{Button, Buttons};
+    use sml::tuning::Tuning;
 
-    let (out, frames, keys, level) = match args {
-        [out] => (out.as_str(), 1u32, "", None),
-        [out, frames] => (out.as_str(), frames.parse().unwrap_or(1), "", None),
-        [out, frames, keys] => (out.as_str(), frames.parse().unwrap_or(1), keys.as_str(), None),
+    let (out, frames, keys, level, tuning_path) = match args {
+        [out] => (out.as_str(), 1u32, "", None, None),
+        [out, frames] => (out.as_str(), frames.parse().unwrap_or(1), "", None, None),
+        [out, frames, keys] => (out.as_str(), frames.parse().unwrap_or(1), keys.as_str(), None, None),
         [out, frames, keys, level] => (
             out.as_str(),
             frames.parse().unwrap_or(1),
             keys.as_str(),
             Some(level.as_str()),
+            None,
+        ),
+        [out, frames, keys, level, tuning] => (
+            out.as_str(),
+            frames.parse().unwrap_or(1),
+            keys.as_str(),
+            Some(level.as_str()),
+            Some(tuning.as_str()),
         ),
         _ => {
-            eprintln!("usage: sml play <out.png> [frames] [keys] [level.txt]");
+            eprintln!("usage: sml play <out.png> [frames] [keys] [level.txt] [tuning.txt]");
             eprintln!("  keys: plus-separated, e.g. right+a");
             return ExitCode::FAILURE;
         }
@@ -310,6 +319,21 @@ fn play(args: &[String]) -> ExitCode {
         None => Game::demo_level(),
     };
     let mut game = Game::new(level);
+    if let Some(path) = tuning_path {
+        match std::fs::read_to_string(path) {
+            Ok(text) => match Tuning::from_text(&text) {
+                Ok(t) => game.tuning = t,
+                Err(e) => {
+                    eprintln!("bad tuning file {path}: {e}");
+                    return ExitCode::FAILURE;
+                }
+            },
+            Err(e) => {
+                eprintln!("could not read tuning file {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
     if start_big || start_fire {
         game.grow_mario();
     }
@@ -439,5 +463,5 @@ fn usage() {
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
     println!("  sml run [level.txt] [tuning.txt]          play in a window (needs --features gui)");
-    println!("  sml play <out.png> [frames] [keys] [lvl]  run the game headlessly to a PNG");
+    println!("  sml play <out.png> [frames] [keys] [lvl] [tuning]  run headlessly to a PNG");
 }

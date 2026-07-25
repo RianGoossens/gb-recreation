@@ -24,6 +24,7 @@ The plan lives at `docs/GRAND_MASTER_PLAN.md`. It is the single source of truth 
 ## Rules
 
 - Keep it honest. Do not mark something done to look productive. A checkbox is a claim that it works and is tested.
+- "Tested" means reachable the way a real user would reach it, not just exercised through the Rust API in a unit test. Milestone 7's "Hooks or data-driven config for tuning mechanics" was checked off with `Tuning::from_text` fully implemented and unit-tested, but no CLI command ever called it, so a level author following the moddability blog post's own example could not actually use it without writing Rust. Worse, `Session` silently discarded any tuning applied after construction on every level transition or restart, a bug a unit test that only checked the first level would not catch. Before checking a user-facing capability done, trace it all the way to the interface a user actually touches (a CLI flag, a window, a file format), not just to a function that could theoretically be called.
 - No em-dashes, no filler words (see CLAUDE.md).
 - One concept per checkbox. If a box hides three things, split it.
 - Every milestone should end with a "blog post" task so progress gets logged.

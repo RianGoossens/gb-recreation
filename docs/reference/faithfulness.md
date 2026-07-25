@@ -55,7 +55,7 @@ matches the cartridge.
   `src/core/physics.rs` now models it that way (`apply_vertical_accel`).
   Not pixel-perfect: the fitted constants were checked by simulating a
   full jump end to end and comparing against the traced arc (about 26px
-  peak, landing around frame 26, versus the real 24-25px over ~24 frames),
+  peak, landing around frame 25, versus the real 24-25px over ~24 frames),
   not derived and shipped untested. See `docs/reference/physics.md` for the
   fitted values, traces, and the correction made while implementing it.
 - **Stomp bounce**: still PROVISIONAL, and unlike gravity, not yet measured

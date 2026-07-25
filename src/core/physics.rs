@@ -133,7 +133,10 @@ fn apply_jump(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
 /// before that cap; and a real acceleration while falling. The cap running
 /// out while still held is not the same event as an early release: the
 /// traced data shows a one-frame flip straight to falling there (no gradual
-/// decay first), so it is modeled as a direct reset, not a slow decay.
+/// decay first), so it is modeled as a direct reset. That reset frame also
+/// applies the first frame of gravity immediately rather than waiting for
+/// the next one: the traced transition frame already shows a small amount
+/// of falling motion, not a frame spent sitting at zero velocity.
 fn apply_vertical_accel(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
     if mario.on_ground {
         return;
@@ -144,13 +147,15 @@ fn apply_vertical_accel(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
     if rising && holding_jump && mario.rise_frames < t.max_rise_frames {
         mario.rise_frames += 1;
         mario.vy += t.rise_drift;
-    } else if rising && holding_jump {
+        return;
+    }
+    if rising && holding_jump {
         mario.vy = 0;
     } else if rising {
         mario.vy += t.jump_cut;
-    } else {
-        mario.vy = (mario.vy + t.gravity).min(t.max_fall_speed);
+        return;
     }
+    mario.vy = (mario.vy + t.gravity).min(t.max_fall_speed);
 }
 
 /// Pixel edges of Mario's bounding box: (left, top, right, bottom), inclusive.

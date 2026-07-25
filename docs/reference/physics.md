@@ -272,12 +272,23 @@ more thing this document had wrong: routing the frame-cap expiry through
 like the real 24px/24-frame arc. The real trace already showed why, and it
 had been read past the first time: at the cap (frame 12 in every held-past
 trial), the delta flips from `-2` straight to `+1` in one frame, with no
-intermediate values the way an early release shows. That is not a slow
-decay reaching zero, it is an abrupt reset. The engine now models the
+intermediate values the way an early release shows. That is an abrupt
+reset, not a slow decay reaching zero. The engine now models the
 cap-expiry-while-held case as a direct `vy = 0`, separately from the
 early-release case (which still decelerates gradually via `JUMP_CUT`), and
 simulating that reproduces the real arc closely: about 26px peak (real:
 24-25px) landing around frame 26 (real: 24).
+
+A second look at that same reset caught one more frame to save. The reset
+frame (frame 12) was implemented as `vy = 0` and nothing else for that
+frame, meaning that frame contributes zero movement, gravity only starting
+to apply from frame 13 onward. But the traced transition frame already
+shows `+1`, a small amount of real falling motion, not a frame spent
+sitting still at zero velocity. Fixed by applying the first frame of
+`GRAVITY` in the same step as the reset instead of waiting a frame: the
+simulated landing moved from frame 26 to frame 25, one frame closer to the
+real 24. The remaining single-frame gap was left alone rather than chased
+further with numbers this data cannot cleanly support.
 
 `GRAVITY` itself also changed from the value first written here. The
 per-trial quadratic fits for the fall phase had residuals up to 1.6px, the

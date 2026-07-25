@@ -1,5 +1,11 @@
 [
   {
+    "title": "The status bar was the answer",
+    "date": "2026-07-25",
+    "slug": "2026-07-25-the-status-bar-was-the-answer",
+    "summary": "The star and the Fly are now dropped from the default game, since Super Mario Land has neither. And the search for the score in work RAM turned up 96 changed bytes, while the number was on screen the whole time in tiles that are literally the digits."
+  },
+  {
     "title": "The numbers were never real",
     "date": "2026-07-25",
     "slug": "2026-07-25-the-numbers-were-never-real",

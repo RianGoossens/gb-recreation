@@ -772,14 +772,27 @@ The answer, over 67 columns of overlap:
 The stream starts at **0x0A206**, and its first record draws world column
 **21**. 130 records decode from there, covering world columns 21 to 150.
 
-### What is still missing
+### What is still missing, stated precisely
 
-Columns 0 to 20 are not in this stream and do not decode from anywhere else
-in the ROM. Twenty-one columns is one screen wide, which fits how a
-scrolling game is usually built: the opening screen is drawn once when the
-level loads, and this data is what streams in behind it as the camera moves.
-Finding where that opening screen is read from is the last piece. Until
-then a complete map still needs the emulator for its first screen, which is
+The opening screen is not in the stream, and it is not elsewhere in the ROM
+either: decoding from every `0xFE` in all 64K, the best match for world
+columns 0-20 is 20/21, and that is 0x0A2BD, which is the level's own
+column-40 data. In other words the only thing in the ROM that looks like the
+opening screen is a later part of the same level.
+
+That is not a coincidence. Checked directly against ground truth:
+
+- Columns **0-19 are byte-identical to columns 40-59**. All twenty, every
+  tile.
+- Columns 20 onward differ from columns 60 onward. Every one of them.
+
+So the repeat is exactly one screen wide (20 columns, 160 pixels) and stops
+dead at the screen boundary. Whatever draws the opening screen produces the
+same content the stream produces at column 40, and the stream itself picks
+up at column 21.
+
+The remaining question is what reads that first screen. Until it is found, a
+complete map still needs the emulator for its first 20 columns, which is
 worth closing rather than living with.
 
 ### The scroll measurement, confirmed a third way

@@ -38,12 +38,12 @@ Worked example, the third column of the level:
 
 which is exactly what the emulator has in that column.
 
-**Not finished.** The first 20 columns decode to exactly what the emulator
-renders, all 16 rows, every tile. From column 20 the stream desynchronises:
-the ROM record there holds tiles (82, and 232 further on) that the running
-game does not draw until around world column 68, so the decoder is running
-ahead of the game. At least one control code or record form is still
-unaccounted for. `--verify` reports this rather than hiding it.
+**Not finished.** What this decodes is a segment covering world column 40
+onward, matching 44 of the 48 columns of ground truth available for it.
+World 1-1's first 40 columns are not immediately before it (only 9 records
+chain back cleanly) and do not decode from anywhere else in banks 2 and 3
+either, so the level is assembled from segments and something not yet found
+points at them. Finding that is the remaining work.
 
 Usage: uv run tools/decode_level.py [--verify]
 """
@@ -55,10 +55,20 @@ COLUMN_START = 0xFE
 ROWS = 16  # the playfield, below the two status bar rows
 FILLER = 44
 
-# Where World 1-1's column records begin. Pinned by the one tile run on the
-# opening screen that is unique in the whole ROM (`36 71 73`, the 54/113/115
-# of the pyramid's second column) and stepping back two records from it.
-LEVEL_1_1_START = 0x0A2BD
+# A stretch of World 1-1's column records, covering world column 40 onward.
+#
+# Not the level's start, though it looked like it. Pinned originally by the
+# one tile run on the opening screen that is unique in the whole ROM
+# (`36 71 73`) and stepping back two records, which gave a clean 20-column
+# match against the game at spawn. That match was a trap: World 1-1 repeats
+# with a period of exactly 40 columns in this stretch, so columns 0-15 and
+# 40-55 are identical and the alignment fitted at the wrong offset.
+#
+# Checked against 88 columns of ground truth read out of the running game:
+# aligning record k to column k matches 21 of 88, while aligning record k to
+# column k+40 matches 44 of 48. The second is the real alignment.
+SEGMENT_START = 0x0A2BD
+SEGMENT_FIRST_COLUMN = 40
 
 
 def decode_column(rom, i):
@@ -114,56 +124,73 @@ def live_columns(pb, camera_col):
     ]
 
 
-def compare(decoded, live, label):
-    matched = 0
-    for world_col, want in live:
-        if world_col >= len(decoded):
-            continue
-        if want == decoded[world_col]:
-            matched += 1
-        elif matched + 3 > len(live):
-            pass
-        else:
-            print(f"  world column {world_col} differs:")
-            print(f"    emulator: {want}")
-            print(f"    decoded:  {decoded[world_col]}")
-    print(f"{label}: {matched}/{len(live)} columns match")
-    return matched == len(live)
+def ground_truth(pb, tracker, walker, frames=900):
+    """Every world column the running game reveals, read from the ring buffer.
+
+    Sampling as the camera moves gives real columns well past the opening
+    screen, which is what makes the alignment check below meaningful.
+    """
+    truth = {}
+
+    def sample():
+        camera = tracker.scroll // 8
+        for i in range(20):
+            n = camera + i
+            truth[n] = [pb.memory[0x9800 + r * 32 + (n % 32)] for r in range(2, 18)]
+
+    sample()
+    for _ in range(frames):
+        walker.step(pb, tracker)
+        pb.tick()
+        tracker.update(pb)
+        if tracker.frozen > 5:
+            break
+        sample()
+    return truth
 
 
 def verify(rom):
-    """Compare the decode against the running game, at spawn and scrolled.
+    """Check the decode against columns the running game actually revealed.
 
-    Matching only at spawn would not prove much: the opening screen is what
-    the format was worked out against. Scrolling well into the level and
-    matching there is the real test.
+    Comparing only at spawn is what produced the wrong offset in the first
+    place: this level repeats every 40 columns, so a 20-column window fits
+    in two places. Scoring every available column against every candidate
+    offset is what separates them.
     """
     sys.path.insert(0, "tools")
     from sml_boot import boot_to_gameplay
     from sml_scroll import ScrollTracker
     from sml_walker import ReactiveWalker
 
-    decoded = decode_columns(rom, LEVEL_1_1_START)
-    print(f"decoded {len(decoded)} columns from 0x{LEVEL_1_1_START:05X}\n")
-
+    decoded = decode_columns(rom, SEGMENT_START)
     pb = boot_to_gameplay()
-    ok = compare(decoded, live_columns(pb, 0), "at spawn")
-
     tracker = ScrollTracker(pb)
     walker = ReactiveWalker(pb)
-    checkpoints = [24, 40, 56]
-    for target in checkpoints:
-        while tracker.scroll // 8 < target:
-            walker.step(pb, tracker)
-            pb.tick()
-            tracker.update(pb)
-            if tracker.frozen > 5:
-                print(f"died before reaching camera column {target}")
-                pb.stop()
-                return False
-        camera_col = tracker.scroll // 8
-        ok &= compare(decoded, live_columns(pb, camera_col), f"at camera column {camera_col}")
+    truth = ground_truth(pb, tracker, walker)
     pb.stop()
+
+    columns = sorted(truth)
+    print(f"decoded {len(decoded)} columns from 0x{SEGMENT_START:05X}")
+    print(f"ground truth: world columns {columns[0]}..{columns[-1]}\n")
+
+    scores = []
+    for offset in range(0, 64):
+        overlap = [n for n in columns if 0 <= n - offset < len(decoded)]
+        if len(overlap) < 16:
+            continue
+        hits = sum(1 for n in overlap if decoded[n - offset] == truth[n])
+        scores.append((hits / len(overlap), hits, len(overlap), offset))
+    scores.sort(reverse=True)
+    print("best alignments (record k against world column k + offset):")
+    for rate, hits, total, offset in scores[:3]:
+        print(f"  offset {offset:2d}: {hits}/{total} columns ({rate:.0%})")
+
+    rate, hits, total, offset = scores[0]
+    ok = offset == SEGMENT_FIRST_COLUMN and rate > 0.85
+    print(
+        f"\n{'PASS' if ok else 'FAIL'}: expected offset {SEGMENT_FIRST_COLUMN}, "
+        f"best was {offset} at {rate:.0%}"
+    )
     return ok
 
 
@@ -173,8 +200,8 @@ def main():
     if "--verify" in sys.argv:
         return 0 if verify(rom) else 1
 
-    columns = decode_columns(rom, LEVEL_1_1_START)
-    print(f"decoded {len(columns)} columns from 0x{LEVEL_1_1_START:05X}\n")
+    columns = decode_columns(rom, SEGMENT_START)
+    print(f"decoded {len(columns)} columns from 0x{SEGMENT_START:05X}\n")
     for row in range(ROWS):
         line = "".join(
             "." if col[row] == FILLER else ("#" if col[row] in (96, 97) else "o")

@@ -732,28 +732,43 @@ fe 02 53 40 b1 5e e2 60 61
                   60 61
 ```
 
-World 1-1's records start at ROM offset **0x0A2BD**, pinned by the one tile
-run on the opening screen that is unique in the whole ROM (`36 71 73`, the
-54/113/115 of the pyramid's second column) and stepping back two records.
+### Two bugs found by checking properly
 
-### Verified, and where it stops
+Both are worth recording, because both looked correct for a while.
 
-`tools/decode_level.py --verify` compares the decode against the running
-game. The first **20 columns match exactly**, all 16 rows, every tile.
+**Splitting the stream on every `0xFE` works for 47 columns and then
+breaks**, since a tile id can itself be `0xFE`, and a `0xFE` inside a run is
+data. Parsing strictly forward, consuming exactly what each run header asks
+for, is correct.
 
-One bug worth recording, because it looked correct for a while: splitting
-the byte stream on every `0xFE` works for 47 columns and then breaks, since
-a tile id can itself be `0xFE` and a `0xFE` inside a run is data. Parsing
-strictly forward, consuming exactly what each run header asks for, is
-correct.
+**The start offset was wrong, and the level's own repeat is what hid it.**
+0x0A2BD was pinned by finding the one tile run on the opening screen that
+is unique in the whole ROM (`36 71 73`) and stepping back two records. That
+gave 20 consecutive columns matching the game at spawn exactly, tile for
+tile, which felt conclusive. It was not: this stretch of 1-1 repeats with a
+period of exactly 40 columns, so a 20-column window fits in two places, and
+the fit landed on the wrong one.
 
-From column 20 the decode desynchronises. The ROM record at column 20 is
-`fe 02 53 40 b5 52 52 52 60 61`, which decodes to tiles 82,82,82 at rows
-11-13; the running game draws a plain empty column there. Column 21's
-record contains tile 232, which the game does not draw until around world
-column 68. So the decoder runs ahead of the game: at least one control code
-or record form is still unaccounted for. Finding it is the remaining work,
-and it is worth far more than any further improvement to the walker.
+Caught by scoring against far more data. `tools/decode_level.py --verify`
+now reads every world column the running game reveals (0 to 87, sampled off
+the ring buffer as the camera moves) and scores every candidate offset:
+
+| alignment | columns matched |
+|-----------|-----------------|
+| record k = column k + 40 | 44/48 (92%) |
+| record k = column k | 21/88 (24%) |
+| record k = column k + 41 | 7/47 (15%) |
+
+So 0x0A2BD is world column **40**, not column 0. A 20-column agreement was
+never enough evidence on a level that repeats every 40.
+
+### What is still missing
+
+World 1-1's first 40 columns are not immediately before 0x0A2BD (only 9
+records chain back cleanly as a valid parse) and do not decode from anywhere
+else in banks 2 or 3 either. So the level is assembled from segments, and
+whatever points at them has not been found. That is the remaining work, and
+it is worth far more than any further improvement to the walker.
 
 ### The scroll measurement, confirmed a third way
 

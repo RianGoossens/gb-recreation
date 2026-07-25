@@ -59,9 +59,11 @@ matches the cartridge.
   not derived and shipped untested. See `docs/reference/physics.md` for the
   fitted values, traces, and the correction made while implementing it.
 - **Stomp bounce**: still PROVISIONAL, and unlike gravity, not yet measured
-  either. An attempt to observe it the same way (react to a nearby enemy,
-  jump, read the trace around the kill) did not land a real stomp; see
-  `docs/reference/physics.md`.
+  either. Two attempts to observe it (react to a nearby enemy, jump, read
+  the trace around the kill; then closer trigger distances with an explicit
+  check for the bounce signature) did not land a real stomp; see
+  `docs/reference/physics.md` for both and a concrete next idea (a score
+  counter as ground truth, itself not yet pinned).
 - **Levels**: the demo level, the example level, and the demo campaign are test
   fixtures, documentation, and placeholders. The real levels come from extracting
   the cartridge's geometry (ROM/emulator), which is open work. Shipping invented

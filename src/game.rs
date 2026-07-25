@@ -415,6 +415,7 @@ impl Game {
         if stomped {
             self.mario.vy = -self.tuning.stomp_bounce;
             self.mario.on_ground = false;
+            self.mario.bouncing = true;
             self.score += 100;
             self.sounds.push(SoundEvent::Stomp);
         }

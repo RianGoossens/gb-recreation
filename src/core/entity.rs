@@ -49,6 +49,11 @@ pub struct Mario {
     /// than by its own (much smaller) deceleration ever reaching zero; see
     /// `docs/reference/physics.md`. Reset to 0 on takeoff.
     pub rise_frames: i32,
+    /// True while rising from a stomp rather than from a jump. A stomp bounce
+    /// decays the same way a released jump does even when the jump button is
+    /// held, which the cartridge shows directly (see `STOMP_BOUNCE`), so it
+    /// must skip the held-rise regimes. Cleared on landing and on a new jump.
+    pub bouncing: bool,
     /// Cleared when Mario takes a fatal hit. The game turns this back on when it
     /// respawns him.
     pub alive: bool,
@@ -73,6 +78,7 @@ impl Mario {
             power: Power::Small,
             jump_latched: false,
             rise_frames: 0,
+            bouncing: false,
             alive: true,
             invuln: 0,
             invincible: 0,

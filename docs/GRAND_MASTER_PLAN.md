@@ -62,7 +62,8 @@ Goal: load level 1-1, see it on screen, move Mario left/right with gravity.
 - [x] Input mapping (keyboard to Game Boy buttons)
 - [x] Walking physics: acceleration, max speed, friction (constants sourced from reference)
   - [x] Verify walking constants against the emulator/disassembly (accel, friction, max walk speed measured from WRAM via tools/find_mario_speed.py)
-  - [x] Verify gravity/jump constants against the emulator (a three-regime state machine, not one acceleration; measured via WRAM plus the internal rise/fall phase byte, implemented in `step_motion`; see docs/reference/physics.md). Stomp bounce is still provisional, an attempt to measure it did not land a clean trace.
+  - [x] Verify gravity/jump constants against the emulator (a three-regime state machine, not one acceleration; measured via WRAM plus the internal rise/fall phase byte, implemented in `step_motion`; see docs/reference/physics.md)
+  - [x] Verify the stomp bounce against the emulator: measured from 61 landed stomps on the first World 1-1 Chibibo (`tools/measure_stomp_bounce.py`), 8px of rise over about 12.4 frames. A bounce decays like a released jump even with the button held, which is a different regime from a jump's held rise, so `Mario` gained a `bouncing` flag. `STOMP_BOUNCE` went 500 -> 360 (docs/reference/physics.md)
 - [x] Gravity and ground collision against the tilemap
 - [x] Jump physics (initial velocity, variable height)
 - [x] Animation states: idle, walk, jump
@@ -135,4 +136,4 @@ Goal: deliver on the promise that users can make custom levels and mechanics.
 - The ROM in the tree passes the hash check (verified 2026-07-22).
 - Keep physics constants cited to the reference so behavior is defensible.
 - Revisit module boundaries at the end of each milestone during self-improvement.
-- Jump physics redesign: done. `step_motion` (`src/core/physics.rs`) now models the three measured regimes (near-constant held rise capped by a frame count, real deceleration on early release, real acceleration while falling) instead of one continuous `GRAVITY` acceleration. See `docs/reference/physics.md` for the traces, fits, and a correction made while implementing (the frame-cap-while-held case turned out to be a direct reset, not routed through the release-deceleration constant). Stomp bounce is still unmeasured and is the one remaining provisional physics constant.
+- Jump physics redesign: done. `step_motion` (`src/core/physics.rs`) now models the three measured regimes (near-constant held rise capped by a frame count, real deceleration on early release, real acceleration while falling) instead of one continuous `GRAVITY` acceleration. See `docs/reference/physics.md` for the traces, fits, and a correction made while implementing (the frame-cap-while-held case turned out to be a direct reset, not routed through the release-deceleration constant). Stomp bounce is measured too now, and no physics constant is provisional any more except `MAX_FALL_SPEED`, which is a tunneling guard rather than a modeled behavior.

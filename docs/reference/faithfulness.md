@@ -58,12 +58,14 @@ matches the cartridge.
   peak, landing around frame 25, versus the real 24-25px over ~24 frames),
   not derived and shipped untested. See `docs/reference/physics.md` for the
   fitted values, traces, and the correction made while implementing it.
-- **Stomp bounce**: still PROVISIONAL, and unlike gravity, not yet measured
-  either. Two attempts to observe it (react to a nearby enemy, jump, read
-  the trace around the kill; then closer trigger distances with an explicit
-  check for the bounce signature) did not land a real stomp; see
-  `docs/reference/physics.md` for both and a concrete next idea (a score
-  counter as ground truth, itself not yet pinned).
+- **Stomp bounce**: canonical, measured and implemented. 61 real stomps on
+  the first World 1-1 Chibibo (`tools/measure_stomp_bounce.py`) give an 8px
+  rise over about 12.4 frames, or 9px over 13.5 with the jump button held.
+  A bounce decays like a released jump in both cases, not like a held rise,
+  so `Mario` carries a `bouncing` flag. The shipped `STOMP_BOUNCE` (360) is
+  the speed that reproduces that traced arc against the engine's `JUMP_CUT`;
+  the raw `2d/t` reading (333) only reached 7px when simulated. See
+  `docs/reference/physics.md`.
 - **Levels**: the demo level, the example level, and the demo campaign are test
   fixtures, documentation, and placeholders. The real levels come from extracting
   the cartridge's geometry (ROM/emulator), which is open work. Shipping invented
@@ -78,10 +80,11 @@ matches the cartridge.
 
 ## Recommended next steps toward faithfulness
 
-1. Measure stomp bounce (still open; gravity and jump are now measured and implemented) and replace that placeholder.
-2. Extract the real level geometry.
-3. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
-4. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.
-5. Pin the cartridge's real sound effect data (APU registers/note data per event) and replace the invented tones in `src/audio.rs`.
+1. Extract the real level geometry.
+2. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
+3. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.
+4. Pin the cartridge's real sound effect data (APU registers/note data per event) and replace the invented tones in `src/audio.rs`.
+5. Match the cartridge's point values (a stomp is 100, seen directly in the
+   status bar while measuring the bounce; the rest are unchecked).
 
 (Brick breaking and superball coin collection are already canonical, done.)

@@ -72,11 +72,11 @@ that airborne quirk. Checked directly rather than assumed.
 
 This section is the working log, kept in the order it was actually found.
 Gravity, jump velocity, and jump cut got pinned and implemented further
-down ("Implemented, with one more correction along the way"); only stomp
-bounce is still open by the end of this document.
+down ("Implemented, with one more correction along the way"), and stomp
+bounce got pinned after that. Nothing in this document is still open.
 
-Gravity, jump velocity, jump cut, and stomp bounce are still provisional
-placeholders. Forcing a jump (hold A, release, let Mario land) and diffing
+At the time this section was written, gravity, jump velocity, jump cut, and
+stomp bounce were all still provisional placeholders. Forcing a jump (hold A, release, let Mario land) and diffing
 WRAM the same way found Mario's vertical state cluster, right next to the
 horizontal one:
 
@@ -306,7 +306,79 @@ actually running it, not derived and shipped untested. `MAX_FALL_SPEED`
 (the tunneling-prevention cap, separate from any of this) was not
 re-examined and is still the old placeholder.
 
-## Stomp bounce: attempted, not yet pinned
+## Stomp bounce: pinned on the third attempt
+
+Measured. `tools/measure_stomp_bounce.py` lands 61 real stomps on the first
+World 1-1 Chibibo and reads the arc off each one. The two failed attempts
+that came before it are kept below, because what fixed them is the useful
+part.
+
+Two changes made it work:
+
+**Ground truth is Mario's own phase byte, not an OAM count.** A stomp is the
+only thing in this stretch of 1-1 that turns a fall back into a rise without
+touching the ground, so `0xC207` going 2 -> 1 while `0xC20A` still says
+airborne is the signature. Both earlier attempts keyed off enemies leaving
+OAM, which is why both kept "finding" stomps that were really off-screen
+despawns.
+
+An enemy-vanish cross-check was added on top of the phase flip at first, and
+it rejected every single hit. That looked like the phase flips were false
+too. They were not: rendering the frames around one hit
+(`tools/stomp_frames.py`) shows Mario landing on the Chibibo, the Chibibo
+disappearing, the 100-point popup appearing, and the score going 0 to 100.
+The cross-check was wrong, not the signal: the popup adds two sprites, so
+the on-screen sprite count goes *up* by one across a stomp. The cross-check
+was dropped and the rendered frames stand as the confirmation instead.
+
+**The approach is a save-state sweep, not a live reaction.** Walk right until
+an enemy is actually on screen ahead of Mario, snapshot there, then replay
+that one frame with every (wait, hold) combination. 61 of 280 combinations
+connect.
+
+That sweep also turned up a trap worth writing down: **PyBoy's button state
+is not part of a save state**, so it survives `load_state` and leaks from one
+trial into the next. The first version of the sweep found a hit at
+`wait=10 hold=16`, and re-running exactly that one combination on its own
+produced an ordinary jump with no stomp at all, because in the sweep the
+previous trial had left Right held across the restore and in the single run
+it had not. Releasing every button before restoring is what made trials
+reproducible. `sml_boot.restore` already documents a related trap (a button
+pressed with no tick after loading does not register); this is a second one
+on the same seam.
+
+### The measured arc
+
+Consistent across all 61 stomps, grouped by how long A was held:
+
+| A still held at the stomp | rise | frames to apex | 2d/t |
+|---------------------------|------|----------------|------|
+| no (6 hold lengths, n=53) | 8px | ~12.4 | 1.30 px/frame |
+| yes (n=8) | 9px | 13.5 | 1.34 px/frame |
+
+Holding the jump button through a stomp is worth 1px. That is the important
+structural finding, and it is not what the engine did: a stomp bounce is
+**not** the held-rise regime. A normal jump held to its cap gets a near-flat
+12-frame rise; a stomp bounce decays right away, the same way a released
+jump does, whether or not A is down. `Mario` now carries a `bouncing` flag
+so `apply_vertical_accel` routes a bounce through `JUMP_CUT` in both cases.
+Without it the held case collapsed to nothing, since `rise_frames` is
+already spent by the jump that got Mario airborne, so the held branch would
+have reset `vy` to 0 on the next frame.
+
+### The value that shipped, and why it is not 2d/t
+
+Same lesson as `GRAVITY` further up: simulating before committing changed
+the number. `2d/t` reads 1.30 px/frame (333 in subpixels), but that value
+carries its own implied deceleration, `2d/t² = 26.9`. The engine decelerates
+a bounce with `JUMP_CUT` (29), measured separately and from tighter data.
+Stepping 333 against 29 reaches only 7px, not 8. **360** is the speed that
+reproduces the traced 8px arc with the deceleration actually applied, and
+that is what shipped. Checked end to end through `Game`'s real stomp path
+(a scripted drop onto a Goomba, run and read, then deleted): 8px rise, with
+and without A held, matching the cartridge's 8px and 9px.
+
+## Stomp bounce: the two attempts that failed first
 
 Tried the same observation approach on `STOMP_BOUNCE`: script Mario to jump
 near the first World 1-1 enemy and read `0xC201`/`0xC207` around the moment

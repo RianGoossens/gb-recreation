@@ -28,8 +28,10 @@
 //! still held is its own, distinct case, not routed through `JUMP_CUT`: the
 //! traced data shows a one-frame flip straight to falling there, so it is
 //! modeled as a direct velocity reset in `apply_vertical_accel`, not a slow
-//! decay. `STOMP_BOUNCE` is still an unmeasured placeholder; an attempt to
-//! observe it did not land a clean trace, see physics.md.
+//! decay. `STOMP_BOUNCE` is measured too, by `tools/measure_stomp_bounce.py`
+//! (61 landed stomps off one save state); the bounce always decays through
+//! `JUMP_CUT`, never through the held-rise regime, which is why `Mario`
+//! carries a `bouncing` flag.
 
 use super::entity::{pixels, Mario};
 use super::level::{Solids, TILE};
@@ -66,8 +68,18 @@ pub const MAX_RISE_FRAMES: i32 = 12;
 /// out). Real and far stronger than `RISE_DRIFT`, which is what gives a
 /// tapped jump a short hop and a held jump a full-height one.
 pub const JUMP_CUT: i32 = 29;
-/// Upward speed Mario gets from stomping an enemy.
-pub const STOMP_BOUNCE: i32 = 500;
+/// Upward speed Mario gets from stomping an enemy. Measured from 61 real
+/// stomps on the first World 1-1 Chibibo (`tools/measure_stomp_bounce.py`):
+/// the bounce lifts Mario 8px over about 12.4 frames before the phase byte
+/// flips back to falling. Holding the jump button through the stomp changes
+/// that by 1px, so there is one bounce speed, not a held and unheld version.
+///
+/// The raw `2d/t` reading is 1.30 px/frame (333 here), but that assumes the
+/// deceleration is `2d/t^2 = 26.9`, and the engine decelerates a bounce with
+/// `JUMP_CUT` (29), measured separately and from tighter data. Simulating 333
+/// against that reaches only 7px. 360 is the speed that reproduces the traced
+/// 8px over 13 frames with the deceleration we actually apply.
+pub const STOMP_BOUNCE: i32 = 360;
 
 /// Update horizontal velocity and facing from the held buttons, without moving.
 fn walk_velocity(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
@@ -106,8 +118,11 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids, t: &Tun
     resolve_vertical(mario, solids);
 
     mario.on_ground = grounded(mario, solids);
-    if mario.on_ground && mario.vy > 0 {
-        mario.vy = 0;
+    if mario.on_ground {
+        mario.bouncing = false;
+        if mario.vy > 0 {
+            mario.vy = 0;
+        }
     }
 }
 
@@ -121,6 +136,7 @@ fn apply_jump(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
         mario.on_ground = false;
         mario.jump_latched = true;
         mario.rise_frames = 0;
+        mario.bouncing = false;
     }
     if !jump {
         mario.jump_latched = false;
@@ -142,7 +158,7 @@ fn apply_vertical_accel(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
         return;
     }
     let rising = mario.vy < 0;
-    let holding_jump = buttons.is_held(Button::A);
+    let holding_jump = buttons.is_held(Button::A) && !mario.bouncing;
 
     if rising && holding_jump && mario.rise_frames < t.max_rise_frames {
         mario.rise_frames += 1;
@@ -287,11 +303,10 @@ mod tests {
 
     #[test]
     fn physics_constants_are_pinned() {
-        // Walking and jumping are both pinned to observed emulator RAM now
-        // (see the module doc comment); stomp bounce is still an unmeasured
-        // placeholder. This test is a tripwire: if a constant changes, it is
-        // a deliberate act, not an accident. Update the expected values here
-        // in the same commit that retunes them.
+        // Every constant here is pinned to observed emulator RAM (see the
+        // module doc comment). This test is a tripwire: if a constant
+        // changes, it is a deliberate act, not an accident. Update the
+        // expected values here in the same commit that retunes them.
         assert_eq!(WALK_ACCEL, 43);
         assert_eq!(FRICTION, 43);
         assert_eq!(MAX_WALK_SPEED, 256);
@@ -301,7 +316,7 @@ mod tests {
         assert_eq!(RISE_DRIFT, 10);
         assert_eq!(MAX_RISE_FRAMES, 12);
         assert_eq!(JUMP_CUT, 29);
-        assert_eq!(STOMP_BOUNCE, 500);
+        assert_eq!(STOMP_BOUNCE, 360);
     }
 
     // Gravity and collision.
@@ -384,6 +399,59 @@ mod tests {
             step_motion(&mut m, held(Button::A), &solids, &Tuning::default());
         }
         assert!(m.pixel_y() < top);
+    }
+
+    /// Rise height in pixels and frames spent rising, for a Mario launched
+    /// upward at `STOMP_BOUNCE` from mid-air with `bouncing` set.
+    fn bounce_arc(buttons: Buttons) -> (i32, i32) {
+        // Tall enough that the arc plays out without touching the floor.
+        let solids = Solids::from_rows(&["........", "........", "########"]);
+        let mut m = Mario::new(8, 0);
+        m.vy = -STOMP_BOUNCE;
+        m.bouncing = true;
+        let start = m.pixel_y();
+        let mut frames = 0;
+        while m.vy < 0 {
+            step_motion(&mut m, buttons, &solids, &Tuning::default());
+            frames += 1;
+        }
+        (start - m.pixel_y(), frames)
+    }
+
+    #[test]
+    fn stomp_bounce_matches_the_traced_arc() {
+        // The cartridge lifts Mario 8px over about 12.4 frames after a stomp
+        // (61 landed stomps, tools/measure_stomp_bounce.py). Simulating the
+        // implemented constant end to end has to land in the same place, not
+        // just equal its own source number: the first value tried here came
+        // straight from 2d/t and only reached 7px once actually stepped.
+        let (rise, frames) = bounce_arc(Buttons::default());
+        assert_eq!(rise, 8, "bounce rise");
+        assert!((12..=14).contains(&frames), "bounce lasted {frames} frames");
+    }
+
+    #[test]
+    fn stomp_bounce_ignores_a_held_jump_button() {
+        // Holding A through a stomp gave 9px over 13.5 frames on the
+        // cartridge, essentially the same bounce, not the near-flat held
+        // rise a jump gets. Without the `bouncing` flag this arc collapses:
+        // rise_frames is already spent from the jump that got Mario airborne,
+        // so the held branch would reset vy to 0 on the very next frame.
+        let (held_rise, held_frames) = bounce_arc(held(Button::A));
+        let (free_rise, free_frames) = bounce_arc(Buttons::default());
+        assert_eq!((held_rise, held_frames), (free_rise, free_frames));
+    }
+
+    #[test]
+    fn landing_clears_the_bounce_flag() {
+        let solids = floor_level();
+        let mut m = Mario::new(8, 0);
+        m.bouncing = true;
+        for _ in 0..200 {
+            step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
+        }
+        assert!(m.on_ground);
+        assert!(!m.bouncing);
     }
 
     #[test]

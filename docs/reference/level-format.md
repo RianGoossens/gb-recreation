@@ -69,7 +69,7 @@ reported error rather than being silently ignored.
 | `jump_cut` | Deceleration applied if the jump button is released before `max_rise_frames` runs out | 29 |
 | `gravity` | Downward acceleration while falling | 76 |
 | `max_fall_speed` | Cap on downward speed, so a long fall does not tunnel through a thin floor | 640 |
-| `stomp_bounce` | Upward speed Mario gets from stomping an enemy | 500 |
+| `stomp_bounce` | Upward speed Mario gets from stomping an enemy | 360 |
 | `timer_start` | The level timer's starting value | 400 |
 
 All of the movement values are in subpixels (256 per pixel) per frame, or

@@ -340,15 +340,38 @@ fn run_game(args: &[String]) -> ExitCode {
     use sml::core::level::Level;
     use sml::input::mapping::{buttons_from_held, Key as GbKey};
     use sml::session::Session;
+    use sml::tuning::Tuning;
 
     const SCALE: usize = 4;
 
     // The whole game lives in Session (headless and tested): title, play, and
     // the end screens. This is just a shell that feeds it keys and blits frames.
-    // An optional level file plays a custom level instead of the built-in demo.
-    let mut session = match args.first() {
+    // An optional level file plays a custom level instead of the built-in demo,
+    // and an optional tuning file (only meaningful alongside a level) retunes
+    // the physics without a recompile (see docs/reference/level-format.md).
+    let level_path = args.first();
+    let tuning_path = args.get(1);
+
+    let tuning = match tuning_path {
+        Some(path) => match std::fs::read_to_string(path) {
+            Ok(text) => match Tuning::from_text(&text) {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("bad tuning file {path}: {e}");
+                    return ExitCode::FAILURE;
+                }
+            },
+            Err(e) => {
+                eprintln!("could not read tuning file {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+        },
+        None => Tuning::default(),
+    };
+
+    let mut session = match level_path {
         Some(path) => match Level::from_file(path) {
-            Ok(level) => Session::new(vec![level]),
+            Ok(level) => Session::with_tuning(vec![level], tuning),
             Err(e) => {
                 eprintln!("could not load level {path}: {e}");
                 return ExitCode::FAILURE;
@@ -415,6 +438,6 @@ fn usage() {
     println!("  sml extract-title [outdir]                extract title screen from ROM");
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
-    println!("  sml run [level.txt]                       play in a window (needs --features gui)");
+    println!("  sml run [level.txt] [tuning.txt]          play in a window (needs --features gui)");
     println!("  sml play <out.png> [frames] [keys] [lvl]  run the game headlessly to a PNG");
 }

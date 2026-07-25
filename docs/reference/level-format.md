@@ -50,11 +50,45 @@ Goombas, a brick, and an end trigger on the right.
 
 (That excerpt is trimmed for width; the real file is 40 tiles wide and 12 tall.)
 
+## Tuning
+
+Geometry is one half of a level; how Mario moves through it is the other,
+and that is data too. A tuning file is a small `key = value` text block,
+one assignment per line (`#` starts a comment, blank lines are ignored). An
+unset key keeps its default; an unknown key or an unparseable value is a
+reported error rather than being silently ignored.
+
+| Key | Meaning | Default |
+|-----|---------|---------|
+| `walk_accel` | Horizontal acceleration while a direction is held | 43 |
+| `friction` | Deceleration applied once no direction is held | 43 |
+| `max_walk_speed` | Cap on horizontal speed | 256 |
+| `jump_velocity` | Upward speed at takeoff, held roughly steady while rising with the button held | 602 |
+| `rise_drift` | Tiny deceleration applied each frame of a held rise | 10 |
+| `max_rise_frames` | How many frames a held rise lasts before it cuts to falling regardless of the button | 12 |
+| `jump_cut` | Deceleration applied if the jump button is released before `max_rise_frames` runs out | 29 |
+| `gravity` | Downward acceleration while falling | 76 |
+| `max_fall_speed` | Cap on downward speed, so a long fall does not tunnel through a thin floor | 640 |
+| `stomp_bounce` | Upward speed Mario gets from stomping an enemy | 500 |
+| `timer_start` | The level timer's starting value | 400 |
+
+All of the movement values are in subpixels (256 per pixel) per frame, or
+per frame squared for the acceleration ones; see `docs/reference/physics.md`
+for where each one comes from. A custom tuning file applies for the whole
+run, including across level transitions and restarts within the same
+session, not just the first level it is loaded with.
+
+```
+# a floatier, higher-jumping feel
+gravity = 40
+jump_velocity = 900
+```
+
 ## Running a level
 
 ```sh
-# play it in a window (needs the gui feature)
-cargo run --features gui -- run levels/example.txt
+# play it in a window (needs the gui feature); tuning.txt is optional
+cargo run --features gui -- run levels/example.txt [tuning.txt]
 
 # render a frame headlessly to a PNG (great for sharing a screenshot)
 cargo run -- play shot.png 1 "" levels/example.txt

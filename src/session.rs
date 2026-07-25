@@ -9,6 +9,7 @@ use crate::core::level::Level;
 use crate::game::Game;
 use crate::input::{Button, Buttons};
 use crate::render::Framebuffer;
+use crate::tuning::Tuning;
 
 /// Placeholder demo levels for exercising the multi-level flow until the
 /// cartridge's real levels are extracted. These are not end-goal content; the
@@ -54,19 +55,35 @@ pub struct Session {
     pub phase: Phase,
     /// Tracks the Start button so a held press does not skip through screens.
     start_latched: bool,
+    /// Applied to every `Game` this session constructs, including on level
+    /// transitions and restarts. Poking `session.game.tuning` directly only
+    /// lasts until the next of those, since each builds a fresh `Game` with
+    /// `Tuning::default()`.
+    tuning: Tuning,
 }
 
 impl Session {
-    /// Start a session at the title screen. There must be at least one level.
+    /// Start a session at the title screen, with default tuning. There must
+    /// be at least one level.
     pub fn new(levels: Vec<Level>) -> Self {
+        Self::with_tuning(levels, Tuning::default())
+    }
+
+    /// Start a session with custom tuning, kept for the whole run: it is
+    /// reapplied on every level transition and restart, not just the first
+    /// level. This is what a custom level's tuning file (see
+    /// `docs/reference/level-format.md`) ultimately feeds into.
+    pub fn with_tuning(levels: Vec<Level>, tuning: Tuning) -> Self {
         assert!(!levels.is_empty(), "a session needs at least one level");
-        let game = Game::new(levels[0].clone());
+        let mut game = Game::new(levels[0].clone());
+        game.tuning = tuning;
         Self {
             levels,
             current: 0,
             game,
             phase: Phase::Title,
             start_latched: false,
+            tuning,
         }
     }
 
@@ -132,6 +149,7 @@ impl Session {
     fn begin(&mut self) {
         self.current = 0;
         self.game = Game::new(self.levels[0].clone());
+        self.game.tuning = self.tuning;
         self.phase = Phase::Playing;
     }
 
@@ -139,6 +157,7 @@ impl Session {
     fn return_to_title(&mut self) {
         self.current = 0;
         self.game = Game::new(self.levels[0].clone());
+        self.game.tuning = self.tuning;
         self.phase = Phase::Title;
     }
 
@@ -152,6 +171,7 @@ impl Session {
         let (lives, score, coins) =
             (self.game.lives, self.game.score, self.game.coins_collected);
         let mut next = Game::new(self.levels[self.current].clone());
+        next.tuning = self.tuning;
         next.lives = lives;
         next.score = score;
         next.coins_collected = coins;
@@ -204,6 +224,46 @@ mod tests {
             }
         }
         assert_eq!(session.phase, Phase::Win, "the whole campaign should be winnable");
+    }
+
+    #[test]
+    fn custom_tuning_survives_a_level_advance() {
+        let tuning = Tuning {
+            jump_velocity: 999,
+            ..Tuning::default()
+        };
+        let mut session = Session::with_tuning(vec![short_level(), short_level()], tuning);
+        press_start(&mut session);
+        assert_eq!(session.game.tuning.jump_velocity, 999);
+
+        // Walk to the end trigger to complete the first level and advance.
+        for _ in 0..400 {
+            session.step(held(Button::Right));
+            if session.current_level() == 1 {
+                break;
+            }
+        }
+        assert_eq!(session.current_level(), 1, "should have advanced to the second level");
+        assert_eq!(
+            session.game.tuning.jump_velocity, 999,
+            "custom tuning should carry into the next level's fresh Game"
+        );
+    }
+
+    #[test]
+    fn custom_tuning_survives_returning_to_the_title() {
+        let tuning = Tuning {
+            jump_velocity: 999,
+            ..Tuning::default()
+        };
+        let mut session = Session::with_tuning(vec![short_level()], tuning);
+        press_start(&mut session);
+        session.return_to_title();
+        assert_eq!(session.phase, Phase::Title);
+        assert_eq!(
+            session.game.tuning.jump_velocity, 999,
+            "custom tuning should survive a fresh Game on return to title"
+        );
     }
 
     #[test]

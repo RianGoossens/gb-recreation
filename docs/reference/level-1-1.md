@@ -525,6 +525,112 @@ position estimate itself was not re-examined this round; narrowing the
 remaining ~15% gap further needs the jump timing itself narrowed first,
 not another look at the position-tracking side.
 
+## Measuring the scroll instead of estimating it, and what that overturned
+
+Everything above this heading that reports a world position past roughly
+column 78 is wrong. The corrections in the sections above were real
+corrections, but they were all corrections to an estimate, and the estimate
+itself had no ground truth to be checked against. This section replaces it
+with a measurement and reports what that measurement says about the
+earlier numbers.
+
+### Two direct sources, both dead ends
+
+`SCX`, the hardware register that shifts the background sideways, reads `0`
+at every VBlank sample, for the reason already documented above (the status
+bar split rewrites it mid-frame). Confirmed again here: 16 samples spread
+across a 320-frame run, all `0`.
+
+`tools/find_scroll_position.py` scans every byte and every 16-bit pair
+(both byte orders) in WRAM, OAM and HRAM for something tracking the
+expected scroll, using the same technique that found the speed register.
+Three shapes were tried: a monotonic 16-bit counter, an 8-bit value whose
+wrapped deltas accumulate to the expected scroll, and a tile-column counter
+advancing once per 8 pixels. Nothing matches. There is no readable scroll
+variable to find.
+
+### The screen itself is the measurement
+
+`tools/sml_scroll.py` cross-correlates consecutive playfield captures over
+candidate shifts of 0 to 8 pixels and sums the winner. No model of Mario's
+speed is involved, so nothing about jumps, pauses or the camera lock can
+skew it.
+
+Validated in `tools/measure_scroll.py` against two things pinned
+independently:
+
+- Between the camera lock and the first death, holding Right gives **91
+  pixels of scroll over 92 frames**, which is the saturated 1 px/frame walk
+  from `physics.md` to within one frame.
+- Across a full run the per-frame shift is only ever 0 or 1, never 2 or
+  more, and the worst frame-to-frame match score is 3.3 out of a 0-255
+  scale. No scene ever cuts, so nothing is being counted as scroll that is
+  really a level reload.
+
+### What the measurement says about the old numbers
+
+The reactive walker's claimed distances were fiction, and this is the part
+worth remembering. Measured with the scroll tracker, the walker described
+in the sections above covers **137 pixels in 5000 frames** and then sits
+still. Screenshots at frame 500 and frame 2999 of that run are
+byte-identical apart from the timer: Mario is jammed against a pipe around
+world column 17 for the entire rest of the run. The reported figures of
+world column 626, 720, and 1880 never happened.
+
+Two separate faults produced them:
+
+1. **`DANGER_RADIUS = 90` is over half the screen width.** Something was
+   almost always within it, so Right was released almost permanently and
+   Mario never built the speed to clear anything.
+2. **Mario's WRAM bytes go stale on death rather than blank.** The death
+   sequence freezes the level for about 150 frames, and through all of it
+   `0xC202` keeps reading 81, `0xC20A` keeps reading grounded, and `0xC20C`
+   keeps reading a saturated 6. So the death check (screen X leaving 81)
+   does not fire, and the position integrated from those bytes keeps
+   accumulating distance through a death that never moved anyone. Any tool
+   reading Mario's state after a death is reading a corpse's last frame.
+
+The frozen-screen counter in `ScrollTracker` is the honest signal for the
+second one, and it is what `stitch_level_1_1.py` now stops on.
+
+### The walker that actually travels
+
+`tools/sml_walker.py` holds Right permanently and jumps on two triggers: a
+sprite within a much smaller `DANGER_RADIUS` (28px, since a stomp needs
+Mario nearly on top of the enemy anyway), and the measured scroll not
+advancing for 12 frames while grounded, which is what walking into a pipe
+looks like. The stuck trigger is only possible because the scroll is
+measured; Mario's own screen X pins at 81 whether he is walking or jammed.
+
+That walker reaches **world column 78 (545px of scroll) at frame 746**
+before its first death, reproducibly, and the figure barely moves across a
+grid of radius, stuck-threshold and cooldown values (53 to 78, with 78
+hit by four of five settings). Past that death the level reloads, so
+capture stops there.
+
+### The stitched map, bounded by what the run supports
+
+`tools/stitch_level_1_1.py` now takes its position from the tracker and
+stops at the first death. `nearest_world_col` also refuses to label a slot
+further ahead than `PRELOAD_MARGIN` (20 tiles) past Mario, since the game
+streams a slot in shortly before he reaches it and a label beyond that
+cannot be supported by the run. Before that bound the tool happily wrote
+136 columns from a run that reached 78.
+
+The result is a 96-column map (world columns 0-95, Mario's 78 plus the
+preload margin), 786 cells directly observed and 542 inferred as repeats.
+
+One thing in it looked like a bug and is not. Columns 40-66 reproduce
+columns 0-26 tile for tile: the same pyramid, pipe, palm trees and question
+block. Independent confirmation that this is real level content and not a
+mislabeled lap: screenshots taken at camera column 0 and camera column 40
+have a mean absolute pixel difference of 1.9 out of 255 and align best at a
+shift of exactly 0. Two separate observations agree the level repeats there.
+A screenshot at camera column 60 shows entirely new content (coins, brick
+and question blocks, hills), so the level does progress; this stretch just
+repeats first. Chunk-based level data reusing a block is the obvious
+explanation, though the level format itself has not been pinned.
+
 ## A real, loadable level from the opening screen
 
 `tools/convert_level_1_1_to_level_format.py` turns the opening 20x18
@@ -550,21 +656,19 @@ work.
   surface was never tested, only the horizontal approach every trace
   this session used; see the pyramid section for what already ruled out
   "solid against a horizontal approach").
-- Improve coverage on genuinely uniform terrain: `tools/stitch_level_1_1.py`
-  can survive arbitrarily far and now numbers detected transitions from
-  a position estimate that only trusts `0xC20C` while grounded (see the
-  correction above), plus a repeat-inference step for slots stale over a
-  full lap. A tile that never visibly changes still can't be positively
-  distinguished from "not yet streamed in" versus "genuinely repeated
-  and correctly inferred" without independent verification.
-- Narrow the remaining position-estimate uncertainty further: the
-  grounded-only case is now well confirmed (matches expected 1 px/frame
-  exactly over a 700-frame jump-free stretch, see the cross-check
-  section above), but the airborne-freeze assumption's accuracy across
-  many real jump events is still open, and cleanly testing it needs our
-  own engine's gravity pinned to the cartridge first (a separate,
-  previously-abandoned problem, see `physics.md`) so a cross-engine
-  replay is not confounded by mismatched jump timing.
+- Survive past world column 78. The walker's first death there is now the
+  single thing capping how much of the level can be captured per run.
+  Worth knowing what kills him before tuning further: a screenshot at the
+  death frame would say whether it is an enemy, a pit, or the timer.
+- Fill the gaps inside the captured range. Columns 27-31 still read blank
+  in the stitched output even though Mario walked across them, so that is
+  missing data rather than a pit (a 5-column pit would have killed him).
+  The transition-watching method cannot distinguish "never streamed in"
+  from "streamed in identical" for those.
+- Reading the level out of ROM directly would sidestep the whole
+  play-through-and-watch approach. The repeat between columns 0-26 and
+  40-66 suggests chunk-based level data; finding that format would give
+  the entire level at once instead of however far one run survives.
 - Extend the level conversion (`tools/convert_level_1_1_to_level_format.py`,
   see the section above) past the opening screen, once the stitched
   width beyond it is trustworthy enough to be worth converting, and wire

@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyboy"]
+# dependencies = ["pyboy", "numpy"]
 # ///
 """Stitch World 1-1's tilemap past the initially-loaded opening screen.
 
@@ -32,60 +32,26 @@ forward streaming and keep incrementing). This script watches for the
 respawn directly (Mario's screen X snapping back near its spawn value
 after the camera lock has engaged) and stops capturing there.
 
-To get past a hazard, this reads OAM every frame: whenever a non-Mario
-sprite is within DANGER_RADIUS pixels of Mario's on-screen X, it releases
-Right and jumps (a stomp attempt, cooldown-limited). Mario's own sprite
-always occupies OAM slots 3-6 (confirmed across every OAM dump this
-session), so those are excluded when scanning for danger. Just releasing
-Right and waiting was tried first and does not work past the first
-hazard or so: an enemy that is already within range keeps closing in
-even while Mario stands still, so waiting only delays contact. Jumping
-at it instead let a run survive past world column 1880 without dying
-once, over a 15000-frame run.
+Getting past hazards is `sml_walker.ReactiveWalker`'s job: hold Right, and
+jump at enemies that come close and at whatever stops the scroll. See that
+module for why an earlier version of it barely moved at all.
 
 That survival distance outran what the tile-tracking used to be able to
 confirm: watching only for a slot's value to change stalls silently
 across long uniform terrain (a long flat stretch of repeated ground
-tile, for example), where nothing ever looks different lap to lap.
-Fixed by tracking Mario's true world position precisely instead of
-periodically: 0xC20C (his horizontal speed, in 1/6-pixel units, see
-physics.md) is integrated every frame into a running subpixel counter.
-When a slot's tile value does change, its new world column is picked as
-the nearest multiple of 32 (relative to the slot's buffer index) to that
-precise position estimate, not a blind "+32 from whatever it was
-labeled before". That closes the mislabeling risk a blind increment
-would have if a long unchanging stretch skipped several real laps
-before the next detected change: the new value gets the correct lap
-number outright, from position, not from a possibly stale label.
+tile, for example), where nothing ever looks different lap to lap. Two
+successive attempts to fix that by estimating Mario's world position
+from WRAM were both wrong, and the second was wrong for a long time
+before anyone noticed. See `docs/reference/level-1-1.md` for the trail.
 
-0xC20C is only trustworthy for this while Mario is grounded (0xC20A ==
-1). Checked directly: it does not hold horizontal speed at all while
-airborne, it climbs unboundedly, one unit per frame, well past the
-walking cap of 6, for as long as a jump lasts, some other counter
-reusing the address mid-flight. Integrating it regardless of grounded
-state was tried first and badly inflated the position estimate, since
-this tool's own stomp-reaction jumps often; caught by a sanity check
-against real screenshots showing almost no visual change over a span
-the buggy estimate claimed covered hundreds of tiles. Fixed by only
-reading 0xC20C while grounded and, while airborne, continuing to add
-whatever speed was last read on the ground (horizontal motion is not
-affected by jumping, confirmed both in physics.md and by on-screen X
-advancing at a steady 1 px/frame through a jump when already at max
-speed beforehand).
-
-The blind spot on totally uniform terrain is now also addressed, within
-a stated confidence level rather than by direct observation alone.
-Measured how far ahead of Mario's precise position a freshly detected
-transition's world column typically sits during ongoing (not initial)
-streaming: 0 to about 17 tiles across 84 sampled transitions, well under
-a full 32-tile lap. So if a slot has gone more than a full lap
-(STALE_LAPS) without a detected change, the buffer would almost
-certainly have refreshed it by now if its content were going to differ;
-its current bytes are inferred to be a genuine repeat, and its label is
-advanced to the current lap without waiting for a value change. This is
-an inference from a measured margin, not a direct observation the way a
-detected change is, and is reported separately in the output so it is
-never confused with directly-confirmed data.
+Position now comes from `sml_scroll.ScrollTracker`, which measures how far
+the background actually moved between two rendered frames. It needs no
+model of Mario's speed, it is validated against known physics (exactly
+1 px/frame at his saturated walk), and it stops dead when the game does.
+That last part matters: the death sequence freezes the level for about 150
+frames while Mario's WRAM bytes keep reading as though he were alive and
+walking, so a position integrated from those bytes runs on through a death
+forever. This stops capturing at the first death instead.
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -95,15 +61,17 @@ import sys
 from pathlib import Path
 
 from sml_boot import boot_to_gameplay
+from sml_scroll import ScrollTracker
+from sml_walker import ReactiveWalker
 
 OUT = Path("assets/extracted")
 MAP_BASE = 0x9800
-OAM_BASE = 0xFE00
-MARIO_OAM_SLOTS = {3, 4, 5, 6}
-DANGER_RADIUS = 90
-STOMP_COOLDOWN = 30
-JUMP_HOLD = 10
+MARIO_SCREEN_X = 81  # where the camera lock pins him
+FROZEN_FRAMES = 5  # identical frames that mean the level stopped running
 STALE_LAPS = 1  # a full 32-tile lap of no detected change before inferring a repeat
+# How far ahead of Mario the buffer is ever seen to have streamed content in.
+# Measured at 0 to about 17 tiles across 84 sampled transitions.
+PRELOAD_MARGIN = 20
 # Rows 0-1 are the status bar (score/coins/time), redrawn every frame
 # regardless of scroll; they are not level geometry, so they are excluded.
 HUD_ROWS = 2
@@ -111,32 +79,23 @@ ROWS = 18
 COLS = 32
 
 
-def nearby_danger(pb, mario_x):
-    for i in range(40):
-        if i in MARIO_OAM_SLOTS:
-            continue
-        base = OAM_BASE + i * 4
-        y, x = pb.memory[base], pb.memory[base + 1]
-        if y == 0 or y >= 160:
-            continue
-        if abs(x - mario_x) <= DANGER_RADIUS:
-            return True
-    return False
-
-
 def nearest_world_col(bx, position_estimate, min_wc):
     """Nearest multiple-of-32 (relative to bx) to a precise position
     estimate, used only when a real value change was just observed.
-    Never returns less than min_wc: the level cannot have negative
-    columns, and a slot's world column cannot legitimately regress once
-    established, so out-of-range candidates are rejected in favor of the
-    next viable lap rather than picked for being numerically closer."""
+
+    Bounded on both sides. Never below min_wc: the level cannot have
+    negative columns, and a slot's world column cannot legitimately regress
+    once established. Never above the position estimate plus PRELOAD_MARGIN
+    either: the game streams a slot in shortly before Mario reaches it, so
+    a label further ahead than the buffer ever preloads would be a fiction.
+    Returns None when no lap satisfies both, meaning the slot should be left
+    alone rather than given a number the run cannot support."""
     k = round((position_estimate - bx) / COLS)
     wc = bx + COLS * k
     while wc < min_wc:
         k += 1
         wc = bx + COLS * k
-    return wc
+    return wc if wc <= position_estimate + PRELOAD_MARGIN else None
 
 
 def main():
@@ -158,77 +117,36 @@ def main():
         for bx in range(COLS):
             combined[(slot_wc[row][bx], row)] = slot_val[row][bx]
 
-    pb.button_press("right")
-    right_held = True
-    locked_at = None
-    stopped_at_frame = None
+    tracker = ScrollTracker(pb)
+    walker = ReactiveWalker(pb)
     max_frames = 5000
-    jump_cooldown = 0
-    a_held = 0
-    # Precise world position, integrated every frame from the real
-    # horizontal speed register (1/6-pixel units, see physics.md). Only
-    # trustworthy while grounded: 0xC20C does not hold horizontal speed
-    # while airborne at all (confirmed directly: it climbs unboundedly,
-    # 1 unit/frame, well past the walking cap of 6, for as long as a jump
-    # lasts, some other counter reusing the address mid-flight). While
-    # airborne this instead keeps adding whatever speed was last read on
-    # the ground, since horizontal motion is not affected by jumping
-    # (established in physics.md; also directly observed: on-screen X
-    # advances at a steady 1 px/frame through a jump when already at max
-    # speed beforehand). Blindly integrating 0xC20C regardless of
-    # grounded state was tried first and produced a wildly inflated
-    # position during this tool's own frequent stomp-jumps, caught by a
-    # sanity check against real screenshots showing almost no visual
-    # change over a span this claimed covered hundreds of tiles.
-    world_x_subpixel = x_spawn * 6
-    last_grounded_speed = 0
+    died_at = None
 
     for f in range(1, max_frames + 1):
-        danger = nearby_danger(pb, pb.memory[0xC202])
-        grounded = pb.memory[0xC20A]
-        if danger:
-            if right_held:
-                pb.button_release("right")
-                right_held = False
-            if grounded and jump_cooldown <= 0:
-                pb.button_press("a")
-                a_held = JUMP_HOLD
-                jump_cooldown = STOMP_COOLDOWN
-        elif not right_held:
-            pb.button_press("right")
-            right_held = True
-        if a_held > 0:
-            a_held -= 1
-            if a_held == 0:
-                pb.button_release("a")
-        if jump_cooldown > 0:
-            jump_cooldown -= 1
-
+        walker.step(pb, tracker)
         pb.tick()
-        x = pb.memory[0xC202]
-        grounded = pb.memory[0xC20A]
-        if grounded:
-            last_grounded_speed = pb.memory[0xC20C]
-        world_x_subpixel += last_grounded_speed
-        position_estimate = world_x_subpixel // 6 // 8  # -> world column
-
-        if locked_at is None and x == 81 and f > 10:
-            locked_at = f
-
-        if locked_at is not None and f > locked_at and x != 81:
-            stopped_at_frame = f
+        tracker.update(pb)
+        if tracker.frozen > FROZEN_FRAMES:
+            died_at = f
             break
+        # The camera's left edge in world pixels, plus Mario's fixed screen
+        # position once locked, is his world position; the buffer preloads a
+        # few columns past that.
+        position_estimate = (tracker.scroll + MARIO_SCREEN_X) // 8
 
         for row in range(HUD_ROWS, ROWS):
             new_vals = read_row(row)
             for bx in range(COLS):
                 if new_vals[bx] != slot_val[row][bx]:
-                    slot_wc[row][bx] = nearest_world_col(
+                    wc = nearest_world_col(
                         bx, position_estimate, slot_wc[row][bx] + 1
                     )
                     slot_val[row][bx] = new_vals[bx]
-                    combined[(slot_wc[row][bx], row)] = new_vals[bx]
-                    inferred.discard((slot_wc[row][bx], row))
+                    if wc is None:
+                        continue
+                    slot_wc[row][bx] = wc
+                    combined[(wc, row)] = new_vals[bx]
+                    inferred.discard((wc, row))
                 elif position_estimate - slot_wc[row][bx] > STALE_LAPS * COLS:
                     # No detected change in over a full lap: the buffer
                     # would almost certainly have refreshed this slot by
@@ -236,23 +154,29 @@ def main():
                     # margin: 0-17 tiles during ongoing streaming, well
                     # under one lap). Infer a genuine repeat rather than
                     # leave it stuck; marked as inferred, not observed.
-                    slot_wc[row][bx] = nearest_world_col(
+                    wc = nearest_world_col(
                         bx, position_estimate, slot_wc[row][bx] + 1
                     )
-                    combined[(slot_wc[row][bx], row)] = slot_val[row][bx]
-                    inferred.add((slot_wc[row][bx], row))
+                    if wc is None:
+                        continue
+                    slot_wc[row][bx] = wc
+                    combined[(wc, row)] = slot_val[row][bx]
+                    inferred.add((wc, row))
 
-    world_x_reached = world_x_subpixel // 6
-    pb.button_release("right")
     pb.stop()
 
-    print(f"spawn x={x_spawn}, camera lock engaged at frame {locked_at}")
-    if stopped_at_frame is not None:
+    print(f"spawn x={x_spawn}")
+    if died_at is not None:
         print(
-            f"stopped at frame {stopped_at_frame}: screen X left 81 after the "
-            f"camera lock, treated as a death/respawn, not a real further scroll"
+            f"stopped at frame {died_at}: the screen went static, which is the "
+            f"death sequence. Everything after it would be a reloaded level."
         )
-    print(f"safely captured up to world column ~{world_x_reached // 8}")
+    print(
+        f"measured scroll {tracker.scroll}px, so Mario reached world column "
+        f"{(tracker.scroll + MARIO_SCREEN_X) // 8}"
+    )
+    if tracker.ambiguous_frames:
+        print(f"{tracker.ambiguous_frames} frames had an ambiguous scroll reading")
     print(
         f"{len(combined) - len(inferred)} cells directly observed, "
         f"{len(inferred)} inferred as repeats (not directly reconfirmed)"

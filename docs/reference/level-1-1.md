@@ -741,34 +741,46 @@ breaks**, since a tile id can itself be `0xFE`, and a `0xFE` inside a run is
 data. Parsing strictly forward, consuming exactly what each run header asks
 for, is correct.
 
-**The start offset was wrong, and the level's own repeat is what hid it.**
-0x0A2BD was pinned by finding the one tile run on the opening screen that
-is unique in the whole ROM (`36 71 73`) and stepping back two records. That
-gave 20 consecutive columns matching the game at spawn exactly, tile for
-tile, which felt conclusive. It was not: this stretch of 1-1 repeats with a
-period of exactly 40 columns, so a 20-column window fits in two places, and
-the fit landed on the wrong one.
+**The start offset was wrong twice, and the level's own repeat is what hid
+it.** 0x0A2BD was pinned by finding the one tile run on the opening screen
+that is unique in the whole ROM (`36 71 73`) and stepping back two records.
+That gave 20 consecutive columns matching the game at spawn exactly, tile
+for tile, which felt conclusive. It was not: this stretch of 1-1 repeats
+with a period of exactly 40 columns, so a 20-column window fits in two
+places, and the fit landed on the wrong one.
 
 Caught by scoring against far more data. `tools/decode_level.py --verify`
-now reads every world column the running game reveals (0 to 87, sampled off
-the ring buffer as the camera moves) and scores every candidate offset:
+now reads every world column the running game reveals (0 to 87, off the
+ring buffer as the camera moves) and scores every candidate offset instead
+of checking one. Two details matter for that to work:
+
+- **Capture each column the first time it appears.** Coins live in the
+  background tilemap, so a column re-read after Mario has walked through it
+  is missing the ones he collected. Keeping later reads costs about 4 points
+  of match rate.
+- **Score all offsets, not the expected one.** That is what surfaced the
+  error rather than confirming the guess.
+
+The answer, over 67 columns of overlap:
 
 | alignment | columns matched |
 |-----------|-----------------|
-| record k = column k + 40 | 44/48 (92%) |
-| record k = column k | 21/88 (24%) |
-| record k = column k + 41 | 7/47 (15%) |
+| record k = column k + 21 | 66/67 (99%) |
+| record k = column k - 19 | 21/88 (24%) |
+| record k = column k + 19 | 12/69 (17%) |
 
-So 0x0A2BD is world column **40**, not column 0. A 20-column agreement was
-never enough evidence on a level that repeats every 40.
+The stream starts at **0x0A206**, and its first record draws world column
+**21**. 130 records decode from there, covering world columns 21 to 150.
 
 ### What is still missing
 
-World 1-1's first 40 columns are not immediately before 0x0A2BD (only 9
-records chain back cleanly as a valid parse) and do not decode from anywhere
-else in banks 2 or 3 either. So the level is assembled from segments, and
-whatever points at them has not been found. That is the remaining work, and
-it is worth far more than any further improvement to the walker.
+Columns 0 to 20 are not in this stream and do not decode from anywhere else
+in the ROM. Twenty-one columns is one screen wide, which fits how a
+scrolling game is usually built: the opening screen is drawn once when the
+level loads, and this data is what streams in behind it as the camera moves.
+Finding where that opening screen is read from is the last piece. Until
+then a complete map still needs the emulator for its first screen, which is
+worth closing rather than living with.
 
 ### The scroll measurement, confirmed a third way
 

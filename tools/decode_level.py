@@ -38,12 +38,11 @@ Worked example, the third column of the level:
 
 which is exactly what the emulator has in that column.
 
-**Not finished.** What this decodes is a segment covering world column 40
-onward, matching 44 of the 48 columns of ground truth available for it.
-World 1-1's first 40 columns are not immediately before it (only 9 records
-chain back cleanly) and do not decode from anywhere else in banks 2 and 3
-either, so the level is assembled from segments and something not yet found
-points at them. Finding that is the remaining work.
+The stream starts at world column 21, one screen in. Nothing decodes the
+columns before that, anywhere in the ROM, which fits how a scrolling game
+is usually built: the opening screen is drawn once when the level loads,
+and this data is what streams in as the camera moves. Reading those first
+columns out of the ROM directly is the one piece still missing.
 
 Usage: uv run tools/decode_level.py [--verify]
 """
@@ -55,20 +54,26 @@ COLUMN_START = 0xFE
 ROWS = 16  # the playfield, below the two status bar rows
 FILLER = 44
 
-# A stretch of World 1-1's column records, covering world column 40 onward.
+# Where World 1-1's streaming column records start, and which world column
+# the first record draws.
 #
-# Not the level's start, though it looked like it. Pinned originally by the
-# one tile run on the opening screen that is unique in the whole ROM
-# (`36 71 73`) and stepping back two records, which gave a clean 20-column
-# match against the game at spawn. That match was a trap: World 1-1 repeats
-# with a period of exactly 40 columns in this stretch, so columns 0-15 and
-# 40-55 are identical and the alignment fitted at the wrong offset.
+# Both numbers were wrong twice before landing here, in the same way each
+# time: checked against too little data. A first attempt pinned 0x0A2BD by
+# finding the one tile run on the opening screen that is unique in the whole
+# ROM (`36 71 73`) and stepping back two records, which gave 20 consecutive
+# columns matching the game at spawn exactly. That is not proof on a level
+# that repeats every 40 columns, and it was fitted to the wrong one of the
+# two places a 20-column window fits.
 #
-# Checked against 88 columns of ground truth read out of the running game:
-# aligning record k to column k matches 21 of 88, while aligning record k to
-# column k+40 matches 44 of 48. The second is the real alignment.
-SEGMENT_START = 0x0A2BD
-SEGMENT_FIRST_COLUMN = 40
+# Scored against every world column the running game reveals (0 to 87, read
+# off the ring buffer as the camera moves, each column captured the first
+# time it appears so Mario cannot alter it by collecting a coin first):
+#
+#   record k = column k + 21   66/67 (99%)
+#   record k = column k - 19   21/88 (24%)
+#   record k = column k + 19   12/69 (17%)
+SEGMENT_START = 0x0A206
+SEGMENT_FIRST_COLUMN = 21
 
 
 def decode_column(rom, i):
@@ -129,6 +134,11 @@ def ground_truth(pb, tracker, walker, frames=900):
 
     Sampling as the camera moves gives real columns well past the opening
     screen, which is what makes the alignment check below meaningful.
+
+    Each column is captured the first time it appears and never overwritten.
+    Coins live in the background tilemap, so a column re-read after Mario has
+    walked through it is missing the ones he collected. Keeping the later
+    reads instead costs about 4 points of match rate.
     """
     truth = {}
 
@@ -136,7 +146,10 @@ def ground_truth(pb, tracker, walker, frames=900):
         camera = tracker.scroll // 8
         for i in range(20):
             n = camera + i
-            truth[n] = [pb.memory[0x9800 + r * 32 + (n % 32)] for r in range(2, 18)]
+            if n not in truth:
+                truth[n] = [
+                    pb.memory[0x9800 + r * 32 + (n % 32)] for r in range(2, 18)
+                ]
 
     sample()
     for _ in range(frames):
@@ -186,7 +199,7 @@ def verify(rom):
         print(f"  offset {offset:2d}: {hits}/{total} columns ({rate:.0%})")
 
     rate, hits, total, offset = scores[0]
-    ok = offset == SEGMENT_FIRST_COLUMN and rate > 0.85
+    ok = offset == SEGMENT_FIRST_COLUMN and rate > 0.95
     print(
         f"\n{'PASS' if ok else 'FAIL'}: expected offset {SEGMENT_FIRST_COLUMN}, "
         f"best was {offset} at {rate:.0%}"

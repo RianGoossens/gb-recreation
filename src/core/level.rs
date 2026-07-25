@@ -146,6 +146,23 @@ impl Level {
         }
     }
 
+    /// Drop the spawns for content Super Mario Land does not have.
+    ///
+    /// Two things qualify, both tracked in `docs/reference/faithfulness.md`:
+    /// the invincibility star (the cartridge has no star at all) and the Fly,
+    /// a generic hopper standing in for an SML enemy that has not been pinned.
+    /// The end goal is a faithful recreation, so the default build runs this
+    /// over every level it plays and a caller has to opt in to keep them.
+    ///
+    /// The level format itself still parses both markers. A level file is
+    /// data, and rejecting it outright would make custom levels that use them
+    /// fail to load rather than simply play faithfully.
+    pub fn without_non_canonical(mut self) -> Self {
+        self.items.retain(|&(_, _, kind)| kind != ItemKind::Star);
+        self.enemy_spawns.retain(|&(_, _, kind)| kind != EnemyKind::Fly);
+        self
+    }
+
     /// Parse a level from a block of text, one row per line. Trailing blank
     /// lines are ignored. Every remaining row must be the same width, otherwise
     /// this returns an error rather than panicking, so a bad file is reported.
@@ -241,6 +258,31 @@ mod tests {
         assert!(!s.is_solid(0, -1));
         assert!(!s.is_solid(1, 0));
         assert!(!s.is_solid(0, 1));
+    }
+
+    #[test]
+    fn without_non_canonical_drops_the_star_and_the_fly() {
+        let level = Level::from_rows(&["M.S.F.", "..G.C.", "######"]);
+        assert_eq!(level.items.len(), 1, "the star parses in the first place");
+        assert_eq!(level.enemy_spawns.len(), 2);
+
+        let faithful = level.without_non_canonical();
+        assert!(faithful.items.is_empty(), "no star survives");
+        assert_eq!(
+            faithful.enemy_spawns.len(),
+            1,
+            "the Goomba stays, the Fly goes"
+        );
+        assert_eq!(faithful.enemy_spawns[0].2, EnemyKind::Goomba);
+        assert_eq!(faithful.coins.len(), 1, "coins are canonical");
+    }
+
+    #[test]
+    fn without_non_canonical_keeps_the_flower() {
+        // The superball flower is SML's own power-up, so it must survive.
+        let level = Level::from_rows(&["M.W.", "####"]).without_non_canonical();
+        assert_eq!(level.items.len(), 1);
+        assert_eq!(level.items[0].2, ItemKind::Flower);
     }
 
     #[test]

@@ -15,6 +15,12 @@ development. They must not ship in the final faithful build. Before release,
 either remove them or gate them behind an explicit opt-in so the default game
 matches the cartridge.
 
+**Done, for the two spawnable ones.** `Level::without_non_canonical` drops the
+star and the Fly, and `run` and `play` apply it unless given
+`--allow-non-canonical`. The level format still parses both markers, since a
+level file is data and refusing to load one would be a worse failure than
+playing it faithfully.
+
 ## Power-ups and states
 
 | Item / state | Label | Notes |
@@ -23,14 +29,14 @@ matches the cartridge.
 | Super mushroom, big Mario | canonical | |
 | Superball flower, fire Mario | canonical | SML's signature power-up |
 | Superball projectile | canonical | thrown by fire Mario; bounces; collects coins |
-| Invincibility star | **invented** | Super Mario Land has NO star. Kept in the codebase for now (per Rian, 2026-07-23); must be removed or gated behind opt-in before the final faithful build. |
+| Invincibility star | **invented** | Super Mario Land has NO star. Gated: dropped from any level played by `run`/`play` unless `--allow-non-canonical` is given. |
 
 ## Enemies
 
 | Enemy | Label | Notes |
 |-------|-------|-------|
 | Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls and ledges); confirm exact behavior against the cartridge. |
-| Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Kept in the codebase for now (per Rian, 2026-07-23); replace with a real SML enemy or gate behind opt-in before the final faithful build. |
+| Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Gated the same way as the star. Still worth replacing with a real SML enemy rather than only hiding it. |
 
 ## Items, blocks, scoring
 
@@ -81,10 +87,9 @@ matches the cartridge.
 ## Recommended next steps toward faithfulness
 
 1. Extract the real level geometry.
-2. Replace the Fly with a real SML enemy (Nokobon), or gate it behind opt-in, before the final faithful build.
-3. Remove the invincibility star, or gate it behind opt-in, before the final faithful build.
-4. Pin the cartridge's real sound effect data (APU registers/note data per event) and replace the invented tones in `src/audio.rs`.
-5. Match the cartridge's point values (a stomp is 100, seen directly in the
+2. Replace the Fly with a real SML enemy (Nokobon). Gating it keeps the default build faithful, but the enemy roster is still one short.
+3. Pin the cartridge's real sound effect data (APU registers/note data per event) and replace the invented tones in `src/audio.rs`.
+4. Match the cartridge's point values (a stomp is 100, seen directly in the
    status bar while measuring the bounce; the rest are unchecked).
 
 (Brick breaking and superball coin collection are already canonical, done.)

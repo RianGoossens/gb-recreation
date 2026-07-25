@@ -13,9 +13,9 @@ code with `Level::from_file` / `Level::from_text`.
 | `.` | empty space |
 | `M` | Mario's spawn (use one) |
 | `G` | a Goomba enemy |
-| `F` | a Fly enemy (walks and hops) |
+| `F` | a Fly enemy (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
-| `S` | a star (grants brief invincibility) |
+| `S` | a star (grants brief invincibility), see the note on non-cartridge content |
 | `W` | a flower (makes Mario fire-powered) |
 | `?` | question block, gives a coin when bumped (solid) |
 | `P` | power block, gives a mushroom when bumped (solid) |
@@ -25,6 +25,22 @@ code with `Level::from_file` / `Level::from_text`.
 Any other character is treated as empty. The block markers (`?`, `P`, `B`) are
 part of the solid world, so Mario stands on them and bumps them from below. `E`
 is passable.
+
+## Content Super Mario Land does not have
+
+Two markers spawn things the cartridge has no equivalent of: `S`, since Super
+Mario Land has no invincibility star at all, and `F`, a generic hopping enemy
+standing in for an SML enemy that has not been pinned yet. See
+`docs/reference/faithfulness.md`.
+
+The end goal is a faithful recreation, so **`run` and `play` drop both spawns
+by default**. A level file using them still loads and still plays; it just
+plays without them. Pass `--allow-non-canonical` (anywhere in the arguments)
+to keep them:
+
+```sh
+cargo run -- play out.png 60 right mylevel.txt --allow-non-canonical
+```
 
 ## Rules
 

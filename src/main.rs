@@ -44,6 +44,23 @@ fn main() -> ExitCode {
     }
 }
 
+/// Opt back in to content Super Mario Land does not have (the star, the Fly).
+/// The default build plays the cartridge's own content only; see
+/// `docs/reference/faithfulness.md`.
+const ALLOW_NON_CANONICAL: &str = "--allow-non-canonical";
+
+/// Pull the opt-in flag out of the argument list, so the positional arguments
+/// each command parses are unaffected by where the flag was written.
+fn split_non_canonical_flag(args: &[String]) -> (Vec<String>, bool) {
+    let allow = args.iter().any(|a| a == ALLOW_NON_CANONICAL);
+    let rest = args
+        .iter()
+        .filter(|a| a.as_str() != ALLOW_NON_CANONICAL)
+        .cloned()
+        .collect();
+    (rest, allow)
+}
+
 fn verify_rom(path: &str) -> ExitCode {
     match sml::rom::verify_file(path) {
         Ok(hashes) => {
@@ -252,6 +269,8 @@ fn play(args: &[String]) -> ExitCode {
     use sml::input::{Button, Buttons};
     use sml::tuning::Tuning;
 
+    let (args, allow_non_canonical) = split_non_canonical_flag(args);
+    let args = args.as_slice();
     let (out, frames, keys, level, tuning_path) = match args {
         [out] => (out.as_str(), 1u32, "", None, None),
         [out, frames] => (out.as_str(), frames.parse().unwrap_or(1), "", None, None),
@@ -318,6 +337,11 @@ fn play(args: &[String]) -> ExitCode {
         },
         None => Game::demo_level(),
     };
+    let level = if allow_non_canonical {
+        level
+    } else {
+        level.without_non_canonical()
+    };
     let mut game = Game::new(level);
     if let Some(path) = tuning_path {
         match std::fs::read_to_string(path) {
@@ -362,6 +386,7 @@ fn play(args: &[String]) -> ExitCode {
 fn run_game(args: &[String]) -> ExitCode {
     use minifb::{Key, Window, WindowOptions};
     use sml::core::level::Level;
+    use sml::session::campaign_levels;
     use sml::input::mapping::{buttons_from_held, Key as GbKey};
     use sml::session::Session;
     use sml::tuning::Tuning;
@@ -373,6 +398,7 @@ fn run_game(args: &[String]) -> ExitCode {
     // An optional level file plays a custom level instead of the built-in demo,
     // and an optional tuning file (only meaningful alongside a level) retunes
     // the physics without a recompile (see docs/reference/level-format.md).
+    let (args, allow_non_canonical) = split_non_canonical_flag(args);
     let level_path = args.first();
     let tuning_path = args.get(1);
 
@@ -393,15 +419,22 @@ fn run_game(args: &[String]) -> ExitCode {
         None => Tuning::default(),
     };
 
+    let faithful = |levels: Vec<Level>| -> Vec<Level> {
+        if allow_non_canonical {
+            levels
+        } else {
+            levels.into_iter().map(Level::without_non_canonical).collect()
+        }
+    };
     let mut session = match level_path {
         Some(path) => match Level::from_file(path) {
-            Ok(level) => Session::with_tuning(vec![level], tuning),
+            Ok(level) => Session::with_tuning(faithful(vec![level]), tuning),
             Err(e) => {
                 eprintln!("could not load level {path}: {e}");
                 return ExitCode::FAILURE;
             }
         },
-        None => Session::campaign(),
+        None => Session::with_tuning(faithful(campaign_levels()), tuning),
     };
 
     let (win_w, win_h) = sml::frontend::scaled_size(SCALE);
@@ -464,4 +497,7 @@ fn usage() {
     println!("  sml render-title <out.png>                render the extracted title screen");
     println!("  sml run [level.txt] [tuning.txt]          play in a window (needs --features gui)");
     println!("  sml play <out.png> [frames] [keys] [lvl] [tuning]  run headlessly to a PNG");
+    println!("\n  run and play accept --allow-non-canonical anywhere in the arguments,");
+    println!("  which keeps content Super Mario Land does not have (the star, the Fly).");
+    println!("  Without it those spawns are dropped, so the default game is the cartridge's.");
 }

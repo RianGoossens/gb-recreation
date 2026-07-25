@@ -15,6 +15,16 @@ use crate::tuning::Tuning;
 /// cartridge's real levels are extracted. These are not end-goal content; the
 /// shipped game is meant to be the original's levels. Each is a rectangle of the
 /// level-format markers (see docs/reference/level-format.md).
+/// The built-in campaign's levels, unfiltered. Callers that are about to play
+/// them should run [`Level::without_non_canonical`] first unless the user has
+/// explicitly opted into non-cartridge content.
+pub fn campaign_levels() -> Vec<Level> {
+    CAMPAIGN
+        .iter()
+        .map(|text| Level::from_text(text).expect("built-in campaign level is valid"))
+        .collect()
+}
+
 const CAMPAIGN: &[&str] = &[
     concat!(
         "....................\n",
@@ -95,11 +105,7 @@ impl Session {
     /// A short demo campaign (placeholder levels) for playing the multi-level
     /// flow until the cartridge's real levels are extracted.
     pub fn campaign() -> Self {
-        let levels = CAMPAIGN
-            .iter()
-            .map(|text| Level::from_text(text).expect("built-in campaign level is valid"))
-            .collect();
-        Self::new(levels)
+        Self::new(campaign_levels())
     }
 
     /// Which level index is being played (0-based).

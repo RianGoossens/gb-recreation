@@ -1,226 +1,207 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyboy"]
+# dependencies = ["pyboy", "numpy"]
 # ///
 """Decode World 1-1 straight out of the ROM, instead of playing through it.
 
 Found by observation, not by reading a disassembly. `find_level_data.py`
 first ruled out the easy possibilities: no row or column of the live tilemap
 appears anywhere in the 64K ROM, no 2x2 tile block does either, and no
-constant offset applied to the tile indices changes that. So the level is
-not stored as tiles laid out the way they appear.
+constant offset applied to the tile indices changes that. A density scan for
+the tile ids the opening screen uses put the data in bank 2, and
+`find_level_pointer.py` (which watches RAM for a banked ROM pointer that only
+moves forward) landed on 0xD010, holding a bank-2 address a few hundred bytes
+below the column data. Hexdumping there showed both halves of the format.
 
-A density scan for the tile IDs the opening screen actually uses put the
-busiest windows in bank 2, and hexdumping there showed an obvious repeating
-delimiter: `fe`, then `53 40`, which are tiles 83 and 64, the two that make
-up the top of every column on screen. Lining those records up against the
-live tilemap column by column decoded the whole thing:
+Two layers.
 
-    0xFE                      start of a column
-    (row << 4) | count        place `count` tiles starting at `row`
-    <count tile bytes>        the tile ids, top to bottom
-    ... more runs ...
-    (until the next 0xFE)
+A **column record** is a list of runs, terminated by 0xFE:
 
-Everything not covered by a run is the background filler (tile 44). `0xFE`
-cannot be mistaken for a run header, since row 15 with a count of 14 would
-run off the bottom of a 16-row column.
+    (row << 4) | count    place `count` tiles starting at `row`
+    <count tile bytes>    the tile ids, top to bottom
+    ...                   more runs
+    0xFE                  end of column
 
-Worked example, the third column of the level:
+with two special cases:
 
-    fe 02 53 40 b1 5e e2 60 61
-       02          -> row 0, 2 tiles: 83, 64
-          53 40
-             b1    -> row 11, 1 tile: 94
-                5e
-                   e2 -> row 14, 2 tiles: 96, 97
-                      60 61
+    count == 0            means a full 16 rows, not an empty run
+    0xFD <tile>           in place of the tile bytes, repeat one tile
+                          for the whole run
 
-which is exactly what the emulator has in that column.
+Anything no run covers is the background filler (tile 44). Worked example,
+world column 87:
 
-The stream starts at world column 21, one screen in. Nothing decodes the
-columns before that, anywhere in the ROM, which fits how a scrolling game
-is usually built: the opening screen is drawn once when the level loads,
-and this data is what streams in as the camera moves. Reading those first
-columns out of the ROM directly is the one piece still missing.
+    02 53 40 | 37 fd f4 | e2 60 61 | fe
+    02          -> row 0, 2 tiles: 83, 64
+    37 fd f4    -> row 3, 7 tiles, all 244
+    e2          -> row 14, 2 tiles: 96, 97
 
-Usage: uv run tools/decode_level.py [--verify]
+A **level** is a list of 16-bit little-endian pointers to those records,
+terminated by 0xFF. Each pointer starts one screen, and a screen is exactly
+20 columns, the width of the Game Boy display. Pointers repeat: World 1-1
+reuses six of its fifteen screens, which is why world columns 0-19 are
+byte-identical to columns 40-59 (both are the screen at 0x62BE).
+
+That repeat is what made an earlier, screen-less reading of this data look
+right while being wrong. Decoding linearly from one guessed offset matched
+the running game for the first 88 columns purely because 1-1's first five
+screens happen to sit in near-linear order, and a 20-column agreement fits
+in two places on a level that repeats every 40 columns. Two different start
+offsets were published before this one.
+
+The current reading is scored against every column the running game reveals
+(0 to 87, captured by `capture_columns.py`), and against every candidate
+list start in the surrounding 192 bytes:
+
+    list at 0x0A198   88/88  (100%)
+    list at 0x0A1AA   40/80   (50%)
+    list at 0x0A1A6   40/88   (45%)
+
+Usage: uv run tools/decode_level.py [--verify] [columns.json]
 """
 
+import json
 import sys
 
 ROM_PATH = "super_mario_land.gb"
-COLUMN_START = 0xFE
 ROWS = 16  # the playfield, below the two status bar rows
+SCREEN_COLUMNS = 20
 FILLER = 44
+REPEAT = 0xFD
+COLUMN_END = 0xFE
+LIST_END = 0xFF
 
-# Where World 1-1's streaming column records start, and which world column
-# the first record draws.
-#
-# Both numbers were wrong twice before landing here, in the same way each
-# time: checked against too little data. A first attempt pinned 0x0A2BD by
-# finding the one tile run on the opening screen that is unique in the whole
-# ROM (`36 71 73`) and stepping back two records, which gave 20 consecutive
-# columns matching the game at spawn exactly. That is not proof on a level
-# that repeats every 40 columns, and it was fitted to the wrong one of the
-# two places a 20-column window fits.
-#
-# Scored against every world column the running game reveals (0 to 87, read
-# off the ring buffer as the camera moves, each column captured the first
-# time it appears so Mario cannot alter it by collecting a coin first):
-#
-#   record k = column k + 21   66/67 (99%)
-#   record k = column k - 19   21/88 (24%)
-#   record k = column k + 19   12/69 (17%)
-SEGMENT_START = 0x0A206
-SEGMENT_FIRST_COLUMN = 21
+# World 1-1's screen list, and the bank-2 window it points through. Bank 2
+# is mapped at CPU 0x4000, so a pointer of 0x62BE is ROM offset 0xA2BE.
+LEVEL_1_1_LIST = 0x0A198
+BANK_BASE = 0x8000
+BANK_WINDOW = 0x4000
+
+
+def rom_offset(pointer):
+    return pointer - BANK_WINDOW + BANK_BASE
 
 
 def decode_column(rom, i):
-    """One column starting at the 0xFE at `rom[i]`. Returns (column, next_i).
-
-    Parsed strictly forward, consuming exactly what each run header asks for.
-    Splitting the stream on every 0xFE instead looks right for the first
-    47 columns and then breaks, because a tile id can itself be 0xFE and a
-    0xFE inside a run is data, not the next column.
+    """One column record starting at `rom[i]`. Returns (column, next_i).
 
     Returns (None, i) if a run does not fit the column, which is what tells
-    the level's data apart from whatever follows it in the ROM.
+    level data apart from whatever else is nearby in the ROM.
     """
     column = [FILLER] * ROWS
-    i += 1
-    while i < len(rom) and rom[i] != COLUMN_START:
-        row, count = rom[i] >> 4, rom[i] & 0x0F
+    while i < len(rom):
+        header = rom[i]
+        if header == COLUMN_END:
+            return column, i + 1
+        row, count = header >> 4, (header & 0x0F) or ROWS
         i += 1
-        if count == 0 or row + count > ROWS or i + count > len(rom):
+        if row + count > ROWS or i >= len(rom):
             return None, i
-        for n in range(count):
-            column[row + n] = rom[i]
-            i += 1
-    return column, i
+        if rom[i] == REPEAT:
+            tile = rom[i + 1]
+            i += 2
+            for n in range(count):
+                column[row + n] = tile
+        else:
+            if i + count > len(rom):
+                return None, i
+            for n in range(count):
+                column[row + n] = rom[i]
+                i += 1
+    return None, i
 
 
-def decode_columns(rom, start, limit=None):
-    """Successive columns from `start` until the records stop parsing."""
+def decode_screen(rom, pointer):
+    """The 20 columns a single screen pointer draws."""
     columns = []
-    i = start
-    while i < len(rom) and rom[i] == COLUMN_START:
+    i = rom_offset(pointer)
+    for _ in range(SCREEN_COLUMNS):
         column, i = decode_column(rom, i)
         if column is None:
-            break
+            return None
         columns.append(column)
-        if limit and len(columns) >= limit:
-            break
     return columns
 
 
-def live_columns(pb, camera_col):
-    """The 20 visible columns, as world columns, from the running game.
-
-    The background map is a 32-column ring buffer, so world column N lives at
-    buffer index N % 32.
-    """
-    return [
-        (
-            camera_col + i,
-            [pb.memory[0x9800 + r * 32 + ((camera_col + i) % 32)] for r in range(2, 18)],
-        )
-        for i in range(20)
-    ]
+def screen_list(rom, start):
+    """The 0xFF-terminated pointer list at `start`."""
+    pointers = []
+    i = start
+    while i + 1 < len(rom) and rom[i] != LIST_END:
+        pointers.append(rom[i] | (rom[i + 1] << 8))
+        i += 2
+    return pointers
 
 
-def ground_truth(pb, tracker, walker, frames=900):
-    """Every world column the running game reveals, read from the ring buffer.
-
-    Sampling as the camera moves gives real columns well past the opening
-    screen, which is what makes the alignment check below meaningful.
-
-    Each column is captured the first time it appears and never overwritten.
-    Coins live in the background tilemap, so a column re-read after Mario has
-    walked through it is missing the ones he collected. Keeping the later
-    reads instead costs about 4 points of match rate.
-    """
-    truth = {}
-
-    def sample():
-        camera = tracker.scroll // 8
-        for i in range(20):
-            n = camera + i
-            if n not in truth:
-                truth[n] = [
-                    pb.memory[0x9800 + r * 32 + (n % 32)] for r in range(2, 18)
-                ]
-
-    sample()
-    for _ in range(frames):
-        walker.step(pb, tracker)
-        pb.tick()
-        tracker.update(pb)
-        if tracker.frozen > 5:
+def decode_level(rom, start=LEVEL_1_1_LIST):
+    """Every column of the level whose screen list starts at `start`."""
+    columns = []
+    for pointer in screen_list(rom, start):
+        screen = decode_screen(rom, pointer)
+        if screen is None:
             break
-        sample()
-    return truth
+        columns += screen
+    return columns
 
 
-def verify(rom):
-    """Check the decode against columns the running game actually revealed.
+def score(rom, start, truth):
+    """How many of the observed columns a candidate list start reproduces."""
+    columns = decode_level(rom, start)
+    overlap = [n for n in truth if n < len(columns)]
+    if not overlap:
+        return 0.0, 0, 0, len(columns)
+    hits = sum(1 for n in overlap if columns[n] == truth[n])
+    return hits / len(overlap), hits, len(overlap), len(columns)
 
-    Comparing only at spawn is what produced the wrong offset in the first
-    place: this level repeats every 40 columns, so a 20-column window fits
-    in two places. Scoring every available column against every candidate
-    offset is what separates them.
+
+def verify(rom, truth):
+    """Score every plausible list start, not just the expected one.
+
+    Checking only the expected offset is what let two wrong answers stand.
     """
-    sys.path.insert(0, "tools")
-    from sml_boot import boot_to_gameplay
-    from sml_scroll import ScrollTracker
-    from sml_walker import ReactiveWalker
-
-    decoded = decode_columns(rom, SEGMENT_START)
-    pb = boot_to_gameplay()
-    tracker = ScrollTracker(pb)
-    walker = ReactiveWalker(pb)
-    truth = ground_truth(pb, tracker, walker)
-    pb.stop()
-
-    columns = sorted(truth)
-    print(f"decoded {len(decoded)} columns from 0x{SEGMENT_START:05X}")
-    print(f"ground truth: world columns {columns[0]}..{columns[-1]}\n")
-
     scores = []
-    for offset in range(0, 64):
-        overlap = [n for n in columns if 0 <= n - offset < len(decoded)]
-        if len(overlap) < 16:
-            continue
-        hits = sum(1 for n in overlap if decoded[n - offset] == truth[n])
-        scores.append((hits / len(overlap), hits, len(overlap), offset))
+    for start in range(LEVEL_1_1_LIST - 0x60, LEVEL_1_1_LIST + 0x60):
+        rate, hits, total, length = score(rom, start, truth)
+        if total >= 80:
+            scores.append((rate, hits, total, start, length))
     scores.sort(reverse=True)
-    print("best alignments (record k against world column k + offset):")
-    for rate, hits, total, offset in scores[:3]:
-        print(f"  offset {offset:2d}: {hits}/{total} columns ({rate:.0%})")
 
-    rate, hits, total, offset = scores[0]
-    ok = offset == SEGMENT_FIRST_COLUMN and rate > 0.95
+    print("best screen lists (scored against every observed column):")
+    for rate, hits, total, start, length in scores[:3]:
+        print(f"  0x{start:05X}: {hits}/{total} ({rate:.0%}), {length} columns")
+
+    rate, hits, total, start, length = scores[0]
+    ok = start == LEVEL_1_1_LIST and rate == 1.0
     print(
-        f"\n{'PASS' if ok else 'FAIL'}: expected offset {SEGMENT_FIRST_COLUMN}, "
-        f"best was {offset} at {rate:.0%}"
+        f"\n{'PASS' if ok else 'FAIL'}: expected 0x{LEVEL_1_1_LIST:05X} at 100%, "
+        f"best was 0x{start:05X} at {rate:.0%}"
     )
     return ok
 
 
-def main():
-    rom = open(ROM_PATH, "rb").read()
-
-    if "--verify" in sys.argv:
-        return 0 if verify(rom) else 1
-
-    columns = decode_columns(rom, SEGMENT_START)
-    print(f"decoded {len(columns)} columns from 0x{SEGMENT_START:05X}\n")
+def render(columns):
     for row in range(ROWS):
         line = "".join(
-            "." if col[row] == FILLER else ("#" if col[row] in (96, 97) else "o")
-            for col in columns
+            "." if c[row] == FILLER else ("#" if c[row] in (96, 97) else "o")
+            for c in columns
         )
         print(f"{row:2d} {line}")
+
+
+def main():
+    rom = open(ROM_PATH, "rb").read()
+    args = [a for a in sys.argv[1:] if a != "--verify"]
+
+    if "--verify" in sys.argv:
+        path = args[0] if args else "columns.json"
+        truth = {int(k): v for k, v in json.load(open(path)).items()}
+        return 0 if verify(rom, truth) else 1
+
+    pointers = screen_list(rom, LEVEL_1_1_LIST)
+    columns = decode_level(rom)
+    print(f"{len(pointers)} screens, {len(columns)} columns")
+    print("  " + " ".join(f"{p:04X}" for p in pointers) + "\n")
+    render(columns)
     return 0
 
 

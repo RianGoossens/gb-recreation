@@ -688,7 +688,7 @@ would need a walker that can deliberately drop into a gap rather than one
 whose only ideas are Right, jump and wait. Untested, and stated as the
 leading hypothesis rather than a finding.
 
-## The level data is in the ROM, and the format is mostly decoded
+## The level data is in the ROM, and the format is decoded
 
 Prompted by Rian (issue 5): playing the game to discover the level caps at
 however far a scripted run survives, and the geometry should be in the
@@ -708,92 +708,126 @@ the busiest 64-byte windows in bank 2 (0x0A9B0 at 47/64 bytes, 0x0ACC0 at
 `53 40`, which are tiles 83 and 64, the two at the top of every column on
 screen.
 
+### Finding the second half of the format
+
+The column records were found first, and reading them alone produced two
+wrong answers (below). What settled it was looking for the game's own read
+position instead of pattern-matching the bytes.
+
+`tools/find_level_pointer.py` boots to gameplay, walks Mario right, and
+scans WRAM and HRAM for a 16-bit value inside the banked-ROM window
+(0x4000-0x7FFF) that never decreases. Exactly one real candidate came back:
+
+| address | at level start | after 68 columns | bytes per column |
+|---------|----------------|------------------|------------------|
+| 0xD010 | 0x6002 | 0x601D | 0.4 |
+
+Bank 2 is mapped at CPU 0x4000, so 0x6002 is ROM offset 0x0A002, a few
+hundred bytes below the column records. 0.4 bytes per column is far too slow
+to be a column read (records average about 9 bytes), so 0xD010 is a
+different table, most likely the object or enemy spawn list. Its value was
+still the useful part: it said to hexdump around 0x0A000, and that region
+holds a block of 16-bit pointers, all landing in 0x62xx-0x6Dxx, which is the
+column-record region.
+
 ### The format
 
-    0xFE                      start of a column
+Two layers. A **column record** is a list of runs terminated by `0xFE`:
+
     (row << 4) | count        place `count` tiles starting at `row`
     <count tile bytes>        tile ids, top to bottom
     ...                       more runs
-                              (until the next 0xFE)
+    0xFE                      end of column
 
-Anything no run covers is the background filler, tile 44. `0xFE` cannot be
-confused with a run header, since row 15 with a count of 14 would run off
-the bottom of a 16-row column.
+with two special cases:
 
-Worked example, the level's third column:
+    count == 0                a full 16 rows, not an empty run
+    0xFD <tile>               in place of the tile bytes, repeat one
+                              tile for the whole run
+
+Anything no run covers is the background filler, tile 44. Neither `0xFD` nor
+`0xFE` ever appears as a real tile id in any of the 88 observed columns.
+
+Worked example, world column 87:
 
 ```
-fe 02 53 40 b1 5e e2 60 61
-   02          row 0, 2 tiles:  83, 64
-      53 40
-         b1    row 11, 1 tile:  94
-            5e
-               e2  row 14, 2 tiles: 96, 97
-                  60 61
+02 53 40 | 37 fd f4 | e2 60 61 | fe
+02          row 0, 2 tiles:  83, 64
+   53 40
+           37    row 3, 7 tiles, all 244
+              fd f4
+                     e2  row 14, 2 tiles: 96, 97
+                        60 61
 ```
 
-### Two bugs found by checking properly
+A **level** is a 0xFF-terminated list of 16-bit little-endian pointers to
+those records. Each pointer starts one screen, and a screen is exactly 20
+columns, the width of the display. World 1-1's list is at **0x0A198**:
 
-Both are worth recording, because both looked correct for a while.
+    62BE 6200 62BE 6381 645F 62BE 650D 62BE 6200 6381 6200 62BE 65DE 66B5 67BB
+
+15 screens, 300 columns, 2400 pixels, ending on the level's gate. Six of the
+fifteen are reused. That reuse is the whole explanation for the "mystery" of
+the opening screen: world columns 0-19 and columns 40-59 are byte-identical
+because both are the screen at 0x62BE, drawn twice.
+
+### Three bugs found by checking properly
+
+All three looked correct for a while.
 
 **Splitting the stream on every `0xFE` works for 47 columns and then
-breaks**, since a tile id can itself be `0xFE`, and a `0xFE` inside a run is
-data. Parsing strictly forward, consuming exactly what each run header asks
-for, is correct.
+breaks.** The stated reason at the time (a tile id can itself be `0xFE`) was
+wrong. The real cause is the `0xFD` repeat marker: skipping it makes the
+parser consume the wrong number of bytes and desynchronise, after which a
+`0xFE` shows up mid-run and looks like proof that tiles can be `0xFE`. With
+`0xFD` handled, no tile in the level is ever `0xFD` or `0xFE`.
 
 **The start offset was wrong twice, and the level's own repeat is what hid
 it.** 0x0A2BD was pinned by finding the one tile run on the opening screen
 that is unique in the whole ROM (`36 71 73`) and stepping back two records.
 That gave 20 consecutive columns matching the game at spawn exactly, tile
-for tile, which felt conclusive. It was not: this stretch of 1-1 repeats
-with a period of exactly 40 columns, so a 20-column window fits in two
-places, and the fit landed on the wrong one.
+for tile, which felt conclusive. It was not: 1-1's first screen is drawn
+again at column 40, so a 20-column window fits in two places, and the fit
+landed on the wrong one. A second attempt moved to 0x0A206 with a linear
+read, which matched 66 of 67 columns only because 1-1's first five screens
+happen to sit in near-linear order in the record pool. It had no way to
+express a reused screen and could not produce columns 0-19 at all.
 
-Caught by scoring against far more data. `tools/decode_level.py --verify`
-now reads every world column the running game reveals (0 to 87, off the
-ring buffer as the camera moves) and scores every candidate offset instead
-of checking one. Two details matter for that to work:
+Caught by scoring against far more data. `tools/capture_columns.py` reads
+every world column the running game reveals (0 to 87, off the ring buffer as
+the camera moves) and `tools/decode_level.py --verify` scores every candidate
+list start in the surrounding 192 bytes:
 
-- **Capture each column the first time it appears.** Coins live in the
-  background tilemap, so a column re-read after Mario has walked through it
-  is missing the ones he collected. Keeping later reads costs about 4 points
-  of match rate.
-- **Score all offsets, not the expected one.** That is what surfaced the
-  error rather than confirming the guess.
+| screen list | columns matched | level length |
+|-------------|-----------------|--------------|
+| **0x0A198** | **88/88 (100%)** | 300 |
+| 0x0A1AA | 40/88 (45%) | 120 |
+| 0x0A1A6 | 40/88 (45%) | 160 |
 
-The answer, over 67 columns of overlap:
+One detail matters for that to work: **capture each column the first time it
+appears.** Coins live in the background tilemap, so a column re-read after
+Mario has walked through it is missing the ones he collected. Keeping later
+reads costs about 4 points of match rate, which is enough noise to make a
+wrong answer look defensible.
 
-| alignment | columns matched |
-|-----------|-----------------|
-| record k = column k + 21 | 66/67 (99%) |
-| record k = column k - 19 | 21/88 (24%) |
-| record k = column k + 19 | 12/69 (17%) |
+### What is still open
 
-The stream starts at **0x0A206**, and its first record draws world column
-**21**. 130 records decode from there, covering world columns 21 to 150.
+The whole of World 1-1 now comes out of the ROM with no emulator involved,
+so the opening-screen gap is closed. Two smaller questions remain:
 
-### What is still missing, stated precisely
+- **How the game picks a level's list.** No reference to 0x0A198 exists
+  anywhere in the ROM, and no RAM byte or word tracks the list pointer or a
+  screen index (both were scanned for directly). The game recomputes it. The
+  four pointers immediately before 0x0A198 (`5F15 62BE 6817 68C7`) belong to
+  something else and are unidentified; 0x5F15 is the only pointer in the
+  region that falls outside the 0x62xx-0x6Dxx record pool.
+- **Which tiles are solid**, which the format does not encode. That is still
+  observation work (see the solidity sections above).
 
-The opening screen is not in the stream, and it is not elsewhere in the ROM
-either: decoding from every `0xFE` in all 64K, the best match for world
-columns 0-20 is 20/21, and that is 0x0A2BD, which is the level's own
-column-40 data. In other words the only thing in the ROM that looks like the
-opening screen is a later part of the same level.
-
-That is not a coincidence. Checked directly against ground truth:
-
-- Columns **0-19 are byte-identical to columns 40-59**. All twenty, every
-  tile.
-- Columns 20 onward differ from columns 60 onward. Every one of them.
-
-So the repeat is exactly one screen wide (20 columns, 160 pixels) and stops
-dead at the screen boundary. Whatever draws the opening screen produces the
-same content the stream produces at column 40, and the stream itself picks
-up at column 21.
-
-The remaining question is what reads that first screen. Until it is found, a
-complete map still needs the emulator for its first 20 columns, which is
-worth closing rather than living with.
+Two further 0xFF-terminated lists sit just after 1-1's, at 0x0A1B7 (17
+screens, 340 columns) and 0x0A1DA (18 screens, 360 columns). Every pointer in
+both decodes cleanly under the same rules, so the format is not specific to
+1-1. Which levels they are has not been checked.
 
 ### The scroll measurement, confirmed a third way
 
@@ -843,22 +877,16 @@ work.
   surface was never tested, only the horizontal approach every trace
   this session used; see the pyramid section for what already ruled out
   "solid against a horizontal approach").
-- Get past world column 78. A flying enemy on a pillar at the edge of a
-  gap, and a checkpoint-and-rewind search that explores many routes and has
-  every one of them converge there (see the section above). The leading
-  hypothesis is that the route continues below through the gap, which needs
-  a walker that can deliberately drop rather than only go right and jump.
-- Fill the gaps inside the captured range. Columns 27-31 still read blank
-  in the stitched output even though Mario walked across them, so that is
-  missing data rather than a pit (a 5-column pit would have killed him).
-  The transition-watching method cannot distinguish "never streamed in"
-  from "streamed in identical" for those.
-- Reading the level out of ROM directly would sidestep the whole
-  play-through-and-watch approach. The repeat between columns 0-26 and
-  40-66 suggests chunk-based level data; finding that format would give
-  the entire level at once instead of however far one run survives.
 - Extend the level conversion (`tools/convert_level_1_1_to_level_format.py`,
-  see the section above) past the opening screen, once the stitched
-  width beyond it is trustworthy enough to be worth converting, and wire
-  the result in behind the existing ROM gating, replacing the
-  placeholder demo level.
+  see the section above) past the opening screen to all 300 columns the ROM
+  decode gives, and wire the result in behind the existing ROM gating,
+  replacing the placeholder demo level. This is now the next real step.
+- Identify how the game selects a level's screen list, so the other eleven
+  levels can be extracted without hunting each list by hand.
+- Classify the solid tiles across the full 300 columns. The level format
+  carries tile ids only, so solidity stays an observation job.
+
+The walker's wall at world column 78, and the gaps inside the stitched
+range, no longer matter: those were limits of discovering the level by
+playing it, and the ROM decode replaces that path entirely. The walker is
+still used, but only to capture ground truth for checking a decode.

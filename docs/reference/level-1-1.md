@@ -631,6 +631,63 @@ and question blocks, hills), so the level does progress; this stretch just
 repeats first. Chunk-based level data reusing a block is the obvious
 explanation, though the level format itself has not been pinned.
 
+## The wall at world column 78
+
+What kills the run there, seen by dumping the frames: Mario is on top of a
+tall pillar with a flying enemy hovering at his own height, right at the
+edge of a gap. Jumping into an enemy at your own height does not stomp it.
+The scroll stops at 545px at frame 654, Mario's Y freezes at 83 while the
+phase byte reads falling, and about 90 frames later the screen goes fully
+static (the level reload).
+
+No fixed policy gets past it. Reactive jumping, constant hopping at five
+hold/cooldown combinations, and a grid over danger radius, stuck threshold
+and cooldown all die in the same place.
+
+### Searching instead of tuning
+
+`stitch_level_1_1.py` now checkpoints and rewinds rather than relying on
+one policy being good enough. Every 120 frames of real progress it saves a
+`Checkpoint`: the emulator state, the scroll tracker, and the stitched map
+together. All three have to move as one, or a rewind would leave the map
+holding tiles from a future that no longer happens. On a death it restores
+the last checkpoint and reseeds the walker (jump hold, cooldown, danger
+radius, a chance of a spontaneous hop, and a chance of pausing, which is
+the only action that can beat an enemy hovering at Mario's height).
+
+Three things this needed that were not obvious:
+
+- **Surviving is not progress.** A walker that stands still survives every
+  segment forever. A segment only counts when the measured scroll also
+  advances by at least 24 pixels.
+- **Right has to be pressed again after a rewind.** PyBoy's button state is
+  not part of a save state, so it has to be cleared before restoring, and
+  then re-pressed. Forgetting the second half left every retry standing
+  perfectly still, which the search scored as no progress, over 156 rewinds
+  that all looked like a hazard nothing could get past.
+- **Backing up one checkpoint is not enough**, because the segment leading
+  in succeeds and puts Mario back in the same spot. The backup now doubles
+  each time the same depth fails again, so the search genuinely explores
+  different routes rather than retrying one.
+
+With all three, the trace shows the search working as intended: it backs
+off 1, then 2, then 4 checkpoints, finds genuinely different paths through
+the earlier stretch (checkpoint 5 landing at 409px on one route and 415px
+on another), and reaches the wall again by a different sequence.
+
+### What the search says about the wall
+
+Every route converges on scroll 545 and stops. That is a stronger statement
+than a single fixed policy failing there: many different approaches, from
+several different earlier states, all arrive and none continues. So it is
+probably not a timing problem to be searched around.
+
+The likely explanation, from the screenshots, is that the upper route
+simply ends there and the level continues below, through the gap. That
+would need a walker that can deliberately drop into a gap rather than one
+whose only ideas are Right, jump and wait. Untested, and stated as the
+leading hypothesis rather than a finding.
+
 ## A real, loadable level from the opening screen
 
 `tools/convert_level_1_1_to_level_format.py` turns the opening 20x18
@@ -656,10 +713,11 @@ work.
   surface was never tested, only the horizontal approach every trace
   this session used; see the pyramid section for what already ruled out
   "solid against a horizontal approach").
-- Survive past world column 78. The walker's first death there is now the
-  single thing capping how much of the level can be captured per run.
-  Worth knowing what kills him before tuning further: a screenshot at the
-  death frame would say whether it is an enemy, a pit, or the timer.
+- Get past world column 78. A flying enemy on a pillar at the edge of a
+  gap, and a checkpoint-and-rewind search that explores many routes and has
+  every one of them converge there (see the section above). The leading
+  hypothesis is that the route continues below through the gap, which needs
+  a walker that can deliberately drop rather than only go right and jump.
 - Fill the gaps inside the captured range. Columns 27-31 still read blank
   in the stitched output even though Mario walked across them, so that is
   missing data rather than a pit (a 5-column pit would have killed him).

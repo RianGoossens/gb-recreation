@@ -38,6 +38,8 @@ this project, so those slots are excluded when scanning for danger.
 Not a runnable tool: import `ReactiveWalker` from another `uv run` script.
 """
 
+import random
+
 OAM_BASE = 0xFE00
 MARIO_OAM_SLOTS = {3, 4, 5, 6}
 MARIO_X = 0xC202
@@ -66,16 +68,37 @@ class ReactiveWalker:
     """Holds Right, and jumps at enemies and at whatever stops the scroll.
 
     Call `step(pb, tracker)` once per frame, before `pb.tick()`.
+
+    `reseed` varies the jump timing and reach. A fixed policy gets stuck at
+    the first hazard it happens to handle badly (a flying enemy hovering at
+    Mario's own height on top of a pillar, at world column 78, kills every
+    fixed setting tried: reactive, constant hopping, and a grid over radius,
+    hold and cooldown). Varying the policy is what makes a rewind-and-retry
+    search worth running, since retrying an identical policy from an
+    identical save state reproduces the identical death.
     """
 
     def __init__(self, pb, radius=DANGER_RADIUS, stuck_frames=STUCK_FRAMES):
         pb.button_press("right")
-        self.radius = radius
+        self.base_radius = radius
         self.stuck_frames = stuck_frames
         self.jump_cooldown = 0
         self.a_held = 0
         self.last_scroll = 0
         self.stalled = 0
+        self.reseed(0)
+
+    def reseed(self, attempt):
+        self.rng = random.Random(attempt)
+        self.radius = self.base_radius if attempt == 0 else self.rng.randint(12, 64)
+        self.hold = JUMP_HOLD if attempt == 0 else self.rng.randint(4, 16)
+        self.cooldown = STOMP_COOLDOWN if attempt == 0 else self.rng.randint(4, 40)
+        self.hop_chance = 0.0 if attempt == 0 else self.rng.choice([0.0, 0.02, 0.08])
+        # Waiting is a real option and the search has no way to find it
+        # otherwise: holding Right and jumping cannot get past an enemy
+        # hovering at Mario's own height, but letting it drift away can.
+        self.wait_chance = 0.0 if attempt == 0 else self.rng.choice([0.0, 0.01, 0.05])
+        self.waiting = 0
 
     def step(self, pb, tracker):
         if tracker.scroll == self.last_scroll:
@@ -84,13 +107,22 @@ class ReactiveWalker:
             self.stalled = 0
             self.last_scroll = tracker.scroll
 
+        if self.waiting > 0:
+            self.waiting -= 1
+            if self.waiting == 0:
+                pb.button_press("right")
+        elif self.wait_chance and self.rng.random() < self.wait_chance:
+            self.waiting = self.rng.randint(10, 60)
+            pb.button_release("right")
+
         grounded = pb.memory[GROUNDED]
-        blocked = self.stalled >= self.stuck_frames
+        blocked = self.stalled >= self.stuck_frames and not self.waiting
         threatened = nearby_danger(pb, pb.memory[MARIO_X], self.radius)
-        if (blocked or threatened) and grounded and self.jump_cooldown <= 0:
+        restless = self.hop_chance and self.rng.random() < self.hop_chance
+        if (blocked or threatened or restless) and grounded and self.jump_cooldown <= 0:
             pb.button_press("a")
-            self.a_held = JUMP_HOLD
-            self.jump_cooldown = STOMP_COOLDOWN
+            self.a_held = self.hold
+            self.jump_cooldown = self.cooldown
 
         if self.a_held > 0:
             self.a_held -= 1
@@ -98,3 +130,21 @@ class ReactiveWalker:
                 pb.button_release("a")
         if self.jump_cooldown > 0:
             self.jump_cooldown -= 1
+
+    def release_all(self, pb):
+        """PyBoy's button state is not part of a save state, so it survives
+        load_state and leaks across a rewind. Clear it before restoring."""
+        pb.button_release("a")
+        pb.button_release("right")
+        self.a_held = 0
+        self.waiting = 0
+
+    def resume(self, pb, scroll):
+        """Pick up again after a rewind. Right has to be pressed back down:
+        forgetting it left every retry standing perfectly still, which the
+        search then scored as a failure to make progress, over 156 rewinds
+        that all looked like a hazard nothing could get past."""
+        pb.button_press("right")
+        self.jump_cooldown = 0
+        self.stalled = 0
+        self.last_scroll = scroll

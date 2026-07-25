@@ -19,30 +19,14 @@ each of the 32 buffer columns' contents changed since the previous frame.
 The buffer only ever streams forward (never rewritten with older data),
 so a slot's world-column identity starts at its raw buffer index (true at
 spawn, confirmed against the static opening-screen tilemap) and increases
-by exactly 32 every time that slot's value changes. This needs no scroll
-register and no position estimate at all for correctness; dead reckoning
-is used only to report a human-readable progress figure and to detect the
-death/respawn below.
+by exactly 32 every time that slot's value changes. That much needs no position estimate at all.
 
-A naive "hold Right forever" script dies to a hazard around world column
-48 (see docs/reference/level-1-1.md) and respawns at the level start,
-which would otherwise reset the buffer back to its spawn contents and
-corrupt the slot-tracking above (the tracker would see the reload as more
-forward streaming and keep incrementing). This script watches for the
-respawn directly (Mario's screen X snapping back near its spawn value
-after the camera lock has engaged) and stops capturing there.
-
-Getting past hazards is `sml_walker.ReactiveWalker`'s job: hold Right, and
-jump at enemies that come close and at whatever stops the scroll. See that
-module for why an earlier version of it barely moved at all.
-
-That survival distance outran what the tile-tracking used to be able to
-confirm: watching only for a slot's value to change stalls silently
-across long uniform terrain (a long flat stretch of repeated ground
-tile, for example), where nothing ever looks different lap to lap. Two
-successive attempts to fix that by estimating Mario's world position
-from WRAM were both wrong, and the second was wrong for a long time
-before anyone noticed. See `docs/reference/level-1-1.md` for the trail.
+Watching only for a slot's value to change stalls silently across long
+uniform terrain (a long flat stretch of repeated ground tile, for example),
+where nothing ever looks different lap to lap. Two successive attempts to
+fix that by estimating Mario's world position from WRAM were both wrong,
+and the second was wrong for a long time before anyone noticed. See
+`docs/reference/level-1-1.md` for the trail.
 
 Position now comes from `sml_scroll.ScrollTracker`, which measures how far
 the background actually moved between two rendered frames. It needs no
@@ -51,7 +35,17 @@ model of Mario's speed, it is validated against known physics (exactly
 That last part matters: the death sequence freezes the level for about 150
 frames while Mario's WRAM bytes keep reading as though he were alive and
 walking, so a position integrated from those bytes runs on through a death
-forever. This stops capturing at the first death instead.
+forever.
+
+Getting past hazards is a search, not a policy. `sml_walker.ReactiveWalker`
+holds Right and jumps at enemies and at whatever stops the scroll, but no
+fixed setting of it survives the flying enemy on a pillar at world column
+78. So every 120 frames of real progress this saves a `Checkpoint` (the
+emulator, the scroll tracker and the stitched map together, since rewinding
+one without the others would leave the map holding tiles from a future that
+no longer happens), and on a death it rewinds and reseeds the walker.
+Backing up goes deeper each time the same depth fails again, otherwise the
+segment leading in just succeeds and puts Mario back in the same spot.
 
 Run: uv run tools/stitch_level_1_1.py
 """
@@ -60,7 +54,7 @@ import struct
 import sys
 from pathlib import Path
 
-from sml_boot import boot_to_gameplay
+from sml_boot import boot_to_gameplay, restore, snapshot
 from sml_scroll import ScrollTracker
 from sml_walker import ReactiveWalker
 
@@ -72,6 +66,10 @@ STALE_LAPS = 1  # a full 32-tile lap of no detected change before inferring a re
 # How far ahead of Mario the buffer is ever seen to have streamed content in.
 # Measured at 0 to about 17 tiles across 84 sampled transitions.
 PRELOAD_MARGIN = 20
+SEGMENT = 120  # frames of survival before a new checkpoint is taken
+FRAME_BUDGET = 20000
+MAX_ATTEMPTS = 25  # reseeded retries from one checkpoint before backing up
+MIN_PROGRESS = 24  # pixels a segment must cover to count as progress
 # Rows 0-1 are the status bar (score/coins/time), redrawn every frame
 # regardless of scroll; they are not level geometry, so they are excluded.
 HUD_ROWS = 2
@@ -98,6 +96,72 @@ def nearest_world_col(bx, position_estimate, min_wc):
     return wc if wc <= position_estimate + PRELOAD_MARGIN else None
 
 
+class Capture:
+    """The stitched map, and the per-slot bookkeeping behind it."""
+
+    def __init__(self, slot_wc, slot_val, combined, inferred):
+        self.slot_wc = slot_wc
+        self.slot_val = slot_val
+        self.combined = combined
+        self.inferred = inferred
+
+    def absorb(self, row, new_vals, position):
+        for bx in range(COLS):
+            changed = new_vals[bx] != self.slot_val[row][bx]
+            stale = position - self.slot_wc[row][bx] > STALE_LAPS * COLS
+            if not changed and not stale:
+                continue
+            wc = nearest_world_col(bx, position, self.slot_wc[row][bx] + 1)
+            if changed:
+                self.slot_val[row][bx] = new_vals[bx]
+            if wc is None:
+                continue
+            self.slot_wc[row][bx] = wc
+            self.combined[(wc, row)] = self.slot_val[row][bx]
+            # A detected change is a direct observation. A stale slot is an
+            # inference: the buffer would almost certainly have refreshed it
+            # by now if its content were going to differ (measured margin, 0
+            # to 17 tiles during ongoing streaming, well under a full lap),
+            # so its bytes are taken as a genuine repeat. Kept apart in the
+            # output so the two are never confused.
+            if changed:
+                self.inferred.discard((wc, row))
+            else:
+                self.inferred.add((wc, row))
+
+    def snapshot(self):
+        return (
+            [r[:] for r in self.slot_wc],
+            [r[:] for r in self.slot_val],
+            dict(self.combined),
+            set(self.inferred),
+        )
+
+    def rollback(self, snap):
+        self.slot_wc, self.slot_val, self.combined, self.inferred = snap
+
+
+class Checkpoint:
+    """A point the run can be rewound to: emulator, scroll, and map alike.
+
+    All three have to move together. Rewinding the emulator alone would
+    leave the map holding tiles from a future that no longer happens.
+    """
+
+    def __init__(self, pb, tracker, capture):
+        self.state = snapshot(pb)
+        self.scroll = tracker.scroll
+        self.prev = tracker.prev.copy()
+        self.capture = capture.snapshot()
+
+    def restore(self, pb, tracker, capture):
+        restore(pb, self.state)
+        tracker.scroll = self.scroll
+        tracker.prev = self.prev.copy()
+        tracker.frozen = 0
+        capture.rollback(self.capture)
+
+
 def main():
     pb = boot_to_gameplay()
 
@@ -119,58 +183,87 @@ def main():
 
     tracker = ScrollTracker(pb)
     walker = ReactiveWalker(pb)
-    max_frames = 5000
-    died_at = None
 
-    for f in range(1, max_frames + 1):
-        walker.step(pb, tracker)
-        pb.tick()
-        tracker.update(pb)
-        if tracker.frozen > FROZEN_FRAMES:
-            died_at = f
-            break
-        # The camera's left edge in world pixels, plus Mario's fixed screen
-        # position once locked, is his world position; the buffer preloads a
-        # few columns past that.
-        position_estimate = (tracker.scroll + MARIO_SCREEN_X) // 8
+    capture = Capture(slot_wc, slot_val, combined, inferred)
 
-        for row in range(HUD_ROWS, ROWS):
-            new_vals = read_row(row)
-            for bx in range(COLS):
-                if new_vals[bx] != slot_val[row][bx]:
-                    wc = nearest_world_col(
-                        bx, position_estimate, slot_wc[row][bx] + 1
-                    )
-                    slot_val[row][bx] = new_vals[bx]
-                    if wc is None:
-                        continue
-                    slot_wc[row][bx] = wc
-                    combined[(wc, row)] = new_vals[bx]
-                    inferred.discard((wc, row))
-                elif position_estimate - slot_wc[row][bx] > STALE_LAPS * COLS:
-                    # No detected change in over a full lap: the buffer
-                    # would almost certainly have refreshed this slot by
-                    # now if its content were going to differ (measured
-                    # margin: 0-17 tiles during ongoing streaming, well
-                    # under one lap). Infer a genuine repeat rather than
-                    # leave it stuck; marked as inferred, not observed.
-                    wc = nearest_world_col(
-                        bx, position_estimate, slot_wc[row][bx] + 1
-                    )
-                    if wc is None:
-                        continue
-                    slot_wc[row][bx] = wc
-                    combined[(wc, row)] = slot_val[row][bx]
-                    inferred.add((wc, row))
+    def advance(frames):
+        """Run forward. Returns the frame the level stopped running, or None."""
+        for i in range(1, frames + 1):
+            walker.step(pb, tracker)
+            pb.tick()
+            tracker.update(pb)
+            if tracker.frozen > FROZEN_FRAMES:
+                return i
+            # The camera's left edge in world pixels, plus Mario's fixed
+            # screen position once locked, is his world position; the buffer
+            # preloads a few columns past that.
+            position = (tracker.scroll + MARIO_SCREEN_X) // 8
+            for row in range(HUD_ROWS, ROWS):
+                capture.absorb(row, read_row(row), position)
+        return None
+
+    # Checkpoint and retry instead of tuning a policy that survives
+    # everything. No fixed policy gets past the flying enemy at world column
+    # 78 (see sml_walker), and retrying the same policy from the same state
+    # reproduces the same death, so each retry reseeds the walker.
+    checkpoints = [Checkpoint(pb, tracker, capture)]
+    emulated = 0
+    attempt = 0
+    failures = 0
+    backoff = 1
+    last_stuck_depth = None
+    while emulated < FRAME_BUDGET and checkpoints:
+        before = tracker.scroll
+        died = advance(SEGMENT)
+        emulated += SEGMENT
+        # Surviving is not the same as getting anywhere: a walker that
+        # stands still survives every segment forever. A segment only counts
+        # when it also covers ground.
+        if died is None and tracker.scroll - before >= MIN_PROGRESS:
+            attempt = 0
+            checkpoints.append(Checkpoint(pb, tracker, capture))
+            print(f"  checkpoint {len(checkpoints) - 1}: scroll {tracker.scroll}px")
+            continue
+        failures += 1
+        attempt += 1
+        if attempt > MAX_ATTEMPTS:
+            # Retrying from just before a hazard is not always enough runway:
+            # by then Mario may be committed to an approach that cannot work.
+            # Backing up one checkpoint is often not enough either, because
+            # the segment leading in succeeds and lands him in the same spot.
+            # So the backup gets deeper each time the same depth fails again.
+            if len(checkpoints) == 1:
+                break
+            depth = len(checkpoints) - 1
+            backoff = backoff * 2 if depth == last_stuck_depth else 1
+            last_stuck_depth = depth
+            del checkpoints[max(1, len(checkpoints) - backoff) :]
+            attempt = 1
+            print(f"  backing up {backoff} to checkpoint {len(checkpoints) - 1}")
+        walker.release_all(pb)
+        checkpoints[-1].restore(pb, tracker, capture)
+        walker.reseed(failures)
+        walker.resume(pb, tracker.scroll)
+
+    stalled = not checkpoints or emulated >= FRAME_BUDGET
+    slot_wc, slot_val, combined, inferred = (
+        capture.slot_wc,
+        capture.slot_val,
+        capture.combined,
+        capture.inferred,
+    )
 
     pb.stop()
 
     print(f"spawn x={x_spawn}")
-    if died_at is not None:
-        print(
-            f"stopped at frame {died_at}: the screen went static, which is the "
-            f"death sequence. Everything after it would be a reloaded level."
-        )
+    print(
+        f"{len(checkpoints) - 1} segments of real progress over {emulated} "
+        f"emulated frames, after {failures} rewinds"
+    )
+    if not checkpoints:
+        print("gave up: the search rewound all the way back to the start")
+    elif stalled:
+        print(f"ran out of the {FRAME_BUDGET}-frame emulation budget")
     print(
         f"measured scroll {tracker.scroll}px, so Mario reached world column "
         f"{(tracker.scroll + MARIO_SCREEN_X) // 8}"

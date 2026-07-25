@@ -1,5 +1,11 @@
 [
   {
+    "title": "The numbers were never real",
+    "date": "2026-07-25",
+    "slug": "2026-07-25-the-numbers-were-never-real",
+    "summary": "Several sessions of refining an estimate of Mario's world position, each fixing a real bug in the last, and none of them ever checked against anything. Measuring the scroll off the rendered frames shows the walker was jammed against a pipe 3% of the way into the level the whole time."
+  },
+  {
     "title": "Landing a stomp on purpose",
     "date": "2026-07-25",
     "slug": "2026-07-25-landing-a-stomp-on-purpose",

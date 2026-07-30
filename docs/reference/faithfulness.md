@@ -82,20 +82,25 @@ playing it faithfully.
 - **World 1-1 geometry**: canonical. All 300 columns decode from the ROM and
   match the running game on every column there is ground truth for (88 of
   them). See `docs/reference/level-1-1.md`.
-- **Tile solidity**: partly canonical, and the level format does not carry it,
-  so it has to be observed. `tools/classify_solid_tiles.py` watches a real run
-  and separates tiles Mario is supported by from tiles he rests inside. Clean
-  results so far, over 68 columns of a real run:
+- **Tile solidity**: **stand-in.** The level format does not carry it, and the
+  cartridge's own collision test has not been found in the ROM. The shipped
+  rule is `0x60 <= tile <= 0xE8`.
+
+  Directly observed, from a real run (`tools/classify_solid_tiles.py`):
 
   | tiles | verdict | evidence |
   |-------|---------|----------|
   | 96 | solid | held Mario up on 577 frames, never rested inside |
   | 44, 49, 50, 51, 54, 94 | non-solid | rested inside; never once supported |
 
-  36 of the level's 43 tile ids are **unresolved**: 27 the walker never
-  reaches (it stops at world column 68), and 9 more it reaches but that
-  produce no evidence either way. Any solidity the converter assigns beyond
-  the table above is inference and is labelled as such where it is used.
+  That is 7 of 43 tile ids. The rule decides the other 36, and it is a fit to
+  those 7 plus playability, not a read of the game's logic. **The previous
+  reading of this was wrong and shipped**, an allow-list of `{96}` plus two
+  invented structural rules, which Rian caught by playing the cartridge: far
+  too few pipes, far too few blocks, and none of the holes you can fall
+  through (it produced a level with zero pits, on a level that has nine). Treat
+  the current rule as provisional until the cartridge's collision test is
+  located.
 
 ## Sound
 

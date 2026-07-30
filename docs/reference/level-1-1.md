@@ -982,3 +982,65 @@ non-solid would open a pit at column 61 that the original does not have,
 since rows 14 and 15 there are 232 and 97 rather than ground, so the
 converter treats fill under a solid surface as solid and that inference is
 recorded in `docs/reference/faithfulness.md`.
+
+## Correction: the shipped solidity was wrong
+
+Rian played the cartridge and reported the extracted level had far too few
+pipes, far too few blocks to collide with, and none of the holes you can fall
+through. All three were right.
+
+The reading being corrected was an allow-list of one solid tile (96) plus two
+structural rules invented to cover the gaps: fill propagating downward from a
+solid cell, and "a column with no solid cell stands on its lowest non-sky
+tile". The second is the worst of it. Applied to a real pit, it invents a
+floor. The level it produced had **zero** columns you could fall through.
+World 1-1 has nine, at world columns 89-90, 138-139, 247-249 and 261-262.
+
+### What replaced it
+
+One rule: a tile is solid when `0x60 <= id <= 0xE8`.
+
+Every tile the observation settled agrees with it, 7 for 7. The single
+observed solid tile is 96, which is `0x60` exactly, and all six observed
+non-solid tiles (44, 49, 50, 51, 54, 94) fall below it. Nothing contradicts
+it.
+
+It also removes the need for both invented rules, and the reason is worth
+recording: each existed only because a solid tile was going unrecognised.
+Fill propagation was needed because tile 232, the body of a raised platform,
+was not solid; 232 is `0xE8`. The floor rule was needed because the level's
+final ground band was not solid; those are tiles 142 and 143, `0x8E` and
+`0x8F`. Both are solid under the range, and both hacks disappear.
+
+### Why the upper bound is not just "everything above 0x60"
+
+A plain `>= 0x60` leaves tile 244 (`0xF4`) solid, and the level then cannot be
+finished: 244 blocks the route dead at world column 269, where it sits in a
+gap in a climbable staircase. Sweeping the upper bound and walking each result
+is what isolated it.
+
+| solid range | result |
+|-------------|--------|
+| 0x60-0x61 | no floor at the exit, falls out of the level |
+| 0x60-0x82 | same |
+| 0x60-0x8F | walks to the exit gate |
+| 0x60-0xE8 | walks to the exit gate |
+| 0x60-0xFF | blocked at world column 269 |
+
+244 being decoration is independently visible in its shape: 18 cells, as
+isolated singles on alternating rows at column 277, and as a seven-tall bar
+floating in open sky at column 87 with nothing beneath it.
+
+### How far to trust this
+
+Not very far. It is a fit to 7 observed tiles plus "the level can be
+finished", not a read of the cartridge's collision test, which has not been
+located in the ROM. 36 of the level's 43 tile ids are decided by the rule
+alone. The upper bound is the weakest part: this level contains no tile
+between `0xE8` and `0xF4`, so the data pins it only to somewhere inside that
+gap.
+
+Finding the game's own collision test is the real fix, and it is now the
+open task. The lesson is the same one as the two wrong offsets: a rule that
+fits the little data that was gathered is not the same as a rule that is
+right, and shipping it inside a level nobody had played is what let it stand.

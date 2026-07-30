@@ -31,13 +31,21 @@ fn extracted_level_has_the_shape_the_rom_decodes_to() {
     assert!(level.end.is_some(), "the level needs its end trigger");
 }
 
-/// Walks the level the way the reactive walker drives the real cartridge:
-/// hold right, jump when forward progress stalls. Mario has to reach the end
-/// trigger, which fails if the solidity rules open a pit or seal a wall.
+/// Walks the level: hold right, jump when blocked, and jump when the ground
+/// ahead runs out. Mario has to reach the end trigger, which fails if the
+/// solidity rule seals a wall shut or opens a pit that is not there.
+///
+/// The gap lookahead is not decoration. World 1-1 has nine columns you can
+/// fall through, and a walker that only jumps when it is already stuck walks
+/// straight into the first one.
 #[test]
 fn extracted_level_can_be_walked_from_spawn_to_the_end() {
     let Some(level) = extracted() else { return };
     let mut game = Game::new(level);
+    let ground_ahead = |game: &Game, x: i32, y: i32| {
+        let column = (x + 12) / 8;
+        (y / 8..ROWS).any(|row| game.level.solids.is_solid(column, row))
+    };
 
     let mut stalled = 0;
     let mut furthest = i32::MIN;
@@ -51,7 +59,8 @@ fn extracted_level_can_be_walked_from_spawn_to_the_end() {
             stalled = 0;
             furthest = x;
         }
-        if stalled > 6 && game.mario.on_ground {
+        let gap = !ground_ahead(&game, x, game.mario.pixel_y());
+        if (stalled > 6 || gap) && game.mario.on_ground {
             hold_jump = 12;
         }
 
@@ -70,9 +79,9 @@ fn extracted_level_can_be_walked_from_spawn_to_the_end() {
     panic!("never reached the end trigger; furthest column was {}", furthest / 8);
 }
 
-/// The raised platform at world columns 61-64 sits on tile 232, which no
-/// observation classified. Treating it as passable turns its footprint into a
-/// pit, so this pins the rule that fills it in.
+/// The raised platform at world columns 61-64 is built from tile 232, and an
+/// earlier reading did not treat it as solid, which turned its footprint into
+/// a pit that is not in the original.
 #[test]
 fn the_raised_platform_is_not_a_pit() {
     let Some(level) = extracted() else { return };
@@ -82,4 +91,16 @@ fn the_raised_platform_is_not_a_pit() {
             "column {column} under the raised platform is empty all the way down"
         );
     }
+}
+
+/// World 1-1 has holes you can fall through, verified by Rian playing the
+/// cartridge. An earlier reading invented a floor under every one of them and
+/// produced a level with no pits at all, so this pins that they are back.
+#[test]
+fn the_level_has_pits_you_can_fall_through() {
+    let Some(level) = extracted() else { return };
+    let pits: Vec<i32> = (0..level.solids.width as i32)
+        .filter(|&c| !(0..ROWS).any(|r| level.solids.is_solid(c, r)))
+        .collect();
+    assert_eq!(pits, vec![89, 90, 138, 139, 247, 248, 249, 261, 262]);
 }

@@ -932,12 +932,12 @@ Over a run reaching world column 68:
 | tile | verdict | stood on | walked through |
 |------|---------|----------|----------------|
 | 96 | solid | 577 | 0 |
-| 44 | non-solid | 7 | 898 |
-| 94 | non-solid | 1 | 86 |
-| 49 | non-solid | 0 | 24 |
-| 50 | non-solid | 0 | 8 |
-| 51 | non-solid | 0 | 8 |
-| 54 | non-solid | 0 | 15 |
+| 44 | non-solid | 7 | 694 |
+| 94 | non-solid | 1 | 100 |
+| 49 | non-solid | 0 | 36 |
+| 50 | non-solid | 0 | 12 |
+| 51 | non-solid | 0 | 12 |
+| 54 | non-solid | 0 | 16 |
 
 Tile 96 separates perfectly: 577 frames of support and not one frame of
 sustained overlap. The seven support frames on tile 44 (sky) are Mario at the
@@ -946,9 +946,22 @@ edge of a ledge, with half of him over the drop.
 49, 50, 51, 54 and 94 are the pyramid tiles, so this reproduces the earlier
 pyramid result by a completely different method.
 
-**35 of the level's 43 tile ids remain unclassified**, because the walker
-reaches world column 68 and never touches them. That is the limiting factor,
-not the method.
+**36 of the level's 43 tile ids remain unresolved.** 27 of them the walker
+never reaches at all, stopping at world column 68. The other nine (52, 82,
+97, 99, 112, 114, 129, 130, 232) it does reach, and comes back with zero
+evidence either way: Mario is beside them repeatedly but neither stands on
+them nor rests inside them. That is what a wall he walks up to and jumps over
+looks like, and it is also what a decoration behind him looks like, so this
+method cannot separate the two.
+
+### A rule that looked like it fixed that, and did not
+
+Tiles Mario is repeatedly up against but never enters are suggestive, so
+"pressed against a lot, never entered, therefore solid" was tried. It labels
+tiles 112 and 114 solid. Both are pyramid tiles, already shown non-solid by
+two independent methods, so the rule is wrong and was removed. It survives as
+a reported number only. Being next to a tile says nothing reliable about
+whether it would stop him.
 
 ### The platform fill, stated precisely
 

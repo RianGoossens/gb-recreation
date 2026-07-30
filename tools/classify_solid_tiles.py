@@ -24,7 +24,23 @@ A cell also has to stay occupied for `MIN_STREAK` frames before it counts as
 walked through. Landing on a raised platform clips Mario a few frames into
 the fill below its surface, which read as him walking through tile 232 on the
 second run even with the inset. A solid can be entered for a frame or two
-during collision resolution; nothing rests inside one.
+during collision resolution; nothing rests inside one. The threshold has to
+stay low: at walking speed Mario crosses an 8-pixel cell in roughly 8 frames,
+so a threshold of 8 discards real pass-throughs and silently turns non-solid
+tiles into unclassified ones.
+
+Duration alone cannot separate a landing clip from a pass-through, since both
+last a handful of frames. Mario's own phase byte can: overlap only counts
+while he has been settled on the ground (grounded, phase 0) for `MIN_STREAK`
+frames, which is true while running through the pyramid and false while
+landing on a platform.
+
+`pressed_against` counts cells the full box laps into but the inset box does
+not, and it is reported only. Using it as evidence ("never entered despite
+being up against it, so solid") was tried and rejected: it labels tiles 112
+and 114 solid, and those are pyramid tiles already shown to be non-solid by
+two independent methods. Mario being beside a tile says nothing reliable
+about whether it would stop him.
 
 Verdicts use the ratio of support to overlap rather than thresholds on each,
 because the two overlap legitimately: standing at the edge of a ledge puts
@@ -70,7 +86,7 @@ ROWS = 16
 FRAMES = 3000
 MIN_SIGHTINGS = 8
 INSET = 4  # pixels trimmed from each side of Mario's box; see the module docstring
-MIN_STREAK = 8  # frames a cell must stay occupied before it counts as walked through
+MIN_STREAK = 4  # frames a cell must stay occupied before it counts as walked through
 SOLID_RATIO = 0.5
 NON_SOLID_RATIO = 0.1
 
@@ -95,14 +111,18 @@ def tile_at(level, column, row):
 
 
 def observe(pb, level, tracker, walker, frames=FRAMES):
-    overlap, support = Counter(), Counter()
+    overlap, support, pressed = Counter(), Counter(), Counter()
     streaks = {}
+    settled = 0
     for _ in range(frames):
         walker.step(pb, tracker)
         pb.tick()
         tracker.update(pb)
         if tracker.frozen > 5:
             break
+
+        grounded = pb.memory[GROUNDED] and pb.memory[PHASE] == 0
+        settled = settled + 1 if grounded else 0
 
         box = mario_box(pb)
         if box is None:
@@ -120,37 +140,50 @@ def observe(pb, level, tracker, walker, frames=FRAMES):
             if tile_at(level, c, r) is not None
         }
         streaks = {cell: streaks.get(cell, 0) + 1 for cell in inside}
-        for cell, run in streaks.items():
-            if run >= MIN_STREAK:
-                overlap[level[cell[0]][cell[1]]] += 1
+        if settled >= MIN_STREAK:
+            for cell, run in streaks.items():
+                if run >= MIN_STREAK:
+                    overlap[level[cell[0]][cell[1]]] += 1
 
-        if pb.memory[GROUNDED] and pb.memory[PHASE] == 0:
+        # Cells the full box laps into but the inset box does not: what Mario
+        # is up against rather than inside.
+        touching = {
+            (c, r)
+            for c in range((tracker.scroll + left) // 8, (tracker.scroll + right - 1) // 8 + 1)
+            for r in range(top // 8 - HUD_ROWS, (bottom - 1) // 8 - HUD_ROWS + 1)
+            if tile_at(level, c, r) is not None
+        }
+        for c, r in touching - inside:
+            pressed[level[c][r]] += 1
+
+        if grounded:
             for c in range(first_col, last_col + 1):
                 tile = tile_at(level, c, bottom // 8 - HUD_ROWS)
                 if tile is not None:
                     support[tile] += 1
-    return overlap, support
+    return overlap, support, pressed
 
 
-def classify(overlap, support):
+def classify(overlap, support, pressed):
     """Solid, non-solid or contested, for every tile the run actually met."""
     out = {}
-    for tile in sorted(set(overlap) | set(support)):
-        held, through = support[tile], overlap[tile]
+    for tile in sorted(set(overlap) | set(support) | set(pressed)):
+        held, through, against = support[tile], overlap[tile], pressed[tile]
         total = held + through
         ratio = held / total if total else 0.0
-        if total < MIN_SIGHTINGS:
-            verdict = "too-few-sightings"
-        elif ratio >= SOLID_RATIO:
+        if total >= MIN_SIGHTINGS and ratio >= SOLID_RATIO:
             verdict = "solid"
-        elif ratio <= NON_SOLID_RATIO:
+        elif total >= MIN_SIGHTINGS and ratio <= NON_SOLID_RATIO:
             verdict = "non-solid"
+        elif total < MIN_SIGHTINGS:
+            verdict = "too-few-sightings"
         else:
             verdict = "contested"
         out[tile] = {
             "verdict": verdict,
             "stood_on": held,
             "passed_through": through,
+            "pressed_against": against,
             "support_ratio": round(ratio, 3),
         }
     return out
@@ -164,19 +197,19 @@ def main():
     pb = boot_to_gameplay()
     tracker = ScrollTracker(pb)
     walker = ReactiveWalker(pb)
-    overlap, support = observe(pb, level, tracker, walker)
+    overlap, support, pressed = observe(pb, level, tracker, walker)
     pb.stop()
 
-    result = classify(overlap, support)
+    result = classify(overlap, support, pressed)
     seen = set(result)
     present = {t for column in level for t in column}
     print(f"reached world column {tracker.scroll // 8}")
     print(f"classified {len(seen)} of {len(present)} tile ids in the level\n")
-    print("tile        verdict            stood on   passed through")
+    print("tile        verdict                  stood on  through  pressed")
     for tile, info in sorted(result.items(), key=lambda kv: -kv[1]["stood_on"]):
         print(
-            f"{tile:3d} 0x{tile:02X}   {info['verdict']:18s} "
-            f"{info['stood_on']:6d}   {info['passed_through']:6d}"
+            f"{tile:3d} 0x{tile:02X}   {info['verdict']:24s} "
+            f"{info['stood_on']:6d}  {info['passed_through']:7d}  {info['pressed_against']:7d}"
         )
     unseen = sorted(present - seen)
     print(f"\nunclassified ({len(unseen)}): " + " ".join(str(t) for t in unseen))

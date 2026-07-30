@@ -92,10 +92,10 @@ playing it faithfully.
   | 96 | solid | held Mario up on 577 frames, never rested inside |
   | 44, 49, 50, 51, 54, 94 | non-solid | rested inside; never once supported |
 
-  35 of the level's 43 tile ids are **unclassified**, because the walker only
-  reaches world column 68 and never meets them. Any solidity the converter
-  assigns beyond the table above is inference and is labelled as such where it
-  is used.
+  36 of the level's 43 tile ids are **unresolved**: 27 the walker never
+  reaches (it stops at world column 68), and 9 more it reaches but that
+  produce no evidence either way. Any solidity the converter assigns beyond
+  the table above is inference and is labelled as such where it is used.
 
 ## Sound
 

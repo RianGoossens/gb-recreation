@@ -1,83 +1,111 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyboy"]
+# dependencies = ["pyboy", "numpy"]
 # ///
-"""Convert World 1-1's opening screen into our level format.
+"""Convert World 1-1 from the ROM into our plain-text level format.
 
-Reads the raw background tilemap straight from a live emulator (the same
-20x18 opening screen extract_level_1_1.py captures) and writes
-assets/extracted/level_1_1_opening.txt in the plain-text level format
-Level::from_file already loads (see docs/reference/level-format.md):
-'#' solid, '.' empty, 'M' Mario's spawn.
+Reads all 300 columns out of the cartridge with `decode_level.py` (no
+emulator involved) and writes `assets/extracted/level_1_1.txt`, which
+`Level::from_file` already loads. Generated on demand from the verified ROM
+and gitignored, never committed.
 
-This is deliberately not committed as a shipped level. It is generated
-on demand from the verified ROM, and it is also incomplete: only this
-opening screen has directly-confirmed tile solidity (see
-docs/reference/level-1-1.md). Tile classification here:
+Solidity is not in the level data, so it comes from
+`tools/classify_solid_tiles.py` plus one structural rule:
 
-- 96 (ground), 97 (underground fill): solid. 96 is directly confirmed
-  by observed collision; 97 is presumed by level-design consistency
-  (never independently confirmed, see level-1-1.md).
-- 44 (sky/blank): non-solid, directly confirmed by observed jump arcs.
-- The pyramid structure's tiles (49, 50, 51, 54, 94, 112, 113, 114, 115,
-  129): non-solid, at least against a horizontal approach. This looked
-  the other way at first (a rendered stacked-block staircase, presumed
-  solid by level-design consistency), but building this exact level with
-  that presumption and walking it is what disproved it: Mario got stuck
-  oscillating at spawn, contradicting every real-emulator trace this
-  session showing him walk straight through with no collision at all.
-  See level-1-1.md for the full account. Solidity from above (a fall
-  onto its top surface) was never tested and is a separate question.
-- Rows 0-1 are the status bar (score/coins/time) bleeding into the raw
-  tilemap read, not level geometry, and are always written as empty.
-- Everything else (the mountain silhouette, clouds, palm trees):
-  treated as non-solid background decoration by the universal Mario
-  convention (backgrounds are never collidable), not independently
-  confirmed either.
+1. Tile 96 is solid. Observed: it held Mario up on 577 frames of a real run
+   and he never once rested inside it.
+2. Tiles 44, 49, 50, 51, 54 and 94 are non-solid. Observed the same way, and
+   49/50/51/54/94 are the pyramid tiles, which an earlier session established
+   independently.
+3. **Fill rule (inference, not observation).** A cell whose neighbour above is
+   solid is solid too, unless its tile is one of the observed non-solid ones.
+   This is what makes tile 97 (under the ground) and tile 232 (the body of a
+   raised platform) solid. Without it, the platform at world columns 61-64
+   becomes a pit the original does not have, since rows 14 and 15 there are
+   232 and 97 rather than ground.
 
-Run: uv run tools/convert_level_1_1_to_level_format.py
+4. **Tile 99, the pipe, is solid.** Settled by playing both readings rather
+   than by looking at it. Driving Mario right through the real cartridge, his
+   grounded feet row over this stretch goes `14 14 14 - 10 10 14 14`: he
+   climbs something and comes back down. Our engine with tile 99 passable
+   runs flat across at row 14 with no obstacle at all; with it solid it jumps
+   at the same place and stands on top. `--passable-pipe` rebuilds the other
+   reading for comparison.
+
+Everything else is treated as non-solid background. That is a real gap rather
+than a finished answer: 36 of the level's 43 tile ids have no solidity
+evidence either way.
+
+Run: uv run tools/convert_level_1_1_to_level_format.py [--passable-pipe]
 """
 
 import sys
 from pathlib import Path
 
-from sml_boot import boot_to_gameplay
+sys.path.insert(0, "tools")
 
-OUT_PATH = Path("assets/extracted/level_1_1_opening.txt")
-MAP_BASE = 0x9800
-COLS, ROWS = 20, 18
+from decode_level import ROWS, decode_level
 
-HUD_ROWS = 2  # rows 0-1: status bar, not level geometry
-GROUND_ROW = 16
-SPAWN_COL = 6
-SPAWN_ROW = GROUND_ROW - 1
+OUT_PATH = Path("assets/extracted/level_1_1.txt")
+OBSERVED_SOLID = {96}
+OBSERVED_NON_SOLID = {44, 49, 50, 51, 54, 94}
+PIPE = 99  # a 2x3 block on the ground at world columns 34-35
 
-SOLID_TILES = {
-    96, 97,  # ground, underground fill
-}
+SPAWN_COLUMN = 6
+GROUND_ROW = 14
+
+
+def solid_grid(columns, extra_solid=frozenset()):
+    """Per-cell solidity: observed tiles, then fill propagated downward."""
+    solid = [[False] * ROWS for _ in columns]
+    for c, column in enumerate(columns):
+        for r in range(ROWS):
+            tile = column[r]
+            if tile in OBSERVED_SOLID or tile in extra_solid:
+                solid[c][r] = True
+            elif r > 0 and solid[c][r - 1] and tile not in OBSERVED_NON_SOLID:
+                solid[c][r] = True
+        floor_rule(column, solid[c])
+    return solid
+
+
+def floor_rule(column, solid):
+    """A column with no solid cell stands on its lowest non-sky tile.
+
+    Inference, and the level cannot be finished without it. World 1-1's last
+    eighteen columns have sky at every row except row 15, which carries a
+    142/143 band, and nothing there is observable because the walker stops at
+    world column 68. Read literally the level ends in a pit that swallows
+    Mario sixteen columns short of its own exit gate, so the band is being
+    treated as the floor for that stretch.
+    """
+    if any(solid):
+        return
+    for r in reversed(range(ROWS)):
+        if column[r] not in OBSERVED_NON_SOLID:
+            solid[r] = True
+            return
+
+
+def to_text(columns, solid):
+    rows = [["#" if solid[c][r] else "." for c in range(len(columns))] for r in range(ROWS)]
+    rows[GROUND_ROW - 1][SPAWN_COLUMN] = "M"
+    rows[GROUND_ROW - 1][len(columns) - 2] = "E"
+    return "\n".join("".join(row) for row in rows) + "\n"
 
 
 def main():
-    pb = boot_to_gameplay()
-
-    rows = []
-    for row in range(ROWS):
-        line = []
-        for col in range(COLS):
-            if row < HUD_ROWS:
-                line.append(".")
-                continue
-            tile = pb.memory[MAP_BASE + row * 32 + col]
-            line.append("#" if tile in SOLID_TILES else ".")
-        rows.append(line)
-    pb.stop()
-
-    rows[SPAWN_ROW][SPAWN_COL] = "M"
+    extra = frozenset() if "--passable-pipe" in sys.argv else {PIPE}
+    rom = open("super_mario_land.gb", "rb").read()
+    columns = decode_level(rom)
+    solid = solid_grid(columns, extra)
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    text = "\n".join("".join(row) for row in rows) + "\n"
-    OUT_PATH.write_text(text)
-    print(f"wrote {OUT_PATH} ({COLS}x{ROWS})")
+    OUT_PATH.write_text(to_text(columns, solid))
+    filled = sum(sum(col) for col in solid)
+    print(f"wrote {OUT_PATH} ({len(columns)}x{ROWS}), {filled} solid cells")
+    print("pipe (tile 99): " + ("passable" if not extra else "solid"))
+    return 0
 
 
 if __name__ == "__main__":

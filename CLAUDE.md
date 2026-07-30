@@ -38,9 +38,12 @@ These are not preferences. Treat a violation as a bug.
 
 - OS: Arch Linux.
 - System packages: install with `shelly`. Do not use pacman, yay, or apt directly in scripts.
-- Python (only if genuinely needed for scripting): use `uv` exclusively. Never invoke bare `python`/`pip`.
+- Python: use `uv` exclusively. Never invoke bare `python`/`pip`.
 - Node.js is forbidden. No npm, no npx, no JS build tools. The blog is hand written HTML, CSS, and JS.
 - Rust is the implementation language. Use stable `cargo`.
+- Python is fine, and often the faster choice, for prototyping and trying things out: hunting a ROM format, driving PyBoy, measuring a constant, checking whether an idea holds. Reach for it freely there. The finished thing is always Rust. Anything that survives as part of the product (parsing the cartridge, decoding assets, game logic) gets ported once it is understood, and the Python that found it either goes away or stays as the observation tool it always was.
+- The dividing line that keeps coming up: reading the cartridge's bytes belongs in Rust, observing a running emulator stays Python (there is no Game Boy emulator in this project, and those scripts are measuring instruments, not shipped code).
+- Whether asset extraction happens at build time (writing a gitignored file) or at runtime (loading straight from the ROM) is deliberately undecided. Rian does not consider it important; pick whichever suits the task and do not treat either as settled policy.
 
 ## Git and commits
 

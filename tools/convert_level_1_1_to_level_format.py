@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyboy", "numpy"]
+# dependencies = []
 # ///
 """Convert World 1-1 from the ROM into our plain-text level format.
 

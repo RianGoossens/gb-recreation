@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyboy", "numpy"]
+# dependencies = []
 # ///
 """Decode World 1-1 straight out of the ROM, instead of playing through it.
 

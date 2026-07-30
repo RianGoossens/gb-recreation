@@ -77,8 +77,25 @@ playing it faithfully.
   `docs/reference/physics.md`.
 - **Levels**: the demo level, the example level, and the demo campaign are test
   fixtures, documentation, and placeholders. The real levels come from extracting
-  the cartridge's geometry (ROM/emulator), which is open work. Shipping invented
+  the cartridge's geometry (ROM/emulator). Shipping invented
   levels is not a goal (see the end-goal note in CLAUDE.md).
+- **World 1-1 geometry**: canonical. All 300 columns decode from the ROM and
+  match the running game on every column there is ground truth for (88 of
+  them). See `docs/reference/level-1-1.md`.
+- **Tile solidity**: partly canonical, and the level format does not carry it,
+  so it has to be observed. `tools/classify_solid_tiles.py` watches a real run
+  and separates tiles Mario is supported by from tiles he rests inside. Clean
+  results so far, over 68 columns of a real run:
+
+  | tiles | verdict | evidence |
+  |-------|---------|----------|
+  | 96 | solid | held Mario up on 577 frames, never rested inside |
+  | 44, 49, 50, 51, 54, 94 | non-solid | rested inside; never once supported |
+
+  35 of the level's 43 tile ids are **unclassified**, because the walker only
+  reaches world column 68 and never meets them. Any solidity the converter
+  assigns beyond the table above is inference and is labelled as such where it
+  is used.
 
 ## Sound
 

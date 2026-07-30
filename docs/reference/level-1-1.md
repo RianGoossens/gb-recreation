@@ -890,3 +890,82 @@ The walker's wall at world column 78, and the gaps inside the stitched
 range, no longer matter: those were limits of discovering the level by
 playing it, and the ROM decode replaces that path entirely. The walker is
 still used, but only to capture ground truth for checking a decode.
+
+## Observing which tiles are solid
+
+The level format carries tile ids and nothing else, so solidity is separate
+observation work. `tools/classify_solid_tiles.py` runs the game and collects
+two kinds of evidence per tile: frames where the tile was directly under
+Mario's feet while grounded (support), and frames where Mario's own box was
+inside the tile (overlap). A tile that supports him is solid; a tile he rests
+inside is not.
+
+Coordinates were calibrated rather than assumed. Mario is four sprites in OAM
+slots 3-6, giving a 16x16 box, with OAM y biased by 16 and x by 8. Playfield
+row `r` is drawn at screen y `(r + 2) * 8`. At spawn his box bottom is screen
+y 128, which is playfield row 14, and row 14 there is tile 96.
+
+### Two systematic errors, both found by disbelieving the first answer
+
+The first run classified tile 99 (a pipe) and tile 232 (the fill inside a
+raised platform) as non-solid, which is wrong for both.
+
+**Mario's box laps into the wall he is blocked by.** He is 16 pixels wide, so
+a box pressed flush against a wall still covers 1 or 2 pixels of the wall's
+own tile column. Every wall that stopped him was being recorded as a wall he
+walked through. Testing against a box inset 4 pixels on each side removed it,
+and tile 99 dropped out of the classified set entirely.
+
+**Landing clips him into the surface he lands on.** Jumping onto the raised
+platform at world columns 61-64 puts him a few frames inside the 232 fill
+below its 96 surface. A cell now has to stay occupied for 8 consecutive
+frames before it counts. Nothing rests inside a solid.
+
+Both errors had the same shape as the offset mistakes above: a rule that
+looked right, checked against data that could not distinguish it from the
+alternative.
+
+### What is actually established
+
+Over a run reaching world column 68:
+
+| tile | verdict | stood on | walked through |
+|------|---------|----------|----------------|
+| 96 | solid | 577 | 0 |
+| 44 | non-solid | 7 | 898 |
+| 94 | non-solid | 1 | 86 |
+| 49 | non-solid | 0 | 24 |
+| 50 | non-solid | 0 | 8 |
+| 51 | non-solid | 0 | 8 |
+| 54 | non-solid | 0 | 15 |
+
+Tile 96 separates perfectly: 577 frames of support and not one frame of
+sustained overlap. The seven support frames on tile 44 (sky) are Mario at the
+edge of a ledge, with half of him over the drop.
+
+49, 50, 51, 54 and 94 are the pyramid tiles, so this reproduces the earlier
+pyramid result by a completely different method.
+
+**35 of the level's 43 tile ids remain unclassified**, because the walker
+reaches world column 68 and never touches them. That is the limiting factor,
+not the method.
+
+### The platform fill, stated precisely
+
+Tile 232 fills rows 12-14 under a 96 surface at row 11, columns 61-64. Logging
+which row Mario's feet rest on, per world column:
+
+```
+col 58: feet row 14           on tile 96
+col 61: feet rows 10-14       (mid-jump)
+col 62: feet rows 9-10        on tiles 44, 94
+col 65: feet rows 9-11        on tiles 44, 94, 96
+```
+
+Past column 61 his feet are only ever on rows 9-11, on top of the platform.
+He is never supported by 232 and never rests inside it. That says his route
+goes over the top; it does not by itself prove 232 blocks him. Treating it as
+non-solid would open a pit at column 61 that the original does not have,
+since rows 14 and 15 there are 232 and 97 rather than ground, so the
+converter treats fill under a solid surface as solid and that inference is
+recorded in `docs/reference/faithfulness.md`.

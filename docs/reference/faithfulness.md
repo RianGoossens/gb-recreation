@@ -82,25 +82,32 @@ playing it faithfully.
 - **World 1-1 geometry**: canonical. All 300 columns decode from the ROM and
   match the running game on every column there is ground truth for (88 of
   them). See `docs/reference/level-1-1.md`.
-- **Tile solidity**: **stand-in.** The level format does not carry it, and the
-  cartridge's own collision test has not been found in the ROM. The shipped
-  rule is `0x60 <= tile <= 0xE8`.
+- **Tile solidity**: **faithful, measured from the cartridge.** The shipped
+  rule is `tile >= 0x60`, with `0xF4` carved out as passable.
 
-  Directly observed, from a real run (`tools/classify_solid_tiles.py`):
+  Super Mario Land tests collision against the background tilemap in video
+  RAM, so `tools/probe_solidity.py` writes each of the 256 tile ids into the
+  tilemap in front of Mario and lets the game's own collision code answer.
+  Every id is covered, not only the ones this level contains.
 
-  | tiles | verdict | evidence |
-  |-------|---------|----------|
-  | 96 | solid | held Mario up on 577 frames, never rested inside |
-  | 44, 49, 50, 51, 54, 94 | non-solid | rested inside; never once supported |
+  | ids | verdict |
+  |-----|---------|
+  | `0x00`-`0x5F`, `0xF4` | pass through, no support |
+  | `0x68`, `0x69`, `0x6A`, `0x7C` | support from above, no sideways block |
+  | everything else `>= 0x60` | solid |
 
-  That is 7 of 43 tile ids. The rule decides the other 36, and it is a fit to
-  those 7 plus playability, not a read of the game's logic. **The previous
-  reading of this was wrong and shipped**, an allow-list of `{96}` plus two
-  invented structural rules, which Rian caught by playing the cartridge: far
-  too few pipes, far too few blocks, and none of the holes you can fall
-  through (it produced a level with zero pits, on a level that has nine). Treat
-  the current rule as provisional until the cartridge's collision test is
-  located.
+  The four semi-solid ids do not appear in World 1-1 and our level format has
+  one notion of solid, so they are flattened to solid. That is the one piece
+  still to settle, and it needs a level that uses them.
+
+  Two earlier readings of this were wrong and shipped. The first was an
+  allow-list of `{96}` plus two invented structural rules, which Rian caught
+  by playing the cartridge: far too few pipes, far too few blocks, and none
+  of the holes you can fall through (it produced a level with zero pits, on a
+  level that has nine). The second, `0x60 <= tile <= 0xE8`, gives the right
+  grid for this level by accident: `0xE8` is not a boundary, and 36 of the
+  level's 43 ids were decided by a fit to the other 7. See
+  `docs/reference/level-1-1.md`.
 
 ## Sound
 

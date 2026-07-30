@@ -11,40 +11,24 @@ and gitignored, never committed.
 
 Solidity is not stored per column, so it comes from the tile id:
 
-    a tile is solid if 0x60 <= id <= 0xE8
+    a tile is solid if id >= 0x60, except 0xF4, which is not
 
-That is one rule for the whole level, and it replaces a per-tile allow-list
-plus two invented structural rules that were wrong. Rian played the real
-cartridge and reported the previous output had far too few pipes, far too
-few blocks to collide with, and none of the holes you can fall through. He
-was right on all three: the earlier reading produced a level with **zero**
-columns you could fall through, on a level that has nine.
+That rule is the cartridge's own answer, not a fit. `probe_solidity.py`
+writes each of the 256 tile ids into the background tilemap in front of
+Mario and lets the game's collision code decide, which covers every id
+instead of only the ones this level happens to contain. All 43 of the
+level's ids are settled by direct observation, including the 36 that were
+previously decided by inference.
 
-Evidence for the threshold:
+Four ids (0x68, 0x69, 0x6A, 0x7C) hold Mario up but do not block him
+sideways. None of them appear in World 1-1, and our level format has one
+notion of solid, so they are treated as solid here.
 
-* Every tile `classify_solid_tiles.py` settled agrees with it, 7 for 7 with
-  no mismatches. The one observed solid tile is 96, which is 0x60 exactly.
-  The six observed non-solid tiles (44, 49, 50, 51, 54, 94) are all below it.
-* It reproduces the level's real structure with no special cases: multiple
-  pipes, floating platforms, and nine columns of genuine pit at world columns
-  89-90, 138-139, 247-249 and 261-262.
-* The level can be walked from spawn to its exit gate, which a plain `>= 0x60`
-  cannot: that leaves tile 244 (0xF4) solid, and 244 blocks the route dead at
-  world column 269. 244 is decoration. It appears 18 times, as isolated single
-  cells on alternating rows at column 277 and as a seven-tall bar floating in
-  open sky at column 87 with nothing under it.
-* The two rules it removes existed only to paper over its absence. A "fill
-  propagates downward" rule was needed because tile 232, the body of a raised
-  platform, went unrecognised; 232 is 0xE8. A "column with no solid cell
-  stands on its lowest non-sky tile" rule was needed because the level's final
-  ground band went unrecognised too; those tiles are 142 and 143, 0x8E and
-  0x8F. Both are solid under the threshold, and both hacks disappear.
-
-Still a hypothesis rather than a confirmed read of the cartridge's own
-collision test, which has not been located in the ROM. Only 7 of the level's
-43 tile ids have been observed directly; the rule decides the other 36. The
-upper bound is the weakest part: this level has no tile between 0xE8 and 0xF4,
-so the data pins it only to somewhere in that gap.
+The rule this replaces was `0x60 <= id <= 0xE8`, a fit to 7 observed tiles
+plus "the level can be finished". It produces the same grid for this level,
+because 1-1 has no id between 0xE8 and 0xF4 and none of the four semi-solid
+ids, but its upper bound was wrong as a general rule: 0xF4 is a single
+exception, not a boundary.
 
 Run: uv run tools/convert_level_1_1_to_level_format.py
 """
@@ -57,15 +41,17 @@ sys.path.insert(0, "tools")
 from decode_level import ROWS, decode_level
 
 OUT_PATH = Path("assets/extracted/level_1_1.txt")
+
 SOLID_FROM = 0x60
-SOLID_TO = 0xE8
+PASSABLE = {0xF4}
+SEMI_SOLID = {0x68, 0x69, 0x6A, 0x7C}
 
 SPAWN_COLUMN = 6
 GROUND_ROW = 14
 
 
 def is_solid(tile):
-    return SOLID_FROM <= tile <= SOLID_TO
+    return tile >= SOLID_FROM and tile not in PASSABLE
 
 
 def to_text(columns):
@@ -89,6 +75,10 @@ def main():
     pits = [c for c, col in enumerate(columns) if not any(is_solid(t) for t in col)]
     print(f"wrote {OUT_PATH} ({len(columns)}x{ROWS}), {solid} solid cells")
     print(f"columns you can fall through: {pits}")
+
+    semi = sorted({t for col in columns for t in col if t in SEMI_SOLID})
+    if semi:
+        print(f"note: semi-solid ids flattened to solid: {semi}")
     return 0
 
 

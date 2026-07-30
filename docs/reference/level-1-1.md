@@ -1044,3 +1044,52 @@ Finding the game's own collision test is the real fix, and it is now the
 open task. The lesson is the same one as the two wrong offsets: a rule that
 fits the little data that was gathered is not the same as a rule that is
 right, and shipping it inside a level nobody had played is what let it stand.
+
+## The cartridge answers: collision reads the tilemap
+
+The rule above is now replaced by a measured one. The open question was
+where the game keeps the data its collision code tests against, and the
+answer is that it tests the background tilemap in video RAM directly, the
+same bytes that are on screen. There is no separate collision map: a search
+of every byte from `0x8000` to `0xFFFF` for a copy of a visible column found
+only the tilemap itself.
+
+That is worth more than a located routine, because it makes the game
+answerable. Writing a tile id into the tilemap in front of Mario changes
+what he can walk through, so every one of the 256 ids can be put in front of
+him and the game's own collision code asked about it. `probe_solidity.py`
+does exactly that, twice per id:
+
+* a fourteen-row wall four tile columns ahead, ground left untouched. Mario
+  is camera locked at screen x 81, so a run ending short of that was stopped
+  by the wall.
+* the ground band ahead replaced by the id. Mario either walks across it or
+  drops through.
+
+Getting the probe to work took one correction. The first version measured
+Mario's horizontal speed byte, which stays at its intended value while he is
+pressed against a wall, so a blocked run and a free run both read as moving.
+His screen x separates them cleanly: walls at ring columns 7, 8 and 9 stop
+him at exactly 58, 66 and 74, eight pixels apart, against 81 for a free run.
+
+### The result
+
+| ids | behavior |
+|-----|----------|
+| `0x00`-`0x5F` | pass through, no support |
+| `0x60`-`0xFF` | solid, with the exceptions below |
+| `0x68`, `0x69`, `0x6A`, `0x7C` | hold Mario up, do not block him sideways |
+| `0xF4` | passes through, no support |
+
+So the rule is `id >= 0x60`, with `0xF4` carved out and four semi-solid ids.
+It agrees with all 7 tiles the earlier walk-through observation had settled,
+and it agrees with the playability sweep that found `0xF4` had to be
+passable. The old `0x60 <= id <= 0xE8` produces the same grid for this level
+(1-1 contains no id between `0xE8` and `0xF4`, and none of the four
+semi-solid ids), so the extracted level file does not change. The reasoning
+behind it did: `0xE8` was never a boundary, it was one exception guessed at
+from the wrong end.
+
+None of the semi-solid ids appear in World 1-1, so they are untested against
+a real structure and our level format flattens them to solid. They will
+matter in a later level.

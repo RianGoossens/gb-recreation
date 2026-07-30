@@ -1,5 +1,11 @@
 [
   {
+    "title": "The cartridge does not say what is solid",
+    "date": "2026-07-25",
+    "slug": "2026-07-25-the-cartridge-does-not-say-what-is-solid",
+    "summary": "The ROM gives World 1-1's 300 columns but nothing about which tiles stop Mario. Observing that took three attempts, because a 16-pixel-wide Mario laps into every wall he is blocked by and landing clips him into every platform he lands on. The pipe was settled by building both readings and walking them."
+  },
+  {
     "title": "World 1-1 in fifteen pointers",
     "date": "2026-07-25",
     "slug": "2026-07-25-world-1-1-in-fifteen-pointers",

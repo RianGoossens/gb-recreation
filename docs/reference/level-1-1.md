@@ -1093,3 +1093,21 @@ from the wrong end.
 None of the semi-solid ids appear in World 1-1, so they are untested against
 a real structure and our level format flattens them to solid. They will
 matter in a later level.
+
+## Where the extraction lives now
+
+The decoding is Rust, in `src/assets/level.rs`, run by `sml extract-level`.
+The Python that found the format (`decode_level.py`,
+`convert_level_1_1_to_level_format.py`) is deleted, along with
+`classify_solid_tiles.py`, which `probe_solidity.py` supersedes. The port was
+checked by diffing the two tools' output on World 1-1: byte-identical, 300
+columns, 922 solid cells, the same nine pits.
+
+The solidity rule is three named constants there (`SOLID_FROM`, `PASSABLE`,
+`SEMI_SOLID`) rather than a magic range, each cited to the probe.
+`tests/rom_level_decode.rs` pins the decode against the ROM: the fifteen
+screen pointers, the six that repeat drawing byte-identical columns, world
+column 87 against its worked-example record, and the nine pits.
+
+The PyBoy tools stay Python. They observe a running emulator, which is not
+something the product does.

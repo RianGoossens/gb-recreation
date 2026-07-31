@@ -6,6 +6,7 @@
 //! in the repo. Extraction always verifies the ROM first, so we never build
 //! assets from an unknown dump.
 
+pub mod level;
 pub mod title;
 
 use std::io;

@@ -1,11 +1,10 @@
 //! Checks on World 1-1 as extracted from the cartridge.
 //!
-//! The level file is generated on demand by
-//! `tools/convert_level_1_1_to_level_format.py` and is gitignored, so these
-//! tests skip when it is absent (no ROM, fresh checkout, CI). When it is
-//! there they are the regression test for the extraction: the geometry is
-//! decoded from the ROM and the solidity rules are partly inference, so a
-//! change to either has to keep the level finishable.
+//! The level file is generated on demand by `sml extract-level` and is
+//! gitignored, so these tests skip when it is absent (no ROM, fresh checkout,
+//! CI). `tests/rom_level_decode.rs` checks the decode itself; these check that
+//! the level it produces is playable, which is the part a wrong solidity rule
+//! breaks without breaking anything else.
 
 use sml::core::level::Level;
 use sml::game::Game;

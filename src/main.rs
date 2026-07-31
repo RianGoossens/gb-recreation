@@ -3,6 +3,7 @@
 //! Subcommands grow with the milestones. Available now:
 //!   verify-rom [path]                       check the ROM is SML (World) v1.0
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
+//!   extract-level [out]                     decode World 1-1 into a level file
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
 use std::process::ExitCode;
@@ -23,6 +24,7 @@ fn main() -> ExitCode {
         }
         Some("extract-tiles") => extract_tiles(&args[1..]),
         Some("extract-title") => extract_title_screen(&args[1..]),
+        Some("extract-level") => extract_level(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
         Some("run") => run_game(&args[1..]),
@@ -187,6 +189,52 @@ fn extract_title_screen(args: &[String]) -> ExitCode {
     println!("  {} unique tiles -> {}", sheet.tiles.len(), tiles_path.display());
     println!("  {}x{} tilemap   -> {}", cols, rows, map_path.display());
     println!("  tile preview    -> {}", pgm_path.display());
+    ExitCode::SUCCESS
+}
+
+/// `extract-level [out]` decodes a level's geometry straight out of the
+/// verified ROM and writes it in our plain-text level format, which
+/// `Level::from_file` loads. No emulator involved.
+///
+/// Output defaults to `assets/extracted/level_1_1.txt`, which is gitignored
+/// and regenerated on demand.
+fn extract_level(args: &[String]) -> ExitCode {
+    use sml::assets::level;
+
+    let out = args
+        .first()
+        .map(String::as_str)
+        .unwrap_or("assets/extracted/level_1_1.txt");
+    let path = std::path::Path::new(out);
+    if let Some(dir) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            eprintln!("could not create output directory {}: {e}", dir.display());
+            return ExitCode::FAILURE;
+        }
+    }
+
+    let columns = match level::extract_level(DEFAULT_ROM, level::LEVEL_1_1_LIST) {
+        Ok(columns) => columns,
+        Err(e) => {
+            eprintln!("level extraction failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Err(e) = std::fs::write(path, level::to_level_text(&columns)) {
+        eprintln!("could not write {out}: {e}");
+        return ExitCode::FAILURE;
+    }
+
+    let solid = columns
+        .iter()
+        .flatten()
+        .filter(|&&t| level::is_solid(t))
+        .count();
+    println!("extracted World 1-1 from ROM (no emulator):");
+    println!("  {}x{} -> {out}", columns.len(), level::ROWS);
+    println!("  {solid} solid cells");
+    println!("  columns you can fall through: {:?}", level::pits(&columns));
     ExitCode::SUCCESS
 }
 

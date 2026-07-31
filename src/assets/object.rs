@@ -139,6 +139,26 @@ pub fn spawning(records: &[ObjectRecord]) -> Vec<ObjectRecord> {
 /// World 1-1's list uses it ten times, World 1-2 four, World 1-3 not at all.
 pub const WALKER: u8 = 0x00;
 
+/// The two lift kinds. World 1-1 uses one of each, at columns 284 and 293,
+/// either side of its exit door. Dropping Mario onto both showed they carry
+/// him (`tools/probe_lift.py`), and their cycles were measured from the
+/// running game (`docs/reference/objects.md`).
+pub const LIFT_VERTICAL: u8 = 0x0A;
+pub const LIFT_HORIZONTAL: u8 = 0x0B;
+
+/// Where a level puts its lifts, as (column, row, vertical).
+pub fn lift_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize, bool)> {
+    spawning(records)
+        .iter()
+        .filter(|r| matches!(r.kind, LIFT_VERTICAL | LIFT_HORIZONTAL))
+        .filter_map(|r| {
+            usize::try_from(r.row())
+                .ok()
+                .map(|row| (r.column(), row, r.kind == LIFT_VERTICAL))
+        })
+        .collect()
+}
+
 /// Where a level puts its ground walkers, as (column, row).
 ///
 /// Deliberately only this kind. The other kinds spawn and move, but nothing

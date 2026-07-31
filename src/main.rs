@@ -244,8 +244,16 @@ fn extract_level(args: &[String]) -> ExitCode {
         }
     };
     let walkers = object::walker_spawns(&records);
+    let lifts = object::lift_spawns(&records);
+    let mut objects: Vec<(usize, usize, u8)> =
+        walkers.iter().map(|&(c, r)| (c, r, b'G')).collect();
+    objects.extend(
+        lifts
+            .iter()
+            .map(|&(c, r, up)| (c, r, if up { b'V' } else { b'H' })),
+    );
 
-    let text = level::to_level_text_with_enemies(&columns, &walkers);
+    let text = level::to_level_text_with_objects(&columns, &objects);
     if let Err(e) = std::fs::write(path, text) {
         eprintln!("could not write {out}: {e}");
         return ExitCode::FAILURE;
@@ -270,8 +278,9 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!(
-        "  {} ground walkers, from {} object records ({} of them spawn)",
+        "  {} ground walkers and {} lifts, from {} object records ({} spawn)",
         walkers.len(),
+        lifts.len(),
         records.len(),
         object::spawning(&records).len(),
     );

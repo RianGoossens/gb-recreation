@@ -89,6 +89,16 @@ playing it faithfully.
   note in CLAUDE.md).
 - **World 1 geometry**: canonical, and verified end to end. Every column of
   all three levels (300, 280, 300) matches the running cartridge exactly.
+- **Lifts**: canonical, measured. World 1-1's kinds `0x0A` and `0x0B` carry
+  Mario (`tools/probe_lift.py`) and run one pixel every two frames on a single
+  axis, reversing every 120 frames over 60 pixels and every 106 over 53
+  (`tools/measure_enemy_walk.py`). `src/core/lift.rs` implements that, and
+  `sml extract-level` writes them into the level file as `V` and `H`: 2 in
+  World 1-1, 7 in 1-2, none in 1-3. One inference is stated rather than
+  measured: 1-2's `0x0A` and `0x0B` records are assumed to be the same objects
+  as 1-1's, on the grounds that the kind byte selects the same code. The text
+  level format is a tile grid, so an object placed at `16x + 8` lands on the
+  column containing it and the half-tile offset is lost.
 - **World 1 enemies**: canonical in placement, **incomplete**. The object
   lists decode (`docs/reference/objects.md`) and `sml extract-level` writes out
   the kind whose movement has been measured, the ground walker: 10 in 1-1, 4 in

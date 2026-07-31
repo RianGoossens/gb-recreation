@@ -64,6 +64,33 @@ fn the_extracted_level_carries_the_cartridge_s_walkers() {
     }
 }
 
+#[test]
+fn the_extracted_level_carries_the_cartridge_s_lifts() {
+    let Some(level) = extracted() else { return };
+    use sml::core::lift::LiftAxis;
+    // World 1-1's last two records, kinds 0x0A and 0x0B, either side of the
+    // exit door. Both were confirmed to hold Mario up on the cartridge.
+    assert_eq!(level.lifts.len(), 2);
+    let mut placed = level.lifts.clone();
+    placed.sort_by_key(|&(x, _, _)| x);
+    // Their records are 8E 87 0A and 92 84 0B. Both carry a y high nibble of
+    // 8, so both sit half a step right of their x byte, at pixels 2280 and
+    // 2344. The text format is a tile grid, so each lands on the column that
+    // contains it and the sub-tile offset is lost.
+    assert_eq!(placed[0], (285 * 8, 5 * 8, LiftAxis::Vertical));
+    assert_eq!(placed[1], (293 * 8, 2 * 8, LiftAxis::Horizontal));
+}
+
+/// A lift Mario can ride has to survive the loader and the game's own set-up,
+/// not just the extractor.
+#[test]
+fn world_1_2_keeps_its_lifts_through_the_loader() {
+    let Some(levels) = sml::session::world_1_levels() else { return };
+    assert_eq!(levels[1].lifts.len(), 7);
+    let game = sml::game::Game::new(levels[1].clone());
+    assert_eq!(game.lifts.len(), 7);
+}
+
 /// Walks the level: hold right, jump when blocked, and jump when the ground
 /// ahead runs out. Mario has to reach the end trigger, which fails if the
 /// solidity rule seals a wall shut or opens a pit that is not there.

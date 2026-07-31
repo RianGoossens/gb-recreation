@@ -3,7 +3,7 @@
 //! Subcommands grow with the milestones. Available now:
 //!   verify-rom [path]                       check the ROM is SML (World) v1.0
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
-//!   extract-level [out]                     decode World 1-1 into a level file
+//!   extract-level [1-1|1-2] [out]           decode a level into a level file
 //!   scan-levels                             list every screen list in the ROM
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
@@ -194,19 +194,26 @@ fn extract_title_screen(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `extract-level [out]` decodes a level's geometry straight out of the
-/// verified ROM and writes it in our plain-text level format, which
+/// `extract-level [1-1|1-2] [out]` decodes a level's geometry straight out of
+/// the verified ROM and writes it in our plain-text level format, which
 /// `Level::from_file` loads. No emulator involved.
 ///
-/// Output defaults to `assets/extracted/level_1_1.txt`, which is gitignored
-/// and regenerated on demand.
+/// Output defaults to `assets/extracted/level_<name>.txt`, gitignored and
+/// regenerated on demand.
 fn extract_level(args: &[String]) -> ExitCode {
     use sml::assets::level;
 
-    let out = args
-        .first()
-        .map(String::as_str)
-        .unwrap_or("assets/extracted/level_1_1.txt");
+    let name = args.first().map(String::as_str).unwrap_or("1-1");
+    let list = match name {
+        "1-1" => level::LEVEL_1_1_LIST,
+        "1-2" => level::LEVEL_1_2_LIST,
+        other => {
+            eprintln!("unknown level {other}; known levels are 1-1 and 1-2");
+            return ExitCode::FAILURE;
+        }
+    };
+    let default_out = format!("assets/extracted/level_{}.txt", name.replace('-', "_"));
+    let out = args.get(1).map(String::as_str).unwrap_or(&default_out);
     let path = std::path::Path::new(out);
     if let Some(dir) = path.parent() {
         if let Err(e) = std::fs::create_dir_all(dir) {
@@ -215,7 +222,7 @@ fn extract_level(args: &[String]) -> ExitCode {
         }
     }
 
-    let columns = match level::extract_level(DEFAULT_ROM, level::LEVEL_1_1_LIST) {
+    let columns = match level::extract_level(DEFAULT_ROM, list) {
         Ok(columns) => columns,
         Err(e) => {
             eprintln!("level extraction failed: {e}");
@@ -233,14 +240,19 @@ fn extract_level(args: &[String]) -> ExitCode {
         .flatten()
         .filter(|&&t| level::is_solid(t))
         .count();
-    println!("extracted World 1-1 from ROM (no emulator):");
-    println!("  {}x{} -> {out}", columns.len(), level::ROWS);
+    let platforms = columns
+        .iter()
+        .flatten()
+        .filter(|&&t| level::is_platform(t))
+        .count();
     let coins = columns
         .iter()
         .flatten()
         .filter(|&&t| level::is_coin(t))
         .count();
-    println!("  {solid} solid cells, {coins} coins");
+    println!("extracted World {name} from ROM (no emulator):");
+    println!("  {}x{} -> {out}", columns.len(), level::ROWS);
+    println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!("  columns you can fall through: {:?}", level::pits(&columns));
     ExitCode::SUCCESS
 }

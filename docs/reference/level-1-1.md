@@ -1202,3 +1202,47 @@ unread. Probing tile 244 as a wall printed its four cells afterwards as
 
 So the level's coins need no object table. They are in the geometry, and
 `sml extract-level` writes them as `C`.
+
+
+## World 1-2's list, pinned by playing to it
+
+`0x0A1BD`, verified rather than inferred. The guess recorded above (each list
+starts six bytes in, after three pointers) turned out to be right, but it was
+checked before being shipped.
+
+Only the level's first screen is needed to settle it, and the game draws that
+into the tilemap before Mario moves, so there is no need to capture a whole
+level. `tools/capture_next_level_opening.py` walks 1-1 with the flatten-and-fly
+trick, stops poking the moment the level ends, taps Start and A through the
+bonus game, and matches every screen the game draws against every pointer in
+every list the ROM contains.
+
+The timeline is what makes it decisive:
+
+```
+frame 2299  World 1-1 ended
+frame 2690  still World 1-1, screen 0x65DE
+frame 5120  the next level opens on 0x69A6 (list 0x0A1B7)
+```
+
+Two false starts on the way to that. Matching the first screen that came up
+after the level ended gave `0x65DE`, which is World 1-1's own thirteenth
+screen: the tail of a level stays on display for a few hundred frames after it
+is over. Gating on "the map showed something no list points at" did not help
+either, because the flattened terrain matches nothing. What works is the
+length of that gap: 1-1's tail matches its own list within a few hundred
+frames, and the bonus game between levels matches nothing for 2270.
+
+Letting go of the right button at the level end, so Mario could not walk into
+1-2 and make a match ambiguous, froze the game instead: the ending sequence
+needs him to keep walking.
+
+`0x69A6` appears only in the second list, so the answer is not ambiguous. Its
+opening screen carries `104 105 105 105 105 106` on row 11 with tile 55
+hanging beneath, which is the platform run the solidity probe predicted.
+
+World 1-2 is 14 screens, 280 columns, 151 solid cells, 183 platform cells and
+26 coins, and it ends on `0x67BB`, the same exit screen as 1-1. Most of its
+columns are open sky.
+
+World 1-3's list is still a guess at `0x0A1E0`, on the same six-byte shape.

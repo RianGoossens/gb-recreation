@@ -187,3 +187,73 @@ fn world_1_1_has_its_eighteen_coins() {
     let text = level::to_level_text(&columns);
     assert_eq!(text.matches('C').count(), 18);
 }
+
+/// World 1-2's list start was pinned the same way 1-1's was, by playing to it
+/// rather than by reasoning about the layout: the level opens on screen
+/// `0x69A6`, which only the second list points at, and it is reached after the
+/// bonus game between the two levels.
+#[test]
+fn world_1_2_starts_on_the_screen_the_game_opens_it_with() {
+    let Some(data) = rom() else { return };
+    let pointers = level::screen_list(&data, level::LEVEL_1_2_LIST);
+    assert_eq!(pointers.first(), Some(&0x69A6));
+    assert_eq!(pointers.len(), 14, "14 screens, 280 columns");
+    assert_eq!(
+        pointers.last(),
+        Some(&0x67BB),
+        "1-2 ends on the same exit screen as 1-1"
+    );
+
+    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
+    assert_eq!(columns.len(), 14 * level::SCREEN_COLUMNS);
+}
+
+/// Both known list starts sit six bytes into their run, after three pointers
+/// that are not part of the level. Whatever those three are, the shape is
+/// consistent, and it is what makes 0x0A1E0 the candidate for World 1-3.
+#[test]
+fn the_known_list_starts_share_a_three_pointer_prefix() {
+    let Some(data) = rom() else { return };
+    for (run, start) in [(0x0A192, level::LEVEL_1_1_LIST), (0x0A1B7, level::LEVEL_1_2_LIST)] {
+        assert_eq!(start - run, 6, "run 0x{run:05X}");
+        let prefix = &level::screen_list(&data, run)[..3];
+        assert_eq!(prefix, [0x62BE, 0x6817, 0x68C7]);
+    }
+}
+
+/// World 1-2 is where the one-way platforms live: horizontal runs of a left
+/// cap, a repeated middle and a right cap. World 1-1 has none.
+#[test]
+fn world_1_2_is_built_on_platforms() {
+    let Some(data) = rom() else { return };
+    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
+    let platform_cells: usize = columns
+        .iter()
+        .map(|c| c.iter().filter(|&&t| level::is_platform(t)).count())
+        .sum();
+    assert!(platform_cells > 100, "got {platform_cells} platform cells");
+
+    // The opening screen's run, read off the running game at frame 5120.
+    let row = 11;
+    let run: Vec<u8> = (10..16).map(|c| columns[c][row]).collect();
+    assert_eq!(run, vec![104, 105, 105, 105, 105, 106]);
+}
+
+/// World 1-2 is a platform level over open sky, so most of its columns are
+/// pits. Mario's spawn column still has to have something under it.
+#[test]
+fn world_1_2_has_ground_under_its_spawn() {
+    let Some(data) = rom() else { return };
+    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
+    let spawn = 6;
+    assert!(
+        columns[spawn].iter().any(|&t| level::is_solid(t)),
+        "nothing to stand on at the spawn column"
+    );
+    let pits = level::pits(&columns);
+    assert!(
+        pits.len() > 50,
+        "1-2 is mostly open sky; got {} pit columns",
+        pits.len()
+    );
+}

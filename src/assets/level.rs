@@ -41,8 +41,19 @@ const REPEAT: u8 = 0xFD;
 const COLUMN_END: u8 = 0xFE;
 const LIST_END: u8 = 0xFF;
 
-/// World 1-1's screen list.
+/// World 1-1's screen list, pinned by capturing all 300 of its columns from
+/// the running cartridge.
 pub const LEVEL_1_1_LIST: usize = 0x0A198;
+
+/// World 1-2's screen list, pinned by playing through 1-1 and the bonus game
+/// that follows it and reading which screen the next level opens on
+/// (`tools/capture_next_level_opening.py`). It is `0x69A6`, which only this
+/// list points at.
+///
+/// Each list in the ROM opens with three pointers that are not part of the
+/// level: 1-1's verified start sits six bytes into its run, and 1-2's does
+/// too. What those three are for is not known yet.
+pub const LEVEL_1_2_LIST: usize = 0x0A1BD;
 
 /// Level data lives in ROM bank 2, which the CPU sees at `0x4000`, so a
 /// pointer of `0x62BE` is ROM file offset `0xA2BE`.

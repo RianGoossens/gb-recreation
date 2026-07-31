@@ -191,12 +191,50 @@ later change to the position mapping cannot move it unnoticed.
 One record, 1-3's `69 10 84`, has a row byte of 0, which puts it two rows above
 the playfield. It carries the skip bit and never spawns.
 
+## What the kinds do
+
+Measured with `tools/measure_enemy_walk.py`, which freezes the camera by
+letting go of right (Super Mario Land only scrolls while Mario moves) and then
+reads the slot's X and Y directly, so what is left is the object's own motion.
+Mario is held at the fly height throughout so a long measurement is not cut
+short by his death.
+
+All five kinds World 1-1 spawns:
+
+| kind | count | horizontal | vertical |
+|---|---|---|---|
+| `0x00` | 10 | 1 px left every 3 frames, 143 steps, no reversal | none |
+| `0x04` | 1 | 1 px every 3 frames, one reversal in 888 frames | none |
+| `0x0E` | 3 | 1 to 4 px steps in bursts, net about zero | same, with 54-frame pauses |
+| `0x0A` | 1 | none | 1 px every 2 frames, reversing every 120 frames |
+| `0x0B` | 1 | 1 px every 2 frames, reversing every 106 frames | none |
+
+`0x00` and `0x04` share a cadence, which is a reason to think they are the same
+sort of thing. `0x00` never turned in 143 steps and `0x04` turned once, so what
+makes it turn is not settled: one reversal cannot separate a wall from a timer.
+
+`0x0E`'s bursts with long pauses and its steps of up to 4 pixels per frame in
+both axes are the shape of something that jumps.
+
+`0x0A` and `0x0B` are the last two records in the level, at columns 284 and
+293, either side of the exit door. Both move at a flat 1 pixel every 2 frames
+and both reverse on a strict cycle, one straight up and down over 60 pixels,
+the other straight left and right over 53. Nothing about that is enemy
+behaviour, and a pair of lifts by the exit would explain both the motion and
+the position, but whether Mario can stand on them has not been tested.
+
+None of these has a name yet. Naming them means matching a 16-pixel sprite to
+an SML enemy, and a wrong guess would put an invented enemy in the game through
+the back door, so the ids stay as ids.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
 - What kinds `0x02` and `0x0C` are, and why 1-3 starts them inside solid tiles.
+- Whether `0x0A` and `0x0B` hold Mario up, which would make them lifts.
+- What makes `0x04` turn around.
 - The rest of a slot's 16 bytes.
 
 ## Tools

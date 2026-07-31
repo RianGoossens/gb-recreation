@@ -27,7 +27,7 @@ from sml_boot import boot_to_gameplay
 
 SCREEN_X = 0xC202
 WATCH = 1200
-APPROACH = 600
+APPROACH = 2600
 
 
 def main():
@@ -37,6 +37,9 @@ def main():
     found = None
     pb.button_press("right")
     for _ in range(APPROACH):
+        # Mario has to survive the walk to the kinds that appear late in the
+        # level, so he flies over everything on the way there.
+        pb.memory[MARIO_Y] = FLY_Y
         pb.tick()
         for s in range(SLOTS):
             state = slot(pb, s)
@@ -58,8 +61,7 @@ def main():
     state = slot(pb, found)
     print(f"kind 0x{want:02X} in slot {found}, camera stopped at mario x "
           f"{pb.memory[SCREEN_X]}")
-    last_x = state[3]
-    first = None
+    last = (state[3], state[2])
     steps = []
     for frame in range(WATCH):
         # Mario has to stay out of the way for a long measurement, and out of
@@ -70,24 +72,37 @@ def main():
         if state[0] != want:
             print(f"frame {frame}: slot emptied")
             break
-        if state[3] != last_x:
-            if first is None:
-                first = frame
-            steps.append((frame, state[3] - last_x))
-            last_x = state[3]
+        now = (state[3], state[2])
+        if now != last:
+            steps.append((frame, (now[0] - last[0], now[1] - last[1])))
+            last = now
     pb.stop()
 
-    if len(steps) < 2:
-        print("it did not move")
-        return 1
-    gaps = [b[0] - a[0] for a, b in zip(steps, steps[1:])]
-    spread = sorted(set(gaps))
-    moved = -sum(d for _, d in steps)
-    span = steps[-1][0] - first
-    print(f"{len(steps)} moves of {sorted({d for _, d in steps})} pixels")
-    print(f"frames between moves: {spread} "
-          f"({', '.join(f'{g}x{gaps.count(g)}' for g in spread)})")
-    print(f"{moved} px over {span} frames = {moved / span:.4f} px per frame")
+    if not steps:
+        print("it did not move at all")
+        return 0
+    for axis, index in (("x", 0), ("y", 1)):
+        moves = [(f, d[index]) for f, d in steps if d[index]]
+        if not moves:
+            print(f"{axis}: never moved")
+            continue
+        gaps = [b[0] - a[0] for a, b in zip(moves, moves[1:])]
+        spread = sorted(set(gaps))
+        travel = sum(d for _, d in moves)
+        reach = sum(abs(d) for _, d in moves)
+        span = moves[-1][0] - moves[0][0]
+        print(f"{axis}: {len(moves)} moves of {sorted({d for _, d in moves})} px, "
+              f"{reach} px travelled, {travel:+d} px net over {span} frames")
+        print(f"   frames between moves: "
+              f"{', '.join(f'{g}x{gaps.count(g)}' for g in spread[:6])}")
+        turns = [
+            b[0]
+            for a, b in zip(moves, moves[1:])
+            if (a[1] > 0) != (b[1] > 0)
+        ]
+        if turns:
+            apart = [b - a for a, b in zip(turns, turns[1:])]
+            print(f"   {len(turns)} reversals, {sorted(set(apart))[:6]} frames apart")
     return 0
 
 

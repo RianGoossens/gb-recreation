@@ -3269,7 +3269,7 @@ neither, solid ground   x 50 -> 81   walking</code></pre>
 <pre><code>level   list      screens   columns   verified against the game
 1-1     0x0A198        15       300   300 of 300
 1-2     0x0A1BD        14       280   280 of 280
-1-3     0x0A1E0        15       300    27 of 300</code></pre>
+1-3     0x0A1E0        15       300   300 of 300</code></pre>
 
     <p>The six-byte shape held for all three, and each was confirmed by watching which screen the
     game actually opened the level on. 1-2 opens on <code>0x69A6</code> and 1-3 on
@@ -3299,10 +3299,14 @@ neither, solid ground   x 50 -> 81   walking</code></pre>
 
     <h2>What is next</h2>
 
-    <p>1-3 is verified for 27 of its 300 columns, and it restarts from a checkpoint rather than the
-    level start, which the capture does not handle yet. The three levels are what the game loads by
-    default now, replacing the placeholder campaign, though only 1-1 can be finished by a script
-    holding right; the other two are real platforming.</p>
+    <p>1-3 needed the same fix one more time. It is dense, 1767 solid cells against 1-1's 922, and
+    the height that crossed 1-2 untouched leaves Mario blocked there before the terrain around him
+    clears. Sweeping again put it at 24, which works for all three, and one run now captures the
+    whole world: 1-1 at frame 2299, 1-2 at 5898, 1-3 at 9320.</p>
+
+    <p>The three levels are what the game loads by default now, replacing the placeholder campaign.
+    Only 1-1 can be finished by a script holding right and jumping when stuck; the other two are
+    real platforming, which is a problem for the test suite rather than for the extraction.</p>
   </main>
 </body>
 </html>

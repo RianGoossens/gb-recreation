@@ -1345,3 +1345,29 @@ the old rule worked.
 World 1-3 contains none of those tiles. It ends World 1 rather than leading to
 another level, and its final screen (`0x75C6`) is a room rather than a gate.
 Its trigger is still placed at the far end, and that is a stand-in.
+
+
+## World 1, complete
+
+All three levels now match the running cartridge on every column: 300, 280 and
+300 of them. The last piece was the same one as before, the flying height.
+
+World 1-3 is dense (1767 solid cells against 1-1's 922), and the height that
+crossed 1-2 without a scratch does not work there. Swept from a snapshot at
+1-3's opening, 3500 frames each:
+
+| pinned y | columns | lives lost |
+|----------|---------|------------|
+| 24 | 332 | 0 |
+| 32 | 0 | 0 |
+| 40 | 0 | 0 |
+| 48 | 0 | 0 |
+| 56 | 330 | 0 |
+| 72 | 332 | 0 |
+
+The zeroes are not deaths. At those heights Mario never moves at all, blocked
+by geometry before the terrain around him has been cleared. 24 works for all
+three levels, so that is what the tool uses.
+
+One run gets everything now: 1-1 at frame 2299, 1-2 at 5898, 1-3 at 9320, and
+the lives run out at 13226.

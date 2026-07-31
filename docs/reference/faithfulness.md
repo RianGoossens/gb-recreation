@@ -81,8 +81,8 @@ playing it faithfully.
   demo campaign remain as test fixtures and as the fallback on a checkout
   without the ROM. Shipping invented levels is not a goal (see the end-goal
   note in CLAUDE.md).
-- **World 1 geometry**: canonical. All 300 columns of 1-1 and all 280 of 1-2
-  match the running cartridge exactly; 1-3's first 27 do so far.
+- **World 1 geometry**: canonical, and verified end to end. Every column of
+  all three levels (300, 280, 300) matches the running cartridge exactly.
 - **Level-end trigger placement**: canonical for 1-1 and 1-2, **stand-in** for
   1-3. The exit is a 2x2 door, `0x13 0x21` over `0x24 0x39`, and it appears
   exactly twice per level in the same column: a raised one leading to the

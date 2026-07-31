@@ -193,7 +193,7 @@ fn the_decode_matches_every_column_the_real_game_draws() {
     };
     assert_eq!(best("1-1"), 300, "the whole of World 1-1 should be covered");
     assert_eq!(best("1-2"), 280, "the whole of World 1-2 should be covered");
-    assert!(best("1-3") >= 20, "World 1-3 is only partly covered so far");
+    assert_eq!(best("1-3"), 300, "the whole of World 1-3 should be covered");
 }
 
 /// World 1-3's list start, reached by playing through 1-1 and 1-2. It opens on

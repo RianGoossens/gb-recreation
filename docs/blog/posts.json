@@ -1,5 +1,11 @@
 [
   {
+    "title": "World 2 decoded perfectly and drew nonsense",
+    "date": "2026-08-01",
+    "slug": "2026-08-01-world-2-decoded-perfectly-and-drew-nonsense",
+    "summary": "The level decoder could only see one ROM bank, so only World 1 existed. Finding the other eleven levels turned up a pointer that hides its own bank, what the pointers before a level are for, and a Mario who could not fall to his death."
+  },
+  {
     "title": "Thirteen enemies deleted on frame one",
     "date": "2026-07-31",
     "slug": "2026-07-31-thirteen-enemies-deleted-on-frame-one",

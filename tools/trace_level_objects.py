@@ -45,6 +45,70 @@ NAMES = ["1-1", "1-2", "1-3"]
 FRAMES = 16000
 
 
+def reach_level(target, on_open=None):
+    """Play from a cold boot until World 1's `target` level is open.
+
+    Returns (pb, capture) with right still held and the level's first columns
+    already captured, or (None, None) if the run died on the way. Split out of
+    the tracer so other tools can start their measurement inside 1-2 or 1-3
+    instead of only in 1-1.
+    """
+    screens = known_screens()
+    pb = boot_to_gameplay()
+    capture = Capture(pb, 0)
+    playing = True
+    level = 0
+    quiet = 0
+    blank = 0
+
+    pb.button_press("right")
+    for frame in range(FRAMES):
+        if level == target:
+            return pb, capture
+        if playing:
+            pb.memory[MARIO_Y] = FLY_Y
+            if pb.memory[SCREEN_X] > SPAWN_X:
+                pb.memory[PHASE] = 0
+        pb.tick()
+        if pb.memory[LIVES] == 0:
+            print(f"  frame {frame}: out of lives before reaching the level")
+            pb.stop()
+            return None, None
+
+        if playing:
+            quiet = 0 if capture.step(pb, frame) else quiet + 1
+            if capture.columns and quiet > LEVEL_GAP_FRAMES:
+                playing = False
+                blank = 0
+            continue
+
+        # Between levels: tap A through the bonus game.
+        if frame % 40 == 0:
+            pb.button_press("a")
+        elif frame % 40 == 12:
+            pb.button_release("a")
+        if frame % SAMPLE_EVERY:
+            continue
+        if not screens.get(repr([read_column(pb, r) for r in range(VISIBLE_COLUMNS)])):
+            blank += SAMPLE_EVERY
+            continue
+        if blank < BONUS_FRAMES:
+            blank = 0
+            continue
+        pb.button_release("right")
+        for _ in range(RELEASE_FRAMES):
+            pb.tick()
+        pb.button_press("right")
+        level += 1
+        capture = Capture(pb, frame)
+        playing = True
+        quiet = 0
+        if on_open:
+            on_open(pb, level)
+    pb.stop()
+    return None, None
+
+
 def main():
     want = sys.argv[1] if len(sys.argv) > 1 else "1-3"
     target = NAMES.index(want)

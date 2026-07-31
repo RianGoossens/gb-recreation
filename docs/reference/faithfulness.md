@@ -38,6 +38,8 @@ playing it faithfully.
 | Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls). Its movement is now measured, on object kind `0x00`, the one World 1-1's list uses ten times: one pixel left every three frames without exception over 143 steps (`tools/measure_enemy_walk.py`), and it walks off a ledge rather than turning, falling straight down at a flat pixel per frame with its X frozen (`tools/probe_enemy_ledge.py`). The ledge-turn our engine used to do was carried over from another game and is gone. Still unverified: the mapping of kind `0x00` to this entity, and its sprite. |
 | Ledge-turning walker | canonical behaviour, unnamed | Object kind `0x04`. Same walk speed as kind `0x00`, and it turns at a ledge where the other steps off. Both were settled by writing a wall and then a pit into the tilemap in front of them (`tools/probe_walker_turn.py`). World 1-1 has one, 1-2 has four. Which SML enemy it is remains unnamed. |
 | Jumper | canonical behaviour, unnamed | Object kind `0x0E`. Traced with the camera held still (`tools/trace_jumper.py`): a 102-frame cycle, 54 frames standing perfectly still and then 16 position updates three frames apart, each 2 px sideways and a rise from a fixed table `[4, 4, 2, 2, 1, 1, 1, 0, 0, -1, -1, -1, -2, -2, -4, -4]`, giving a 32 px hop 15 px high. The table is not constant deceleration, so it is a table in the cartridge and a table in `src/core/enemy.rs`. It turns at a wall and hops off a ledge, both settled against a control run with no obstacle, which a hopper needs because it reverses and rises and falls on its own. World 1-1 has three, 1-2 has none, 1-3 has none. Which SML enemy it is remains unnamed. |
+| World 1-3's vertical mover | measured, **not implemented** | Object kind `0x02`. X frozen; Y runs 16 px down at a pixel a frame, waits 62 frames, runs 16 px back up, waits 106, on a 200-frame period (`tools/measure_level_kind.py`). Left out of the extracted level because what it does on contact is unmeasured: dropping Mario on one leaves him on the terrain the record sits inside, 8 px above it, so the drop answers nothing. |
+| World 1-3's faller | measured, **not implemented** | Object kind `0x0C`. X frozen; stands still, then falls at exactly one pixel a frame with no gaps until it leaves the level. Whether the wait is a timer or something Mario triggers is open, and so is contact, so it is left out too. |
 | Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Gated the same way as the star. Still worth replacing with a real SML enemy rather than only hiding it. |
 
 ## Open discrepancies
@@ -110,9 +112,10 @@ playing it faithfully.
 - **World 1 enemies**: canonical in placement, **incomplete**. The object
   lists decode (`docs/reference/objects.md`) and `sml extract-level` writes out
   the kinds whose movement has been measured: the two ground walkers and the
-  jumper, giving 14 enemies in 1-1, 8 in 1-2, none in 1-3. The remaining kinds
-  spawn in the cartridge and are left out of our levels, because nothing about
-  how they move has been measured yet. So a
+  jumper, giving 14 enemies in 1-1, 8 in 1-2, none in 1-3. World 1-3's own two
+  kinds now have their motion measured but not what they do on contact, so they
+  stay out; the level carrying no enemies is a known gap rather than an
+  oversight. So a
   level is short of enemies rather than carrying invented ones. Which kind byte
   is which named SML enemy is also open; `tools/capture_object_sprites.py`
   draws each one, which tells them apart without naming them.

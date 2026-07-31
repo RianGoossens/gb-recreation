@@ -15,7 +15,12 @@ Mario settles it. Put him directly above the object, let go, and see where he
 stops. Landing on it means his Y comes to rest at the object's height and then
 follows it; falling through means he carries on to the ground far below.
 
-Usage: uv run tools/probe_lift.py [kind]
+World 1-3 introduces two more kinds that move on one axis only, `0x02`
+(16 px down, pause, 16 px back up, on a 200-frame cycle) and `0x0C` (still,
+then straight down at a pixel a frame). The same question applies to both, so
+the probe takes a level as well as a kind.
+
+Usage: uv run tools/probe_lift.py [kind] [1-1|1-2|1-3]
 """
 
 import sys
@@ -23,8 +28,9 @@ import sys
 sys.path.insert(0, "tools")
 
 from dump_object_slots import EMPTY, SLOTS, slot
-from run_through_levels import FLY_Y, MARIO_Y
+from run_through_levels import FLY_Y, MARIO_Y, PHASE, SPAWN_X
 from sml_boot import boot_to_gameplay
+from trace_level_objects import NAMES, reach_level
 
 SCREEN_X = 0xC202
 APPROACH = 2600
@@ -34,12 +40,21 @@ WATCH = 200
 
 def main():
     want = int(sys.argv[1], 0) if len(sys.argv) > 1 else 0x0A
-    pb = boot_to_gameplay()
+    level = sys.argv[2] if len(sys.argv) > 2 else "1-1"
+    if level == "1-1":
+        pb = boot_to_gameplay()
+        pb.button_press("right")
+    else:
+        pb, _capture = reach_level(NAMES.index(level))
+        if pb is None:
+            print(f"never reached World {level}")
+            return 1
 
     found = None
-    pb.button_press("right")
     for _ in range(APPROACH):
         pb.memory[MARIO_Y] = FLY_Y
+        if pb.memory[SCREEN_X] > SPAWN_X:
+            pb.memory[PHASE] = 0
         pb.tick()
         for s in range(SLOTS):
             state = slot(pb, s)

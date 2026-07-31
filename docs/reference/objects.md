@@ -209,6 +209,36 @@ They sit back to back. 1-3 begins one byte past 1-2's terminator. 1-2 begins
 two bytes past 1-1's, because there are two `0xFF` bytes at the end of 1-1's
 list where every other list has one.
 
+## What World 1-3's own kinds do
+
+1-3 is the one level of World 1 whose extracted file carries no enemies at
+all, because both kinds it introduces were unmeasured. `measure_level_kind.py`
+fixes the reach: `trace_level_objects.reach_level` plays through 1-1 and 1-2
+first, and from there the camera-freeze instrument works the same as it does in
+1-1.
+
+**Kind `0x02` oscillates vertically.** Its X never changes by a pixel in 600
+frames. Its Y runs 16 pixels down at one pixel per frame, waits 62 frames, runs
+16 pixels back up, waits 106, and repeats on a 200-frame period:
+
+```
+x: never moved
+y: 96 moves of [-1, 1] px, 96 px travelled, +0 px net
+   frames between moves: 1x90, 63x3, 107x2
+   5 reversals, [78, 122] frames apart
+```
+
+**Kind `0x0C` falls.** X frozen again, then 127 moves of exactly +1, one per
+frame, with no gap anywhere, until it left the level and its slot emptied. In
+the one trace taken it stood still for 125 frames first.
+
+What neither measurement settles is whether these carry Mario or hurt him.
+Dropping him onto a `0x02` (`probe_lift.py 0x02 1-3`) leaves him resting 8
+pixels above its top edge, which is the terrain those records sit inside rather
+than the object, so the drop answers nothing. Both stay out of the extracted
+levels until that is pinned. Whether `0x0C`'s 125-frame wait is a fixed timer
+or something Mario triggers is also open.
+
 ### What World 1-3 added
 
 1-3 is where the `y` byte's two fields came from, and it is worth saying how,
@@ -370,7 +400,9 @@ the back door, so the ids stay as ids.
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
   All five now have their movement measured; only the names are missing.
-- What kinds `0x02` and `0x0C` are, and why 1-3 starts them inside solid tiles.
+- Whether `0x02` and `0x0C` carry Mario or hurt him. Their motion is measured
+  (see above); what they do on contact is not, so they stay out of the levels.
+- Why 1-3 starts them inside solid tiles.
 - The rest of a slot's 16 bytes.
 
 ## Tools
@@ -390,5 +422,6 @@ the back door, so the ids stay as ids.
 | `tools/find_object_lists.py` | where each World 1 level's list starts |
 | `tools/trace_level_objects.py` | the same trace in any World 1 level |
 | `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
+| `tools/measure_level_kind.py` | how a kind moves, in 1-2 and 1-3 as well as 1-1 |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |
 | `tools/verify_skip_flag.py` | that byte across a whole level |

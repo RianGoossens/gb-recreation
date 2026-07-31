@@ -206,8 +206,8 @@ All five kinds World 1-1 spawns:
 | `0x00` | 10 | 1 px left every 3 frames, 143 steps, no reversal | none |
 | `0x04` | 1 | 1 px every 3 frames, one reversal in 888 frames | none |
 | `0x0E` | 3 | 1 to 4 px steps in bursts, net about zero | same, with 54-frame pauses |
-| `0x0A` | 1 | none | 1 px every 2 frames, reversing every 120 frames |
-| `0x0B` | 1 | 1 px every 2 frames, reversing every 106 frames | none |
+| `0x0A` | 1 | none | 1 px every 2 frames, reversing every 120 frames (a lift) |
+| `0x0B` | 1 | 1 px every 2 frames, reversing every 106 frames (a lift) | none |
 
 `0x00` and `0x04` share a cadence, which is a reason to think they are the same
 sort of thing. `0x00` never turned in 143 steps and `0x04` turned once, so what
@@ -216,12 +216,32 @@ makes it turn is not settled: one reversal cannot separate a wall from a timer.
 `0x0E`'s bursts with long pauses and its steps of up to 4 pixels per frame in
 both axes are the shape of something that jumps.
 
+### The two by the exit are lifts
+
 `0x0A` and `0x0B` are the last two records in the level, at columns 284 and
 293, either side of the exit door. Both move at a flat 1 pixel every 2 frames
 and both reverse on a strict cycle, one straight up and down over 60 pixels,
-the other straight left and right over 53. Nothing about that is enemy
-behaviour, and a pair of lifts by the exit would explain both the motion and
-the position, but whether Mario can stand on them has not been tested.
+the other straight left and right over 53.
+
+That is the motion of a lift, and World 1-1's raised exit needs some way of
+being reached, but Mario is the one who can answer it. `tools/probe_lift.py`
+puts him directly above one and drops him:
+
+```
+frame  mario y   object x   object y
+   15      102        136        112
+   35      112        136        122
+   55      122        136        132
+   60      120        136        130
+   65      117        136        127
+```
+
+He lands on it and rides it, 10 pixels above it, back down and up again. The
+horizontal one holds him just as steadily: his Y sits at 38 against the
+object's 48 and stays there for 195 frames.
+
+So neither is an enemy. Both carry Mario, which is what makes the level's upper
+exit reachable.
 
 None of these has a name yet. Naming them means matching a 16-pixel sprite to
 an SML enemy, and a wrong guess would put an invented enemy in the game through
@@ -233,7 +253,6 @@ the back door, so the ids stay as ids.
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
 - What kinds `0x02` and `0x0C` are, and why 1-3 starts them inside solid tiles.
-- Whether `0x0A` and `0x0B` hold Mario up, which would make them lifts.
 - What makes `0x04` turn around.
 - The rest of a slot's 16 bytes.
 
@@ -247,5 +266,7 @@ the back door, so the ids stay as ids.
 | `tools/watch_object_slot.py` | one slot through a plain walk, terrain intact |
 | `tools/measure_spawn_column.py` | column count against camera scroll |
 | `tools/probe_object_type_flag.py` | what the kind byte's top bit does |
+| `tools/measure_enemy_walk.py` | how a kind moves, with the camera frozen |
+| `tools/probe_lift.py` | whether an object holds Mario up |
 | `tools/find_object_lists.py` | where each World 1 level's list starts |
 | `tools/trace_level_objects.py` | the same trace in any World 1 level |

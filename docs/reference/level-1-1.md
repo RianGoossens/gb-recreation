@@ -1371,3 +1371,39 @@ three levels, so that is what the tool uses.
 
 One run gets everything now: 1-1 at frame 2299, 1-2 at 5898, 1-3 at 9320, and
 the lives run out at 13226.
+
+
+## Drawing a level with the cartridge's own tiles
+
+`sml render-level 1-1 0 out.png` draws a level screen from the ROM, no
+emulator involved. Scored against the emulator's own first frame:
+
+```
+playfield match: 20399/20480 pixels (99.60%)
+rows that differ: 116..127
+```
+
+Those rows are Mario. Our renderer draws the background and no sprites, and
+his box at the level's first frame is x 35 to 50, y 112 to 127. Every other
+pixel of the playfield is identical.
+
+### The tile data is not where the title screen's is
+
+An earlier note here said World 1-1 needs no new ROM offsets, because every
+unique tile on its opening screen was found inside the three blocks already
+pinned for the title screen. That is true about the ROM and useless for
+rendering: gameplay copies that data to different VRAM addresses, so a level's
+tile ids index different tiles. Reusing the title screen's layout draws a
+screen full of font glyphs, which is what the first attempt produced.
+
+Reading video RAM after a level loads and locating each 64-byte chunk of it in
+the ROM (`tools/find_gameplay_tile_blocks.py`) gives one contiguous copy:
+
+```
+rom 0x08032 -> vram 0x8000, size 0x1800
+```
+
+The whole tile area, in one block, at a constant offset of 0x32. The title
+screen's three blocks sit at the same offset from their own destinations,
+which is why they looked like separate blocks: they are three slices of this
+one atlas, copied to three different places.

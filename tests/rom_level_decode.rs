@@ -268,3 +268,47 @@ fn world_1_3_has_no_exit_door() {
     let columns = level::decode_level(&data, level::LEVEL_1_3_LIST);
     assert_eq!(level::exit_door(&columns), None);
 }
+
+/// A level screen renders from the cartridge's own tile graphics. Scored
+/// against the emulator's frame by `tools/compare_level_render.py` at 99.60%,
+/// where the only differing pixels are Mario's sprite, which the background
+/// renderer does not draw.
+#[test]
+fn a_level_screen_extracts_with_the_cartridges_tiles() {
+    if rom().is_none() {
+        return;
+    }
+    let (sheet, cells) =
+        level::extract_screen(ROM, level::LEVEL_1_1_LIST, 0).expect("screen extracts");
+    assert_eq!(cells.len(), level::SCREEN_COLUMNS * level::SCREEN_ROWS);
+
+    // The status bar rows are blank and the playfield is not.
+    let status = level::SCREEN_COLUMNS * level::STATUS_ROWS;
+    assert!(cells[..status].iter().all(|&c| c == 0));
+    assert!(cells[status..].iter().any(|&c| c != 0));
+
+    // Enough distinct tiles to be a real screen, few enough to be one screen.
+    assert!(
+        (10..60).contains(&sheet.tiles.len()),
+        "got {} unique tiles",
+        sheet.tiles.len()
+    );
+    for &cell in &cells {
+        assert!((cell as usize) < sheet.tiles.len());
+    }
+}
+
+/// Gameplay copies one contiguous run of tile data, ROM 0x08032 to VRAM
+/// 0x8000. The title screen draws from the same bank-2 atlas but copies three
+/// slices of it elsewhere, and using its layout for a level draws font glyphs.
+#[test]
+fn the_gameplay_tile_block_is_one_contiguous_copy() {
+    let Some(data) = rom() else { return };
+    let tiles = level::gameplay_tiles(&data).expect("tile data is in range");
+    assert_eq!(tiles.len(), level::TILES_SIZE);
+    assert_eq!(level::TILES_ROM_OFFSET, 0x08032);
+    assert!(
+        tiles.iter().filter(|&&b| b != 0).count() > level::TILES_SIZE / 4,
+        "the block should be mostly real tile data"
+    );
+}

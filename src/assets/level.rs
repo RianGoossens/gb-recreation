@@ -28,7 +28,9 @@
 use std::path::Path;
 
 use crate::rom;
-use super::AssetError;
+use crate::tiles::Tile;
+use super::title::{tile_vram_addr, VRAM_TILE_BASE};
+use super::{AssetError, TileSheet, DEFAULT_BGP};
 
 /// Playfield rows, below the two status bar rows.
 pub const ROWS: usize = 16;
@@ -36,6 +38,10 @@ pub const ROWS: usize = 16;
 pub const SCREEN_COLUMNS: usize = 20;
 /// The tile any run leaves uncovered.
 pub const FILLER: u8 = 44;
+/// The two rows the status bar occupies, above the playfield.
+pub const STATUS_ROWS: usize = 2;
+/// A full screen: the status bar rows plus the playfield.
+pub const SCREEN_ROWS: usize = STATUS_ROWS + ROWS;
 
 const REPEAT: u8 = 0xFD;
 const COLUMN_END: u8 = 0xFE;
@@ -323,6 +329,65 @@ pub fn find_screen_lists(rom: &[u8]) -> Vec<(usize, Vec<u16>)> {
         }
     }
     kept
+}
+
+/// Where gameplay's tile graphics live in the ROM, and how much.
+///
+/// One contiguous copy: ROM `0x08032` to VRAM `0x8000`, the whole 0x1800 of
+/// tile data. Found by reading video RAM after a level has loaded and locating
+/// each chunk of it in the ROM file (`tools/find_gameplay_tile_blocks.py`),
+/// which is the same technique that pinned the title screen's blocks.
+///
+/// The title screen draws from the same bank-2 atlas but copies three slices
+/// of it to different VRAM addresses. Reusing its layout for a level renders
+/// font glyphs, because a level's tile ids then index the wrong tiles.
+pub const TILES_ROM_OFFSET: usize = 0x08032;
+pub const TILES_SIZE: usize = 0x1800;
+
+/// Gameplay's VRAM tile data, straight from the ROM.
+pub fn gameplay_tiles(rom: &[u8]) -> Result<&[u8], AssetError> {
+    let end = TILES_ROM_OFFSET + TILES_SIZE;
+    if end > rom.len() {
+        return Err(AssetError::OutOfRange { end, len: rom.len() });
+    }
+    Ok(&rom[TILES_ROM_OFFSET..end])
+}
+
+/// A level's own graphics, as the cartridge draws them.
+///
+/// Returns a deduplicated sheet plus a `SCREEN_COLUMNS` by [`SCREEN_ROWS`] map
+/// of indices into it, starting at world column `first_column`. The top two
+/// rows are blank: that is where the status bar goes, which the game draws
+/// with a mid-frame scanline split rather than from the level.
+pub fn extract_screen(
+    rom_path: impl AsRef<Path>,
+    list: usize,
+    first_column: usize,
+) -> Result<(TileSheet, Vec<u8>), AssetError> {
+    rom::verify_file(&rom_path).map_err(AssetError::Rom)?;
+    let rom = std::fs::read(&rom_path).map_err(AssetError::Io)?;
+    let columns = decode_level(&rom, list);
+    if columns.is_empty() {
+        return Err(AssetError::BadFormat);
+    }
+    let vram = gameplay_tiles(&rom)?;
+
+    let mut tiles: Vec<Tile> = vec![Tile { pixels: [[0; 8]; 8] }];
+    let mut seen: std::collections::HashMap<[u8; 16], u8> = std::collections::HashMap::new();
+    let mut cells = vec![0u8; SCREEN_COLUMNS * STATUS_ROWS];
+    for row in 0..ROWS {
+        for i in 0..SCREEN_COLUMNS {
+            let column = &columns[(first_column + i) % columns.len()];
+            let offset = tile_vram_addr(column[row]) - VRAM_TILE_BASE;
+            let raw: [u8; 16] = vram[offset..offset + 16].try_into().unwrap();
+            let index = *seen.entry(raw).or_insert_with(|| {
+                tiles.push(Tile::decode(&raw));
+                (tiles.len() - 1) as u8
+            });
+            cells.push(index);
+        }
+    }
+    Ok((TileSheet::new(tiles, DEFAULT_BGP), cells))
 }
 
 #[cfg(test)]

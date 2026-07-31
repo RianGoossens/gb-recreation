@@ -5,6 +5,7 @@
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
 //!   extract-level [1-1|1-2|1-3] [out]       decode a level into a level file
 //!   scan-levels                             list every screen list in the ROM
+//!   render-level <level> <col> <out.png>    draw a level screen with its real tiles
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
 use std::process::ExitCode;
@@ -27,6 +28,7 @@ fn main() -> ExitCode {
         Some("extract-title") => extract_title_screen(&args[1..]),
         Some("extract-level") => extract_level(&args[1..]),
         Some("scan-levels") => scan_levels(),
+        Some("render-level") => render_level(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
         Some("run") => run_game(&args[1..]),
@@ -251,6 +253,45 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!("  columns you can fall through: {:?}", level::pits(&columns));
+    ExitCode::SUCCESS
+}
+
+/// `render-level [1-1|1-2|1-3] <column> <out.png>` draws one screen of a level
+/// with the cartridge's own tile graphics, straight from the ROM.
+fn render_level(args: &[String]) -> ExitCode {
+    use sml::assets::level;
+    use sml::render::{Framebuffer, Palette, TileMap};
+
+    let [name, column, out] = args else {
+        eprintln!("usage: sml render-level <1-1|1-2|1-3> <column> <out.png>");
+        return ExitCode::FAILURE;
+    };
+    let Some(&(_, list)) = level::WORLD_1.iter().find(|(n, _)| n == name) else {
+        eprintln!("unknown level {name}");
+        return ExitCode::FAILURE;
+    };
+    let Ok(column) = column.parse::<usize>() else {
+        eprintln!("column must be a number");
+        return ExitCode::FAILURE;
+    };
+
+    let (sheet, cells) = match level::extract_screen(DEFAULT_ROM, list, column) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("screen extraction failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let map = TileMap::new(level::SCREEN_COLUMNS, level::SCREEN_ROWS, cells);
+    let mut fb = Framebuffer::new();
+    sml::render::render_background(&mut fb, &map, &sheet.tiles, 0, 0, &Palette::new(sheet.palette));
+    let png = sml::png::encode_gray(160, 144, &fb.to_gray());
+    if let Err(e) = std::fs::write(out, png) {
+        eprintln!("could not write {out}: {e}");
+        return ExitCode::FAILURE;
+    }
+    println!("drew World {name} from column {column} ({} unique tiles) -> {out}", sheet.tiles.len());
     ExitCode::SUCCESS
 }
 

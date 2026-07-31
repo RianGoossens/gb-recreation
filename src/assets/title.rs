@@ -45,12 +45,12 @@ const TILE_BLOCKS: &[TileBlock] = &[
 ];
 
 /// VRAM tile data spans 0x8000..0x97FF (6144 bytes, 384 tiles of 16 bytes each).
-const VRAM_TILE_BASE: usize = 0x8000;
+pub(super) const VRAM_TILE_BASE: usize = 0x8000;
 const VRAM_TILE_SIZE: usize = 0x1800; // 6144 bytes
 
 /// Build a VRAM tile data buffer (0x8000..0x97FF) from the ROM, populating only
 /// the regions the title screen touches.
-fn build_vram_tiles(rom: &[u8]) -> Result<[u8; VRAM_TILE_SIZE], AssetError> {
+pub(super) fn build_vram_tiles(rom: &[u8]) -> Result<[u8; VRAM_TILE_SIZE], AssetError> {
     let mut vram = [0u8; VRAM_TILE_SIZE];
     for block in TILE_BLOCKS {
         let end = block.rom_offset + block.size;
@@ -76,7 +76,7 @@ fn build_vram_tiles(rom: &[u8]) -> Result<[u8; VRAM_TILE_SIZE], AssetError> {
 /// Resolve a tile map index to 2bpp tile data using the Game Boy's signed
 /// addressing mode (LCDC bit 4 = 0). Index 0..127 -> 0x9000 + idx*16,
 /// index 128..255 -> 0x8800 + (idx-128)*16.
-fn tile_vram_addr(index: u8) -> usize {
+pub(super) fn tile_vram_addr(index: u8) -> usize {
     if index < 128 {
         0x9000 + (index as usize) * 16
     } else {

@@ -135,6 +135,12 @@ playing it faithfully.
   level's 43 ids were decided by a fit to the other 7. See
   `docs/reference/level-1-1.md`.
 
+## Rendering
+
+| Piece | Label | Notes |
+|-------|-------|-------|
+| World 1 level graphics | canonical | drawn from the ROM's own tile data (one block, `0x08032` to VRAM `0x8000`), scored at 99.60% of playfield pixels against the emulator's first frame; the only difference is Mario's sprite, which the background renderer does not draw (`tools/compare_level_render.py`) |
+
 ## Sound
 
 | Piece | Label | Notes |

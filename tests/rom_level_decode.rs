@@ -130,22 +130,45 @@ fn the_text_level_has_a_row_per_playfield_row() {
 }
 
 /// There is no pointer table anywhere in the ROM holding World 1-1's list
-/// address, so the lists have to be found by their own structure. World 1 has
-/// three levels and the scan finds exactly three lists, one of them containing
-/// 1-1's verified start.
+/// address, so the lists have to be found by their own structure. Super Mario
+/// Land has twelve levels and the scan finds exactly twelve lists, spread over
+/// the three switchable banks, one of them containing 1-1's verified start.
 #[test]
-fn the_scan_finds_world_ones_three_screen_lists() {
+fn the_scan_finds_all_twelve_screen_lists() {
     let Some(data) = rom() else { return };
     let lists = level::find_screen_lists(&data);
     let starts: Vec<usize> = lists.iter().map(|(start, _)| *start).collect();
-    assert_eq!(starts, vec![0x0A190, 0x0A1B7, 0x0A1DA]);
-
-    let (start, pointers) = &lists[0];
-    assert!(
-        *start <= level::LEVEL_1_1_LIST
-            && level::LEVEL_1_1_LIST < start + 2 * pointers.len(),
-        "the first list has to contain World 1-1's verified start"
+    assert_eq!(
+        starts,
+        vec![
+            0x055BB, 0x055E2, 0x05605, 0x05630, 0x05665, 0x056AE, 0x0A190,
+            0x0A1B7, 0x0A1DA, 0x0D03F, 0x0D074, 0x0D0A7,
+        ]
     );
+
+    let world_1 = &lists[6];
+    assert!(
+        world_1.0 <= level::LEVEL_1_1_LIST
+            && level::LEVEL_1_1_LIST < world_1.0 + 2 * world_1.1.len(),
+        "the seventh list has to contain World 1-1's verified start"
+    );
+}
+
+/// A screen pointer is resolved against the bank its list was found in, so a
+/// list in bank 1 or bank 3 decodes against its own columns. Every list the
+/// scan returns produces exactly 20 columns per pointer; a bank mix-up would
+/// leave short levels where a column record failed to decode.
+#[test]
+fn every_found_list_decodes_fully_in_its_own_bank() {
+    let Some(data) = rom() else { return };
+    for (start, pointers) in level::find_screen_lists(&data) {
+        let columns = level::decode_level(&data, start);
+        assert_eq!(
+            columns.len(),
+            pointers.len() * level::SCREEN_COLUMNS,
+            "list at {start:#07X} decoded short"
+        );
+    }
 }
 
 /// The strongest check there is on the decode: drive the real cartridge

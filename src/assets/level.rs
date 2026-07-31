@@ -73,23 +73,30 @@ pub const WORLD_1: [(&str, usize); 3] = [
     ("1-3", LEVEL_1_3_LIST),
 ];
 
-/// Level data lives in ROM bank 2, which the CPU sees at `0x4000`, so a
-/// pointer of `0x62BE` is ROM file offset `0xA2BE`.
-const BANK_BASE: usize = 0x8000;
+/// A switchable ROM bank is 16 KB, and the CPU sees it at `0x4000`. World 1's
+/// data is in bank 2, so a pointer of `0x62BE` is ROM file offset `0xA2BE`.
+/// Later worlds live in other banks, which is why the bank is derived from
+/// wherever a screen list was found rather than fixed.
 const BANK_WINDOW: usize = 0x4000;
+
+/// The base file offset of the bank containing `offset`.
+fn bank_base(offset: usize) -> usize {
+    offset & !(BANK_WINDOW - 1)
+}
 
 /// A decoded column: one tile id per playfield row, top to bottom.
 pub type Column = [u8; ROWS];
 
-/// Resolve a screen pointer to a ROM file offset. `None` if it does not point
-/// into the bank window at all, which is how a scan tells a real screen list
-/// from a run of bytes that merely ends in `0xFF`.
-fn rom_offset(pointer: u16) -> Option<usize> {
+/// Resolve a screen pointer to a ROM file offset, given the bank it is read
+/// from. `None` if it does not point into the bank window at all, which is how
+/// a scan tells a real screen list from a run of bytes that merely ends in
+/// `0xFF`.
+fn rom_offset(pointer: u16, bank: usize) -> Option<usize> {
     let pointer = pointer as usize;
     if !(BANK_WINDOW..BANK_WINDOW * 2).contains(&pointer) {
         return None;
     }
-    Some(pointer - BANK_WINDOW + BANK_BASE)
+    Some(pointer - BANK_WINDOW + bank)
 }
 
 /// Solidity is not stored per column, so it comes from the tile id.
@@ -166,9 +173,9 @@ fn decode_column(rom: &[u8], mut i: usize) -> Option<(Column, usize)> {
 }
 
 /// The 20 columns a single screen pointer draws.
-fn decode_screen(rom: &[u8], pointer: u16) -> Option<Vec<Column>> {
+fn decode_screen(rom: &[u8], pointer: u16, bank: usize) -> Option<Vec<Column>> {
     let mut columns = Vec::with_capacity(SCREEN_COLUMNS);
-    let mut i = rom_offset(pointer)?;
+    let mut i = rom_offset(pointer, bank)?;
     for _ in 0..SCREEN_COLUMNS {
         let (column, next) = decode_column(rom, i)?;
         columns.push(column);
@@ -193,8 +200,9 @@ pub fn screen_list(rom: &[u8], start: usize) -> Vec<u16> {
 /// rather than garbage.
 pub fn decode_level(rom: &[u8], start: usize) -> Vec<Column> {
     let mut columns = Vec::new();
+    let bank = bank_base(start);
     for pointer in screen_list(rom, start) {
-        match decode_screen(rom, pointer) {
+        match decode_screen(rom, pointer, bank) {
             Some(screen) => columns.extend(screen),
             None => break,
         }
@@ -343,7 +351,9 @@ pub fn find_screen_lists(rom: &[u8]) -> Vec<(usize, Vec<u16>)> {
     const MIN_SOLID: f32 = 0.7;
 
     let mut found: Vec<(usize, Vec<u16>)> = Vec::new();
-    for start in BANK_BASE..rom.len() {
+    // Bank 0 is always mapped at 0x0000, so no pointer into the 0x4000 window
+    // ever resolves to it. The scan starts at the first switchable bank.
+    for start in BANK_WINDOW..rom.len() {
         let pointers = screen_list(rom, start);
         if pointers.len() < MIN_SCREENS {
             continue;

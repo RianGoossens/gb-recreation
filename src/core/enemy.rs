@@ -59,6 +59,15 @@ pub const HOP_FRAMES: u32 = HOP_RISE.len() as u32 * HOP_STEP_FRAMES;
 /// The peak of the arc, which is what the table sums to at its highest point.
 pub const HOP_HEIGHT: i32 = 15;
 
+/// Frames World 1-3's faller (object kind `0x0C`) waits before it drops.
+///
+/// Measured from the frame the game creates the object, not the frame it
+/// scrolls into view, since it is created off the right of the screen
+/// (`tools/probe_faller_trigger.py`). The same 175 comes back with Mario
+/// directly under it, a screen away, and at the left edge, so it is a timer
+/// rather than something he sets off.
+pub const FALL_DELAY: u32 = 175;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
@@ -72,6 +81,11 @@ pub enum EnemyKind {
     LedgeTurner,
     /// Walks but hops on a timer, so it does not respect ledges.
     Fly,
+    /// World 1-3's faller: holds its position for 175 frames and then drops
+    /// straight down at a pixel a frame. It never moves sideways. Its contact
+    /// sweep matches a walker's exactly, so it hurts Mario from every side but
+    /// a stomp (`tools/probe_object_contact.py`).
+    Faller,
     /// The cartridge's jumper: still for 54 frames, then a 32 px hop 15 px
     /// high over 48. It turns at a wall and hops straight off a ledge, both
     /// settled against a control run with no obstacle
@@ -126,6 +140,13 @@ impl Enemy {
     /// A Fly at a whole-pixel position: it walks and hops.
     pub fn fly(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
         Self::new(pixel_x, pixel_y, going_left, EnemyKind::Fly)
+    }
+
+    /// World 1-3's faller, at the start of its wait.
+    pub fn faller(pixel_x: i32, pixel_y: i32) -> Self {
+        let mut faller = Self::new(pixel_x, pixel_y, true, EnemyKind::Faller);
+        faller.vx = 0;
+        faller
     }
 
     /// The cartridge's jumper, resting at the start of its cycle.
@@ -209,6 +230,12 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     }
     if enemy.kind == EnemyKind::Hopper {
         update_hopper(enemy, solids);
+        return;
+    }
+    // The faller holds still, then drops. Once the wait is over the shared
+    // path below does the rest, since its horizontal speed is zero.
+    if enemy.kind == EnemyKind::Faller && enemy.phase < FALL_DELAY {
+        enemy.phase += 1;
         return;
     }
 
@@ -548,6 +575,33 @@ mod tests {
         }
         assert!(h.pixel_x() >= 80, "it should have hopped past the ledge");
         assert!(h.pixel_y() > start_y, "and be on its way down");
+    }
+
+    #[test]
+    fn a_faller_holds_still_and_then_drops() {
+        let solids = floor();
+        let mut f = Enemy::faller(40, 0);
+        let start = (f.pixel_x(), f.pixel_y());
+        for _ in 0..FALL_DELAY {
+            update_enemy(&mut f, &solids);
+            assert_eq!((f.pixel_x(), f.pixel_y()), start, "it waits where it is");
+        }
+        for step in 1..=8 {
+            update_enemy(&mut f, &solids);
+            assert_eq!(f.pixel_x(), start.0, "and never moves sideways");
+            assert_eq!(f.pixel_y(), start.1 + step, "one pixel down per frame");
+        }
+    }
+
+    #[test]
+    fn a_faller_comes_to_rest_on_a_floor() {
+        let solids = floor();
+        let mut f = Enemy::faller(40, 0);
+        for _ in 0..(FALL_DELAY as usize + 200) {
+            update_enemy(&mut f, &solids);
+        }
+        assert_eq!(f.pixel_y(), 16, "floor top is y=24 and it is 8 tall");
+        assert!(f.on_ground);
     }
 
     #[test]

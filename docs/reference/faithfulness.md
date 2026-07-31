@@ -39,7 +39,7 @@ playing it faithfully.
 | Ledge-turning walker | canonical behaviour, unnamed | Object kind `0x04`. Same walk speed as kind `0x00`, and it turns at a ledge where the other steps off. Both were settled by writing a wall and then a pit into the tilemap in front of them (`tools/probe_walker_turn.py`). World 1-1 has one, 1-2 has four. Which SML enemy it is remains unnamed. |
 | Jumper | canonical behaviour, unnamed | Object kind `0x0E`. Traced with the camera held still (`tools/trace_jumper.py`): a 102-frame cycle, 54 frames standing perfectly still and then 16 position updates three frames apart, each 2 px sideways and a rise from a fixed table `[4, 4, 2, 2, 1, 1, 1, 0, 0, -1, -1, -1, -2, -2, -4, -4]`, giving a 32 px hop 15 px high. The table is not constant deceleration, so it is a table in the cartridge and a table in `src/core/enemy.rs`. It turns at a wall and hops off a ledge, both settled against a control run with no obstacle, which a hopper needs because it reverses and rises and falls on its own. World 1-1 has three, 1-2 has none, 1-3 has none. Which SML enemy it is remains unnamed. |
 | World 1-3's vertical mover | measured, **correctly absent** | Object kind `0x02`. X frozen; Y runs 16 px down at a pixel a frame, waits 62 frames, runs 16 px back up, waits 106, on a 200-frame period (`tools/measure_level_kind.py`). It never costs Mario a life at any overlap through two full cycles, and it does not hold him up either: with the tilemap carved away he drops straight past it. Neither an enemy nor a platform, so leaving it out of the level is right rather than a gap. What it is for is open. |
-| World 1-3's faller | measured, **not implemented** | Object kind `0x0C`. X frozen; stands still, then falls at exactly one pixel a frame with no gaps until it leaves the level. Its contact sweep matches the walker's exactly, a stomp from above and a lost life from every other side, so it is a stompable falling hazard. Left out until one thing is settled: whether the wait before the fall is a fixed timer or something Mario triggers. |
+| Faller | canonical behaviour, unnamed | Object kind `0x0C`, the only kind World 1-3 puts in our level. X frozen; holds position for 175 frames from the frame the game creates it, then falls at exactly one pixel a frame. The 175 is the same with Mario directly under it, a screen away, and at the left edge (`tools/probe_faller_trigger.py`), so it is a timer. Its contact sweep matches a walker's exactly, so it hurts from every side but a stomp. `D` in the level format; 1-3 gets 6 of its 8 records, the other two starting inside solid tiles the text format cannot represent. Unmeasured: whether it stops on a floor or falls through. Ours lands. |
 | Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Gated the same way as the star. Still worth replacing with a real SML enemy rather than only hiding it. |
 
 ## Open discrepancies
@@ -86,6 +86,13 @@ playing it faithfully.
   the speed that reproduces that traced arc against the engine's `JUMP_CUT`;
   the raw `2d/t` reading (333) only reached 7px when simulated. See
   `docs/reference/physics.md`.
+- **When enemies appear**: canonical. The cartridge streams objects in with one
+  forward read pointer, and an object arrives with a slot X of `0xBF`, which is
+  183 pixels right of the camera. `Game` does the same: spawns wait in a list
+  and fire when the camera reaches them, and a fired record never comes back.
+  Before this, every enemy was created at level start and the ones past the
+  first screen were deleted on frame one, so World 1-1 played with 1 of its 14
+  and 1-2 and 1-3 with none of theirs.
 - **World 1-3's end trigger**: **stand-in**, and now at least a reachable one.
   1-3 has no exit door, since it ends the world rather than leading anywhere,
   so its trigger is placed by rule. The old rule (two columns from the right

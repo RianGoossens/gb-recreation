@@ -16,6 +16,7 @@ code with `Level::from_file` / `Level::from_text`.
 | `G` | a ground walker: turns at walls, walks off ledges |
 | `T` | a ground walker that turns at ledges too |
 | `J` | a jumper: still for 54 frames, then a 32 px hop 15 px high |
+| `D` | a faller: holds position for 175 frames, then drops a pixel a frame |
 | `F` | a Fly enemy (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility), see the note on non-cartridge content |

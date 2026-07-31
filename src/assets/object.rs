@@ -52,12 +52,11 @@ pub const LEVEL_1_2_OBJECTS: usize = 0x0A073;
 /// World 1-3's object list, read after playing through 1-2. It starts one byte
 /// past 1-2's terminator.
 ///
-/// This one is only partly understood. The position mapping places all 37 of
-/// 1-1's records and all 46 of 1-2's on a cell that is not solid, and misses on
-/// 17 of 1-3's 48. Every miss is a kind 1-3 introduces (`0x02` and `0x0C`, plus
-/// one `0x36`), and the nine `0x02` records carry a `y` byte whose high nibble
-/// is 4 or C, which no record in the other two levels uses. Something about
-/// those kinds is read differently, and it has not been traced yet.
+/// The position mapping places all 37 of 1-1's records and all 46 of 1-2's on
+/// a cell that is not solid, and misses on 15 of 1-3's 48, all of them kinds
+/// 1-3 introduces. Tracing the spawns showed the slot positions match the
+/// decode, so those records really do start inside terrain and that is the
+/// game's doing rather than a decoding error.
 pub const LEVEL_1_3_OBJECTS: usize = 0x0A0FE;
 
 /// The three levels of World 1 and their object lists, in order.
@@ -193,6 +192,21 @@ pub fn lift_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize, b
                 .ok()
                 .map(|row| (r.column(), row, r.kind_id() == LIFT_VERTICAL))
         })
+        .collect()
+}
+
+/// The faller. World 1-3 is the only level of World 1 that uses it. It holds
+/// position for 175 frames from spawn and then drops straight down at a pixel
+/// a frame (`tools/probe_faller_trigger.py`), and it hurts Mario from every
+/// side but a stomp (`tools/probe_object_contact.py`).
+pub const FALLER: u8 = 0x0C;
+
+/// Where a level puts its fallers, as (column, row).
+pub fn faller_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == FALLER)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
         .collect()
 }
 

@@ -269,9 +269,27 @@ an enemy nor a platform.
 and a lost life at every offset from `+6` down. So it is a stompable hazard
 that falls.
 
-Still open on `0x0C`: whether its 125-frame wait is a fixed timer or something
-Mario triggers. Until that is answered it stays out of the levels, since a
-falling hazard with the wrong trigger is a different obstacle.
+### What starts the faller
+
+A hazard that drops when Mario walks under it and one that drops on a clock are
+different obstacles, so `0x0C`'s wait had to be pinned before it could be
+implemented. The two readings come apart if Mario is somewhere else:
+`probe_faller_trigger.py` catches the slot the frame the game creates the
+object, parks Mario at a chosen screen X, and counts frames to the first pixel
+of fall.
+
+```
+  mario at screen x 191, object at 191: fell after 175 frames
+  mario at screen x 60,  object at 191: fell after 175 frames
+  mario at screen x 8,   object at 191: fell after 175 frames
+```
+
+Directly under it, a screen away, and at the left edge, all 175. A timer.
+
+Catching the fill rather than waiting for the object to become visible matters
+here: it is created at slot X `0xBF`, which is off the right of the screen, so
+counting from when it scrolls into view spends part of the timer before the
+measurement starts. That version reported 134.
 
 ### What World 1-3 added
 
@@ -434,9 +452,10 @@ the back door, so the ids stay as ids.
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
   All five now have their movement measured; only the names are missing.
-- What starts `0x0C` falling. Its motion and its contact behaviour are both
-  measured; whether the wait before the fall is a timer or a trigger is not.
 - What `0x02` is for, given it neither hurts Mario nor holds him up.
+- Whether the faller stops on a floor or passes through it. Ours lands, like
+  every other enemy; the one traced fell out of the level, which does not
+  distinguish the two.
 - Why 1-3 starts them inside solid tiles.
 - The rest of a slot's 16 bytes.
 
@@ -459,5 +478,6 @@ the back door, so the ids stay as ids.
 | `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
 | `tools/measure_level_kind.py` | how a kind moves, in 1-2 and 1-3 as well as 1-1 |
 | `tools/probe_object_contact.py` | whether touching a kind costs Mario a life |
+| `tools/probe_faller_trigger.py` | whether a fall is on a timer or on Mario |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |
 | `tools/verify_skip_flag.py` | that byte across a whole level |

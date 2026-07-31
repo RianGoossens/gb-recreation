@@ -119,7 +119,13 @@ fn world_1_2_keeps_its_lifts_through_the_loader() {
 /// straight into the first one.
 #[test]
 fn extracted_level_can_be_walked_from_spawn_to_the_end() {
-    let Some(level) = extracted() else { return };
+    let Some(mut level) = extracted() else { return };
+    // Geometry only. Since the enemies stream in with the camera the way the
+    // cartridge's read pointer does, the level actually contains them now, and
+    // a walker that only knows how to jump gaps dies to the third one. What
+    // this test is for is walls that seal the level and pits that are not
+    // there, so the enemies come out.
+    level.enemy_spawns.clear();
     let mut game = Game::new(level);
     let ground_ahead = |game: &Game, x: i32, y: i32| {
         let column = (x + 12) / 8;
@@ -228,11 +234,16 @@ fn mario_can_stand_and_move_at_every_world_1_spawn() {
         let start = game.mario.pixel_x();
         let mut buttons = Buttons::default();
         buttons.set(Button::Right, true);
+        let mut furthest = start;
         for _ in 0..120 {
             game.step(buttons);
+            furthest = furthest.max(game.mario.pixel_x());
         }
+        // The furthest he reached, not where he ends up: dying puts him back
+        // at the spawn, and 1-2 kills him on the way down off its opening
+        // ledge whatever the extraction did.
         assert!(
-            game.mario.pixel_x() > start,
+            furthest > start,
             "level {} left Mario stuck at the spawn",
             i + 1
         );
@@ -324,4 +335,36 @@ fn every_world_1_end_trigger_is_reachable_from_the_spawn() {
             cell.1
         );
     }
+}
+
+
+/// World 1-3 used to load with no enemies at all, because both kinds it
+/// introduces were unmeasured.
+///
+/// Eight of its records are fallers and six of them reach the level file. The
+/// other two start inside solid tiles, which the cartridge does and the text
+/// format cannot represent, so the stamper leaves those cells alone rather
+/// than replacing terrain with an enemy.
+#[test]
+fn world_1_3_carries_its_fallers() {
+    let path = "assets/extracted/level_1_3.txt";
+    if !std::path::Path::new(path).exists() {
+        return;
+    }
+    let level = Level::from_file(path).expect("extracted level parses");
+    let fallers = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Faller)
+        .count();
+    assert_eq!(fallers, 6);
+    // Its one ground walker starts inside terrain too, so the fallers are all
+    // the level ends up with.
+    assert_eq!(level.enemy_spawns.len(), 6);
+
+    // They arrive with the camera, so a fresh Game has none of them live yet:
+    // the nearest is well past the first screen. All six are waiting.
+    let game = Game::new(level);
+    assert!(game.enemies.is_empty());
+    assert_eq!(game.pending_enemy_count(), 6);
 }

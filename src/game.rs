@@ -46,6 +46,9 @@ pub struct Game {
     pub level: Level,
     pub mario: Mario,
     pub enemies: Vec<Enemy>,
+    /// Spawns the camera has not reached yet, furthest first. They move into
+    /// `enemies` as it advances and never come back once they have.
+    pending_enemies: Vec<(i32, i32, crate::core::enemy::EnemyKind)>,
     pub camera: Camera,
     pub animator: Animator,
     /// How many times Mario has died and respawned this session.
@@ -200,21 +203,58 @@ fn coin_tile() -> Tile {
     Tile { pixels }
 }
 
-fn spawn_enemies(level: &Level) -> Vec<Enemy> {
+/// How far right of the camera's left edge an object is created.
+///
+/// The cartridge streams objects in with a single forward read pointer: a
+/// record fires when the camera reaches it, and the object appears with a slot
+/// X of 0xBF, which is an OAM coordinate and so 183 pixels right of the camera
+/// (`docs/reference/objects.md`). The screen is 160 wide, so it arrives 23
+/// pixels off the right edge and walks on.
+pub const SPAWN_AHEAD: i32 = 183;
+
+/// The spawns a level still has ahead of the camera, furthest first so the
+/// next one to fire is the last element.
+fn pending_enemies(level: &Level) -> Vec<(i32, i32, crate::core::enemy::EnemyKind)> {
+    let mut pending = level.enemy_spawns.clone();
+    pending.sort_by_key(|&(x, _, _)| std::cmp::Reverse(x));
+    pending
+}
+
+fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
     use crate::core::enemy::EnemyKind;
-    level
-        .enemy_spawns
-        .iter()
-        .map(|&(px, py, kind)| match kind {
-            EnemyKind::Goomba => Enemy::goomba(px, py, true),
-            EnemyKind::LedgeTurner => Enemy::ledge_turner(px, py, true),
-            EnemyKind::Fly => Enemy::fly(px, py, true),
-            EnemyKind::Hopper => Enemy::hopper(px, py, true),
-        })
-        .collect()
+    match kind {
+        EnemyKind::Goomba => Enemy::goomba(px, py, true),
+        EnemyKind::LedgeTurner => Enemy::ledge_turner(px, py, true),
+        EnemyKind::Fly => Enemy::fly(px, py, true),
+        EnemyKind::Hopper => Enemy::hopper(px, py, true),
+        EnemyKind::Faller => Enemy::faller(px, py),
+    }
+}
+
+/// Move every spawn the camera has now reached out of `pending` and into the
+/// live list. Records only ever fire forwards, so one that has fired is gone
+/// from `pending` for good, which is what the cartridge's read pointer does.
+fn release_enemies(
+    pending: &mut Vec<(i32, i32, crate::core::enemy::EnemyKind)>,
+    enemies: &mut Vec<Enemy>,
+    camera_x: i32,
+) {
+    while let Some(&(px, py, kind)) = pending.last() {
+        if px > camera_x + SPAWN_AHEAD {
+            break;
+        }
+        pending.pop();
+        enemies.push(make_enemy(px, py, kind));
+    }
 }
 
 impl Game {
+    /// Spawns the camera has not reached yet. Zero once the level's whole
+    /// object list has fired.
+    pub fn pending_enemy_count(&self) -> usize {
+        self.pending_enemies.len()
+    }
+
     pub fn new(level: Level) -> Self {
         let (w, h) = (level.solids.width, level.solids.height);
         let mut cells = Vec::with_capacity(w * h);
@@ -225,7 +265,9 @@ impl Game {
             }
         }
         let mario = Mario::new(level.spawn.0, level.spawn.1);
-        let enemies = spawn_enemies(&level);
+        let mut pending = pending_enemies(&level);
+        let mut enemies = Vec::new();
+        release_enemies(&mut pending, &mut enemies, 0);
         let coins = level.coins.clone();
         let blocks = spawn_blocks(&level);
         let items = spawn_items(&level);
@@ -236,6 +278,7 @@ impl Game {
             .collect();
         let tuning = Tuning::default();
         Self {
+            pending_enemies: pending,
             level,
             mario,
             enemies,
@@ -368,6 +411,7 @@ impl Game {
         let (lw, lh) = self.level_size();
         self.camera
             .follow(self.mario.pixel_x() + 4, self.mario.pixel_y() + 4, lw, lh);
+        release_enemies(&mut self.pending_enemies, &mut self.enemies, self.camera.x);
         despawn_offscreen(&mut self.enemies, self.camera.x);
 
         // Reaching the end trigger completes the level.
@@ -691,7 +735,9 @@ impl Game {
     /// step via follow.
     fn respawn(&mut self) {
         self.mario = Mario::new(self.level.spawn.0, self.level.spawn.1);
-        self.enemies = spawn_enemies(&self.level);
+        self.pending_enemies = pending_enemies(&self.level);
+        self.enemies = Vec::new();
+        release_enemies(&mut self.pending_enemies, &mut self.enemies, 0);
         self.animator = Animator::new();
         self.camera = Camera::new(); // the one-way view resets to the spawn
         self.timer = self.tuning.timer_start;
@@ -802,6 +848,40 @@ mod tests {
         let mut b = Buttons::default();
         b.set(button, true);
         b
+    }
+
+    #[test]
+    fn a_spawn_fires_when_the_camera_reaches_it_and_not_before() {
+        use crate::core::enemy::EnemyKind::Goomba;
+        let mut pending = vec![(400, 16, Goomba), (200, 16, Goomba), (24, 16, Goomba)];
+        let mut enemies = Vec::new();
+
+        release_enemies(&mut pending, &mut enemies, 0);
+        assert_eq!(enemies.len(), 1, "only the one inside 183 px of the camera");
+
+        release_enemies(&mut pending, &mut enemies, 16);
+        assert_eq!(enemies.len(), 1, "16 px is not far enough for the next");
+        release_enemies(&mut pending, &mut enemies, 17);
+        assert_eq!(enemies.len(), 2, "200 - 183 is exactly when it fires");
+
+        release_enemies(&mut pending, &mut enemies, 400);
+        assert_eq!(enemies.len(), 3);
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn a_level_starts_with_only_the_spawns_near_the_camera() {
+        let mut rows = vec![".".repeat(60); 6];
+        rows[4].replace_range(2..3, "M");
+        rows[4].replace_range(30..31, "G");
+        rows[4].replace_range(55..56, "G");
+        rows[5] = "#".repeat(60);
+        let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
+        let game = Game::new(Level::from_rows(&refs));
+        // Columns 30 and 55 are 240 and 440 px out, both past the 183 the
+        // cartridge creates an object at, so neither is live yet.
+        assert!(game.enemies.is_empty());
+        assert_eq!(game.pending_enemy_count(), 2);
     }
 
     #[test]

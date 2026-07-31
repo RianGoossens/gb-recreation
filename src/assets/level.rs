@@ -513,6 +513,48 @@ pub fn gameplay_tiles(rom: &[u8]) -> Result<&[u8], AssetError> {
     Ok(&rom[TILES_ROM_OFFSET..end])
 }
 
+/// The blocks World 2 loads over the shared atlas, as `(rom, vram, size)`.
+///
+/// A level's tile ids index whatever is in video RAM while it is playing, and
+/// that is not one atlas for the whole cartridge. World 2's geometry decodes
+/// exactly (all 320 of 2-1's columns match the running game) and renders as
+/// garbage through World 1's tiles, which is the same failure that caught the
+/// title screen once: data that decodes without error and draws the wrong
+/// picture.
+///
+/// Read from video RAM at 2-1's opening (`tools/find_gameplay_tile_blocks.py
+/// 2-1`). Most of the atlas is shared with World 1; four spans are replaced,
+/// three of them from `0x04032` onward. That is bank 1 plus `0x32`, the same
+/// offset into its own bank that World 1's `0x08032` is into bank 2, so a
+/// world's own tiles sit at the start of the bank holding its levels.
+///
+/// Measured from 2-1 only. Whether 2-2 and 2-3 load the same overlay is not
+/// checked.
+pub const WORLD_2_TILE_BLOCKS: [(usize, usize, usize); 4] = [
+    (0x04032, 0x8A00, 0x03C0),
+    (0x04432, 0x9340, 0x0100),
+    (0x04572, 0x9480, 0x0280),
+    (0x09732, 0x9700, 0x0100),
+];
+
+/// The tile data in video RAM while the level whose list is at `list` plays.
+///
+/// World 1's levels use the shared atlas unchanged. World 2's overlay
+/// [`WORLD_2_TILE_BLOCKS`] on top of it.
+pub fn tiles_for_level(rom: &[u8], list: usize) -> Result<Vec<u8>, AssetError> {
+    let mut vram = gameplay_tiles(rom)?.to_vec();
+    if WORLD_2.iter().any(|&(_, start)| start == list) {
+        for (from, to, size) in WORLD_2_TILE_BLOCKS {
+            if from + size > rom.len() {
+                return Err(AssetError::OutOfRange { end: from + size, len: rom.len() });
+            }
+            let at = to - VRAM_TILE_BASE;
+            vram[at..at + size].copy_from_slice(&rom[from..from + size]);
+        }
+    }
+    Ok(vram)
+}
+
 /// A level's own graphics, as the cartridge draws them.
 ///
 /// Returns a deduplicated sheet plus a `SCREEN_COLUMNS` by [`SCREEN_ROWS`] map
@@ -530,7 +572,7 @@ pub fn extract_screen(
     if columns.is_empty() {
         return Err(AssetError::BadFormat);
     }
-    let vram = gameplay_tiles(&rom)?;
+    let vram = tiles_for_level(&rom, list)?;
 
     let mut tiles: Vec<Tile> = vec![Tile { pixels: [[0; 8]; 8] }];
     let mut seen: std::collections::HashMap<[u8; 16], u8> = std::collections::HashMap::new();

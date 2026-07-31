@@ -14,7 +14,12 @@ each chunk of it in the ROM file, the same way `find_rom_offset.py` pins a
 single offset. Contiguous chunks with a constant ROM-to-VRAM delta are
 coalesced into blocks, which is what the Rust side needs.
 
-Usage: uv run tools/find_gameplay_tile_blocks.py
+A level's tile ids index whatever atlas is loaded when it is playing, and
+that is not one atlas for the whole cartridge: World 2's geometry decodes
+correctly and renders as garbage through World 1's blocks. So the level to
+read from is an argument.
+
+Usage: uv run tools/find_gameplay_tile_blocks.py [level]
 """
 
 import sys
@@ -22,6 +27,7 @@ import sys
 sys.path.insert(0, "tools")
 
 from sml_boot import boot_to_gameplay
+from trace_level_objects import NAMES, reach_level
 
 VRAM_TILE_BASE = 0x8000
 VRAM_TILE_SIZE = 0x1800
@@ -30,9 +36,17 @@ CHUNK = 0x40
 
 def main():
     rom = open("super_mario_land.gb", "rb").read()
-    pb = boot_to_gameplay()
+    want = sys.argv[1] if len(sys.argv) > 1 else "1-1"
+    if want == "1-1":
+        pb = boot_to_gameplay()
+    else:
+        pb, _capture = reach_level(NAMES.index(want))
+        if pb is None:
+            print(f"never reached World {want}")
+            return 1
     vram = bytes(pb.memory[VRAM_TILE_BASE + i] for i in range(VRAM_TILE_SIZE))
     pb.stop()
+    print(f"World {want}:")
 
     # ROM offset for each chunk of tile data, where it can be found uniquely.
     placements = []

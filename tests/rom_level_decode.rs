@@ -405,3 +405,62 @@ fn a_levels_own_opening_screen_is_not_a_sealed_room() {
         );
     }
 }
+
+/// A level's tile ids index whatever atlas is in video RAM while it plays, and
+/// that is not one atlas for the whole cartridge. World 2's geometry decodes
+/// exactly and draws garbage through World 1's tiles.
+///
+/// World 1's levels use the shared atlas unchanged; World 2's overlay four
+/// spans on top of it, three from bank 1 plus 0x32, which is the same offset
+/// into its own bank that World 1's tiles are into bank 2.
+#[test]
+fn world_2_loads_its_own_tiles_over_the_shared_atlas() {
+    let Some(data) = rom() else { return };
+    let shared = level::gameplay_tiles(&data).unwrap();
+
+    for (name, list) in level::WORLD_1 {
+        let tiles = level::tiles_for_level(&data, list).unwrap();
+        assert_eq!(tiles, shared, "World {name} uses the shared atlas unchanged");
+    }
+    for (name, list) in level::WORLD_2 {
+        let tiles = level::tiles_for_level(&data, list).unwrap();
+        assert_ne!(tiles, shared, "World {name} has to differ from World 1's");
+        for (from, to, size) in level::WORLD_2_TILE_BLOCKS {
+            let at = to - 0x8000;
+            assert_eq!(
+                &tiles[at..at + size],
+                &data[from..from + size],
+                "World {name}'s block at {to:#06X} should come from {from:#07X}"
+            );
+        }
+    }
+}
+
+/// The overlay only matters if World 2 actually draws from the spans it
+/// replaces. Without this, the test above would pass on an overlay that lands
+/// entirely on tiles no level uses.
+#[test]
+fn world_2_1s_opening_draws_from_the_overlaid_tiles() {
+    let Some(data) = rom() else { return };
+    let columns = level::decode_level(&data, level::LEVEL_2_1_LIST);
+    // Background tiles use the signed addressing mode, so an id below 128
+    // reads from 0x9000 and the rest from 0x8800. Using 0x8000 + id * 16 here
+    // looks right and points at the wrong half of video RAM.
+    let replaced = |id: u8| {
+        let addr = if id < 128 {
+            0x9000 + (id as usize) * 16
+        } else {
+            0x8800 + (id as usize - 128) * 16
+        };
+        level::WORLD_2_TILE_BLOCKS
+            .iter()
+            .any(|&(_, to, size)| (to..to + size).contains(&addr))
+    };
+    let used = columns
+        .iter()
+        .take(level::SCREEN_COLUMNS)
+        .flatten()
+        .filter(|&&t| replaced(t))
+        .count();
+    assert!(used > 0, "World 2-1's opening screen has to use an overlaid tile");
+}

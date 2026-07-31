@@ -142,3 +142,33 @@ all carry `0x62BE` there, which is 1-1's own opening screen, and World 2's
 three all carry `0x56CD`, which is 2-1's. The lists that are not yet tied to a
 level do not follow that, so it is a pattern across two worlds rather than a
 rule.
+
+## A world loads its own tiles
+
+A level's tile ids index whatever is in video RAM while it is playing, and
+that is not one atlas for the whole cartridge. World 2's geometry decodes
+exactly, every one of 2-1's 320 columns matching the running game, and renders
+as garbage through World 1's tiles. Same failure as the title screen once had:
+data that decodes without error and draws the wrong picture.
+
+Reading video RAM at 2-1's opening (`tools/find_gameplay_tile_blocks.py 2-1`)
+shows most of the atlas shared with World 1 and four spans replaced:
+
+| rom | vram | size |
+|---|---|---|
+| `0x04032` | `0x8A00` | `0x03C0` |
+| `0x04432` | `0x9340` | `0x0100` |
+| `0x04572` | `0x9480` | `0x0280` |
+| `0x09732` | `0x9700` | `0x0100` |
+
+Three of the four come from `0x04032` onward, which is bank 1 plus `0x32`.
+World 1's tiles are at `0x08032`, bank 2 plus `0x32`. So a world's own tiles
+sit at the same offset into whichever bank holds its levels.
+
+`level::tiles_for_level` applies the overlay. Measured from 2-1 only; whether
+2-2 and 2-3 load the same spans is not checked.
+
+One trap worth keeping: background tiles use the signed addressing mode, so an
+id below 128 reads from `0x9000` and the rest from `0x8800`. Computing
+`0x8000 + id * 16` looks right and points at the wrong half of video RAM,
+which made a test that should have caught an unused overlay pass by accident.

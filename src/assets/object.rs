@@ -8,7 +8,7 @@
 //! ```text
 //! x      position, in units of 16 pixels (two columns)
 //! y      low nibble is the row plus 2, high nibble is a pixel offset on x
-//! kind   what to create, with the top bit marking a record normal play skips
+//! kind   what to create, with the top bit marking an expert-mode-only object
 //! ```
 //!
 //! Records are sorted by `x`, which is how the game gets away with a single
@@ -28,9 +28,11 @@
 //!   within its 16-pixel step. World 1-3 settles this on its own: two records
 //!   at `x = 0x76`, one with `y = 0x0D` and one with `y = 0x8D`, spawn in the
 //!   same frame exactly 8 pixels apart.
-//! - The top bit of `kind` suppresses the record. Clearing it in a scratch copy
-//!   of the cartridge makes that record spawn, at the predicted column
-//!   (`tools/probe_object_type_flag.py`). What the flag selects for is open.
+//! - The top bit of `kind` holds the record back for expert mode, the harder
+//!   replay unlocked by finishing the game. Clearing it in a scratch copy of
+//!   the cartridge makes that record spawn at the predicted column
+//!   (`tools/probe_object_type_flag.py`), and setting the game's own
+//!   expert-mode byte releases all of them at once (see [`EXPERT_ONLY`]).
 
 use std::path::Path;
 
@@ -68,8 +70,15 @@ pub const WORLD_1_OBJECTS: [(&str, usize); 3] = [
 const RECORD: usize = 3;
 const LIST_END: u8 = 0xFF;
 
-/// Marks a record the game does not act on during normal play.
-pub const SKIP: u8 = 0x80;
+/// Marks a record that only appears in expert mode, the harder replay the
+/// cartridge unlocks once the game has been finished. The game gates it on
+/// `hWinCount` at 0xFF9A, which is zero until then: sweeping every byte of
+/// work RAM and high RAM for one that makes a marked record spawn finds that
+/// address and no other (`tools/find_skip_flag.py`), and holding it non-zero
+/// takes World 1-1 from 16 objects to all 37 (`tools/verify_skip_flag.py`).
+/// The kaspermeerts disassembly agrees: `Call_24EF` in bank 0 reads
+/// `hWinCount`, and skips the record on bit 7 only when it is zero.
+pub const EXPERT_ONLY: u8 = 0x80;
 /// A row byte counts from the top of the screen, above the status bar.
 pub const ROW_OFFSET: i32 = 2;
 /// One step of `x` is 16 pixels, two columns.
@@ -95,22 +104,32 @@ impl ObjectRecord {
     }
 
     /// The playfield row the object occupies. Ground-standing objects sit one
-    /// row above the ground they rest on. Can be negative: one skipped record
-    /// in World 1-3 has a row byte of 0, which would put it in the status bar.
+    /// row above the ground they rest on. Can be negative: one expert-only
+    /// record in World 1-3 has a row byte of 0, above the playfield.
     pub fn row(&self) -> i32 {
         (self.y & 0x0F) as i32 - ROW_OFFSET
     }
 
-    /// Whether normal play skips this record.
-    pub fn skipped(&self) -> bool {
-        self.kind & SKIP != 0
+    /// Whether this record is one of the extra objects expert mode adds.
+    pub fn expert_only(&self) -> bool {
+        self.kind & EXPERT_ONLY != 0
     }
 
-    /// The kind byte without the skip flag, so a skipped record can still be
-    /// compared against the kinds that do spawn.
+    /// The kind byte without the expert flag, so an expert-only record can
+    /// still be compared against the kinds that spawn in normal play.
     pub fn kind_id(&self) -> u8 {
-        self.kind & !SKIP
+        self.kind & !EXPERT_ONLY
     }
+}
+
+/// Which pass through the cartridge a level is being played on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Mode {
+    /// The first play through. Expert-only records stay out.
+    #[default]
+    Normal,
+    /// The replay unlocked by finishing the game, which adds every record.
+    Expert,
 }
 
 /// Read a level's object list from `start` until its `0xFF` terminator.
@@ -130,7 +149,17 @@ pub fn object_list(rom: &[u8], start: usize) -> Vec<ObjectRecord> {
 
 /// The records normal play actually acts on, in the order the game meets them.
 pub fn spawning(records: &[ObjectRecord]) -> Vec<ObjectRecord> {
-    records.iter().copied().filter(|r| !r.skipped()).collect()
+    spawning_in(records, Mode::Normal)
+}
+
+/// The records a given mode acts on. Expert mode adds to normal play rather
+/// than replacing it: every record spawns.
+pub fn spawning_in(records: &[ObjectRecord], mode: Mode) -> Vec<ObjectRecord> {
+    records
+        .iter()
+        .copied()
+        .filter(|r| mode == Mode::Expert || !r.expert_only())
+        .collect()
 }
 
 /// The two ground walkers. Both move one pixel every three frames and turn at
@@ -149,14 +178,14 @@ pub const LIFT_VERTICAL: u8 = 0x0A;
 pub const LIFT_HORIZONTAL: u8 = 0x0B;
 
 /// Where a level puts its lifts, as (column, row, vertical).
-pub fn lift_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize, bool)> {
-    spawning(records)
+pub fn lift_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize, bool)> {
+    spawning_in(records, mode)
         .iter()
-        .filter(|r| matches!(r.kind, LIFT_VERTICAL | LIFT_HORIZONTAL))
+        .filter(|r| matches!(r.kind_id(), LIFT_VERTICAL | LIFT_HORIZONTAL))
         .filter_map(|r| {
             usize::try_from(r.row())
                 .ok()
-                .map(|row| (r.column(), row, r.kind == LIFT_VERTICAL))
+                .map(|row| (r.column(), row, r.kind_id() == LIFT_VERTICAL))
         })
         .collect()
 }
@@ -166,14 +195,14 @@ pub fn lift_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize, bool)> {
 /// Deliberately only these two kinds. The others spawn and move, but nothing
 /// about how they move has been measured, so a level file is short of enemies
 /// rather than carrying invented ones.
-pub fn walker_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize, bool)> {
-    spawning(records)
+pub fn walker_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize, bool)> {
+    spawning_in(records, mode)
         .iter()
-        .filter(|r| matches!(r.kind, WALKER | LEDGE_TURNER))
+        .filter(|r| matches!(r.kind_id(), WALKER | LEDGE_TURNER))
         .filter_map(|r| {
             usize::try_from(r.row())
                 .ok()
-                .map(|row| (r.column(), row, r.kind == LEDGE_TURNER))
+                .map(|row| (r.column(), row, r.kind_id() == LEDGE_TURNER))
         })
         .collect()
 }
@@ -198,7 +227,7 @@ mod tests {
         let records = object_list(&rom, 0);
         assert_eq!(records.len(), 2);
         assert_eq!(records[0].kind, 0x00);
-        assert!(records[1].skipped());
+        assert!(records[1].expert_only());
     }
 
     #[test]
@@ -211,7 +240,7 @@ mod tests {
         assert_eq!(record.pixel_x(), 192);
         assert_eq!(record.column(), 24);
         assert_eq!(record.row(), 13);
-        assert!(!record.skipped());
+        assert!(!record.expert_only());
     }
 
     #[test]
@@ -240,6 +269,6 @@ mod tests {
             kind: 0x84,
         };
         assert_eq!(record.row(), -2);
-        assert!(record.skipped());
+        assert!(record.expert_only());
     }
 }

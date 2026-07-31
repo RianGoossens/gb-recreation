@@ -30,9 +30,34 @@ fn world_1_1_has_thirty_seven_object_records() {
 #[test]
 fn sixteen_of_them_spawn_in_normal_play() {
     let Some(records) = records() else { return };
-    // Every slot fill the trace saw, and no more: the other 21 records carry
-    // the skip bit and the game walks straight past them.
+    // Every slot fill the trace saw, and no more: the other 21 records are
+    // held back for expert mode and the game walks straight past them.
     assert_eq!(object::spawning(&records).len(), 16);
+}
+
+#[test]
+fn expert_mode_adds_the_rest_rather_than_replacing_them() {
+    let Some(records) = records() else { return };
+    // Holding 0xFF9A non-zero on the cartridge takes World 1-1 from 16 objects
+    // to every record in the list, normal-play ones included
+    // (`tools/verify_skip_flag.py`).
+    let normal = object::spawning_in(&records, object::Mode::Normal);
+    let expert = object::spawning_in(&records, object::Mode::Expert);
+    assert_eq!(expert.len(), 37);
+    assert!(normal.iter().all(|r| expert.contains(r)));
+}
+
+#[test]
+fn expert_mode_puts_more_walkers_and_lifts_in_the_level() {
+    let Some(records) = records() else { return };
+    let normal = object::walker_spawns(&records, object::Mode::Normal);
+    let expert = object::walker_spawns(&records, object::Mode::Expert);
+    assert_eq!(normal.len(), 11);
+    assert_eq!(expert.len(), 26);
+    // The lifts either side of the exit are normal-play records, so the count
+    // is the same and expert mode does not reach them.
+    assert_eq!(object::lift_spawns(&records, object::Mode::Normal).len(), 2);
+    assert_eq!(object::lift_spawns(&records, object::Mode::Expert).len(), 2);
 }
 
 #[test]
@@ -49,7 +74,7 @@ fn the_first_record_is_the_one_the_pointer_moved_on_first() {
     assert_eq!((first.x, first.y, first.kind), (0x0C, 0x0F, 0x00));
     assert_eq!(first.column(), 24);
     assert_eq!(first.row(), 13);
-    assert!(!first.skipped());
+    assert!(!first.expert_only());
 }
 
 #[test]
@@ -189,10 +214,10 @@ fn only_one_record_in_world_1_falls_off_the_playfield() {
         }
     }
     // World 1-3's `69 10 84`: a row byte of 0 puts it two rows above the
-    // playfield. It carries the skip bit and never spawns, so nothing reads it.
+    // playfield. It is an expert-mode record, so normal play never reads it.
     assert_eq!(off.len(), 1);
     assert_eq!(off[0].0, "1-3");
-    assert!(off[0].1.skipped());
+    assert!(off[0].1.expert_only());
 }
 
 #[test]

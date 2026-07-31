@@ -45,7 +45,7 @@ lands on `2x + 5` for every single record.
 ```
 x      position, in units of 16 pixels (two columns)
 y      low nibble is the row plus 2, high nibble is a pixel offset on x
-kind   what to create, top bit marks a record normal play skips
+kind   what to create, top bit marks an expert-mode-only object
 ```
 
 A list is a run of these ending on `0xFF`. Records are sorted by `x`, which is
@@ -113,11 +113,11 @@ world pixel x = 16 * x + (y >> 4)
 row           = (y & 0x0F) - 2
 ```
 
-### The skip bit
+### The expert-mode bit
 
-Only 16 of the 37 records ever fill an object slot. They are exactly the 16
-whose `kind` byte has the top bit clear, which is a correlation and not yet an
-explanation.
+Only 16 of the 37 records ever fill an object slot on a first play through.
+They are exactly the 16 whose `kind` byte has the top bit clear, which starts
+out as a correlation.
 
 `tools/probe_object_type_flag.py` settles it by asking the game. It copies the
 cartridge to a temporary file, clears the top bit of one record that never
@@ -133,10 +133,53 @@ Column 43 is `2 * 0x13 + 5`, the exact place the shipped run walked past it.
 So the bit suppresses the record, and the low seven bits are the kind either
 way.
 
-What the flag selects *for* is open. 21 of 37 records carry it in World 1-1,
-which is too many to be leftovers. A second placement set for the harder second
-quest would fit the shape of the data, but nothing has been measured that says
-so, and it is not claimed here.
+### What the bit selects for
+
+21 of 37 records carry it in World 1-1, too many to be leftovers, so something
+has to turn them on. The game's own memory is the place to look, and the search
+can be exhaustive rather than clever: walk until the read pointer is sitting on
+a skipped record, snapshot there, then for every byte of work RAM and high RAM
+restore the snapshot, poke that byte, and walk the same short distance
+(`tools/find_skip_flag.py`). Two skipped records sit inside the window, so a
+real flag shows up as two extra spawns; a poke that lands in the stack fills
+every slot at once and is easy to throw out.
+
+```
+baseline: 0 slot fills in 140 frames
+FF9A -> 2 fills
+FFB3 -> 1 fills
+CFFE, FFB8, FFBD, FFBE, FFBF -> 9 fills each
+```
+
+0xFF9A is the only address with the right signature, and it reads 0 through
+every frame of ordinary play. Holding it at 1 across a whole run of World 1-1
+(`tools/verify_skip_flag.py`) releases the records in order, at their predicted
+columns:
+
+```
+plain run: 16 objects spawned
+FF9A held at 0x01: every record up to column 137 spawned, 15 of 15
+```
+
+Expert mode adds to normal play rather than swapping sets: the 16 still spawn
+and the other 21 join them, so World 1-1 carries 37 objects on a replay.
+
+The disassembly names the byte and confirms the reading. `hram.asm` calls
+0xFF9A `hWinCount`, bank 0 sets it from work RAM with the comment "Expert Mode
+activated when non zero", and `Call_24EF` is the read that matters:
+
+```
+	ldh a, [hWinCount]
+	and a
+	jr nz, .jmp_24F7
+	bit 7, [hl]		; 7th bit set means the enemy appears only in expert mode
+	ret nz
+```
+
+So the cartridge ships one object list per level holding both passes, and
+finishing the game is what unlocks the second half of it. `sml extract-level
+<level> --expert` writes that version out: World 1-1 goes from 11 ground
+walkers to 26.
 
 ## Where the objects go
 
@@ -189,7 +232,7 @@ inside the terrain. `tests/rom_object_decode.rs` pins the count at 15 so a
 later change to the position mapping cannot move it unnoticed.
 
 One record, 1-3's `69 10 84`, has a row byte of 0, which puts it two rows above
-the playfield. It carries the skip bit and never spawns.
+the playfield. It is an expert-mode record, so normal play never reads it.
 
 ## What the kinds do
 

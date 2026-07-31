@@ -4,6 +4,7 @@
 //!   verify-rom [path]                       check the ROM is SML (World) v1.0
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
 //!   extract-level [1-1|1-2|1-3] [out]       decode a level into a level file
+//!                 [--expert]                include the expert-mode objects
 //!   scan-levels                             list every screen list in the ROM
 //!   list-objects [1-1|1-2|1-3]              print a level's object list
 //!   render-level <level> <col> <out.png>    draw a level screen with its real tiles
@@ -207,14 +208,26 @@ fn extract_title_screen(args: &[String]) -> ExitCode {
 fn extract_level(args: &[String]) -> ExitCode {
     use sml::assets::{level, object};
 
-    let name = args.first().map(String::as_str).unwrap_or("1-1");
+    let expert = args.iter().any(|a| a == "--expert");
+    let args: Vec<&String> = args.iter().filter(|a| *a != "--expert").collect();
+    let mode = if expert {
+        object::Mode::Expert
+    } else {
+        object::Mode::Normal
+    };
+
+    let name = args.first().map(|s| s.as_str()).unwrap_or("1-1");
     let Some(&(_, list)) = level::WORLD_1.iter().find(|(n, _)| *n == name) else {
         let known: Vec<&str> = level::WORLD_1.iter().map(|(n, _)| *n).collect();
         eprintln!("unknown level {name}; known levels are {}", known.join(", "));
         return ExitCode::FAILURE;
     };
-    let default_out = format!("assets/extracted/level_{}.txt", name.replace('-', "_"));
-    let out = args.get(1).map(String::as_str).unwrap_or(&default_out);
+    let suffix = if expert { "_expert" } else { "" };
+    let default_out = format!(
+        "assets/extracted/level_{}{suffix}.txt",
+        name.replace('-', "_")
+    );
+    let out = args.get(1).map(|s| s.as_str()).unwrap_or(&default_out);
     let path = std::path::Path::new(out);
     if let Some(dir) = path.parent() {
         if let Err(e) = std::fs::create_dir_all(dir) {
@@ -243,8 +256,8 @@ fn extract_level(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let walkers = object::walker_spawns(&records);
-    let lifts = object::lift_spawns(&records);
+    let walkers = object::walker_spawns(&records, mode);
+    let lifts = object::lift_spawns(&records, mode);
     let mut objects: Vec<(usize, usize, u8)> =
         walkers
             .iter()
@@ -281,11 +294,12 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!(
-        "  {} ground walkers and {} lifts, from {} object records ({} spawn)",
+        "  {} ground walkers and {} lifts, from {} object records ({} spawn in {} mode)",
         walkers.len(),
         lifts.len(),
         records.len(),
-        object::spawning(&records).len(),
+        object::spawning_in(&records, mode).len(),
+        if expert { "expert" } else { "normal" },
     );
     println!("  columns you can fall through: {:?}", level::pits(&columns));
     ExitCode::SUCCESS
@@ -349,7 +363,7 @@ fn list_objects(args: &[String]) -> ExitCode {
         }
     };
     println!("World {name}: {} records at 0x{start:05X}", records.len());
-    println!(" bytes     pixel x  column  row  kind  spawns");
+    println!(" bytes     pixel x  column  row  kind  mode");
     for r in &records {
         println!(
             " {:02X} {:02X} {:02X}   {:7}  {:6}  {:3}  0x{:02X}  {}",
@@ -360,10 +374,14 @@ fn list_objects(args: &[String]) -> ExitCode {
             r.column(),
             r.row(),
             r.kind_id(),
-            if r.skipped() { "no" } else { "yes" },
+            if r.expert_only() { "expert" } else { "both" },
         );
     }
-    println!("{} of them spawn in normal play", object::spawning(&records).len());
+    println!(
+        "{} spawn in normal play, all {} in expert mode",
+        object::spawning(&records).len(),
+        records.len(),
+    );
     ExitCode::SUCCESS
 }
 

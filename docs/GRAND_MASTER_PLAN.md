@@ -130,6 +130,11 @@ Goal: expand from a vertical slice to coverage of the original game.
 - [x] Remaining enemy types for World 1 (added a hopping Fly alongside the Goomba; more can follow)
 - [x] Sound and music model: event model implemented (Game emits SoundEvents; frontend drains them)
 - [x] Tone playback: the `gui` frontend plays each SoundEvent as a square-wave beep via `cpal` (src/audio.rs). Frequencies are invented placeholders, not read from the APU; flagged as a stand-in in docs/reference/faithfulness.md.
+- [~] Decode the cartridge's object table so the extracted levels carry their real enemies
+  - [x] Pinned the record format. A record is three bytes, a list ends on 0xFF, and World 1-1's list is at ROM 0x0A002 (the value 0xD010 holds the moment the level opens, so it is the start by construction). `x` is the position in units of 16 pixels, `y` is the row plus 2, `kind` is what to create. The position mapping came out with no leftover offset: the pointer fires at column count `2x + 5`, the start of a level ties count to scroll at 8 frames per column (`tools/measure_spawn_column.py`), and the object appears 183 pixels right of the camera, so world pixel x is exactly `16x`. Checked against the geometry: all 37 records land on a non-solid cell and all 16 at row 13 have ground beneath. Only 16 records spawn in normal play, exactly those with the top bit of `kind` clear, which was settled by clearing that bit in a scratch copy of the cartridge and watching the record start spawning at the predicted column (`tools/probe_object_type_flag.py`). `sml list-objects 1-1` prints the list (docs/reference/objects.md)
+  - [ ] Work out which kind byte is which enemy. Five kinds spawn in World 1-1: 0x00 (nine times), 0x0E (three), 0x04, 0x0A, 0x0B (once each)
+  - [ ] Pin World 1-2's and 1-3's object lists by reading 0xD010 the moment each level opens
+  - [ ] Find out what the top bit of the `y` byte means, and what the skip bit selects for (21 of 37 records in 1-1 carry it, which is too many to be leftovers)
 - [ ] Additional worlds, level by level
 - [ ] Bosses and special stages
 - [x] Blog posts per major addition (power-ups and polish post covers the star, superball, pause, one-way camera, sound; more per addition)

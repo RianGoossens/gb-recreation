@@ -7,6 +7,7 @@
 //! assets from an unknown dump.
 
 pub mod level;
+pub mod object;
 pub mod title;
 
 use std::io;

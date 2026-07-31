@@ -5,6 +5,7 @@
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
 //!   extract-level [1-1|1-2|1-3] [out]       decode a level into a level file
 //!   scan-levels                             list every screen list in the ROM
+//!   list-objects [1-1]                      print a level's object list
 //!   render-level <level> <col> <out.png>    draw a level screen with its real tiles
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
@@ -28,6 +29,7 @@ fn main() -> ExitCode {
         Some("extract-title") => extract_title_screen(&args[1..]),
         Some("extract-level") => extract_level(&args[1..]),
         Some("scan-levels") => scan_levels(),
+        Some("list-objects") => list_objects(&args[1..]),
         Some("render-level") => render_level(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
@@ -292,6 +294,41 @@ fn render_level(args: &[String]) -> ExitCode {
         return ExitCode::FAILURE;
     }
     println!("drew World {name} from column {column} ({} unique tiles) -> {out}", sheet.tiles.len());
+    ExitCode::SUCCESS
+}
+
+/// `list-objects [1-1]` prints a level's object list: where each record puts
+/// its object in the level, and whether normal play acts on it at all.
+fn list_objects(args: &[String]) -> ExitCode {
+    use sml::assets::object;
+
+    let name = args.first().map(String::as_str).unwrap_or("1-1");
+    if name != "1-1" {
+        eprintln!("only World 1-1's object list is pinned so far");
+        return ExitCode::FAILURE;
+    }
+    let records = match object::extract_objects(DEFAULT_ROM, object::LEVEL_1_1_OBJECTS) {
+        Ok(records) => records,
+        Err(e) => {
+            eprintln!("object extraction failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("World {name}: {} records at 0x{:05X}", records.len(), object::LEVEL_1_1_OBJECTS);
+    println!(" bytes     column  row  kind  spawns");
+    for r in &records {
+        println!(
+            " {:02X} {:02X} {:02X}   {:6}  {:3}  0x{:02X}  {}",
+            r.x,
+            r.y,
+            r.kind,
+            r.column(),
+            r.row(),
+            r.kind_id(),
+            if r.skipped() { "no" } else { "yes" },
+        );
+    }
+    println!("{} of them spawn in normal play", object::spawning(&records).len());
     ExitCode::SUCCESS
 }
 

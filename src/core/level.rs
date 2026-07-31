@@ -170,6 +170,7 @@ impl Level {
                     'G' => enemy_spawns.push((px, py, EnemyKind::Goomba)),
                     'T' => enemy_spawns.push((px, py, EnemyKind::LedgeTurner)),
                     'F' => enemy_spawns.push((px, py, EnemyKind::Fly)),
+                    'J' => enemy_spawns.push((px, py, EnemyKind::Hopper)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),

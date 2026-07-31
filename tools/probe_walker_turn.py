@@ -41,10 +41,9 @@ APPROACH = 2600
 WATCH = 500
 
 
-def main():
-    want = int(sys.argv[1], 0) if len(sys.argv) > 1 else 0x04
-    mode = sys.argv[2] if len(sys.argv) > 2 else "wall"
-
+def run(want, mode):
+    """Approach the object, put `mode` in its path, and watch. `mode` of
+    "none" is the control: same approach, same watch, no obstacle."""
     pb = boot_to_gameplay()
     capture = Capture(pb, 0)
     capture.pending.clear()
@@ -71,7 +70,7 @@ def main():
     if found is None:
         print(f"no kind 0x{want:02X} settled on the ground on screen")
         pb.stop()
-        return 1
+        return None
 
     # Two samples, far enough apart to see a pixel of movement at 1 per 3 frames.
     before = slot(pb, found)[3]
@@ -80,6 +79,7 @@ def main():
         pb.tick()
     state = slot(pb, found)
     heading = 1 if state[3] > before else -1
+    start_x = state[3]
     print(f"kind 0x{want:02X} in slot {found} at screen x {state[3] - OAM_OFFSET}, "
           f"walking {'right' if heading > 0 else 'left'}")
 
@@ -90,29 +90,32 @@ def main():
     if not all(t >= SOLID_FROM for t in under):
         print(f"the computed column {column} is not ground ({under})")
         pb.stop()
-        return 1
+        return None
 
     for step in range(1, GAP + 1):
         at = (ring + heading * step) % MAP_WIDTH
         if mode == "pit":
             for row in GROUND_ROWS:
                 pb.memory[MAP_BASE + row * MAP_WIDTH + at] = OPEN
-        else:
+        elif mode == "wall":
             for row in AIR_ROWS:
                 pb.memory[MAP_BASE + row * MAP_WIDTH + at] = WALL_TILE
-    print(f"put a {mode} {GAP} columns ahead of it\n")
+    print(f"put a {mode} {GAP} columns ahead of it")
 
     last = (state[3], state[2])
     turned = False
     fell = False
+    emptied = None
+    reach = state[3]
     for frame in range(WATCH):
         pb.memory[MARIO_Y] = FLY_Y
         pb.tick()
         state = slot(pb, found)
         if state[0] != want:
-            print(f"frame {frame}: slot emptied")
+            emptied = frame
             break
         now = (state[3], state[2])
+        reach = max(reach, now[0]) if heading > 0 else min(reach, now[0])
         if now != last:
             if (now[0] - last[0]) * heading < 0:
                 turned = True
@@ -121,8 +124,36 @@ def main():
             last = now
 
     pb.stop()
-    print(f"turned back: {turned}")
-    print(f"fell: {fell}")
+    return {
+        "heading": heading,
+        "turned": turned,
+        "fell": fell,
+        "emptied": emptied,
+        "reach": reach,
+        "start": start_x,
+    }
+
+
+def main():
+    want = int(sys.argv[1], 0) if len(sys.argv) > 1 else 0x04
+    mode = sys.argv[2] if len(sys.argv) > 2 else "wall"
+
+    # A hopper reverses on its own and rises and falls every hop, so "it turned"
+    # and "it fell" mean nothing for it on their own. The control run makes the
+    # comparison the measurement: how far it got with the obstacle, against how
+    # far the same object got without one.
+    control = run(want, "none")
+    print()
+    obstacle = run(want, mode)
+    if control is None or obstacle is None:
+        return 1
+
+    print()
+    for name, result in (("control", control), (mode, obstacle)):
+        travel = abs(result["reach"] - result["start"])
+        print(f"{name:8s}: reached {travel:3d} px, turned {result['turned']}, "
+              f"fell {result['fell']}, "
+              f"slot emptied at {result['emptied']}")
     return 0
 
 

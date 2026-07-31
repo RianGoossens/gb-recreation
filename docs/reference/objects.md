@@ -264,8 +264,46 @@ Writing a wall and then a pit into the tilemap in front of each
 So the cartridge has both a walker that ignores ledges and one that respects
 them, which is why the engine carries two.
 
-`0x0E`'s bursts with long pauses and its steps of up to 4 pixels per frame in
-both axes are the shape of something that jumps.
+### Kind 0x0E, the jumper
+
+`measure_enemy_walk.py` could only describe this one as noise: bursts of up to
+4 px a frame on both axes with 54-frame pauses. Its summary suits something
+that walks. `trace_jumper.py` prints the raw arc instead, with the camera held
+still the same way, and the cycle comes out exact.
+
+```
+resting row at slot Y 136, lowest reached 121 (15 px above it)
+9 excursions above the resting row, starts 102 frames apart, 45 frames each
+the second excursion, as height above the resting row:
+  0 4 4 4 8 8 8 10 10 10 12 12 12 13 13 13 14 14 14 15 15 15 15 15 15
+  15 15 15 14 14 14 13 13 13 12 12 12 10 10 10 8 8 8 4 4 4 0
+```
+
+Every value is held for three frames, so the object updates its position 16
+times per hop and then stands perfectly still. The updates are `-2` px
+sideways every time, and the rises are:
+
+```
++4 +4 +2 +2 +1 +1 +1 0 0 -1 -1 -1 -2 -2 -4 -4
+```
+
+That is not constant deceleration (which would be `+4 +3 +2 +1 ...`), so the
+cartridge is reading a table and `src/core/enemy.rs` reads the same one. The
+cycle is 16 x 3 = 48 frames of hop plus 54 of standing, which is the 102 the
+excursions are apart.
+
+Turning had to be measured differently from the walkers. A hopper reverses on
+its own and rises and falls every hop, so "it turned" and "it fell" are true
+whatever you put in front of it. `probe_walker_turn.py` now runs a control with
+no obstacle and compares how far the object got:
+
+```
+control : reached  93 px
+wall    : reached  36 px
+pit     : reached  61 px, slot emptied at frame 180
+```
+
+So it turns at a wall and hops into a pit and out of the level.
 
 ### The two by the exit are lifts
 
@@ -331,6 +369,7 @@ the back door, so the ids stay as ids.
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
+  All five now have their movement measured; only the names are missing.
 - What kinds `0x02` and `0x0C` are, and why 1-3 starts them inside solid tiles.
 - The rest of a slot's 16 bytes.
 
@@ -350,3 +389,6 @@ the back door, so the ids stay as ids.
 | `tools/probe_walker_turn.py` | whether a walker turns at a wall or a ledge |
 | `tools/find_object_lists.py` | where each World 1 level's list starts |
 | `tools/trace_level_objects.py` | the same trace in any World 1 level |
+| `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
+| `tools/find_skip_flag.py` | which byte of memory releases the skipped records |
+| `tools/verify_skip_flag.py` | that byte across a whole level |

@@ -170,6 +170,12 @@ pub fn spawning_in(records: &[ObjectRecord], mode: Mode) -> Vec<ObjectRecord> {
 pub const WALKER: u8 = 0x00;
 pub const LEDGE_TURNER: u8 = 0x04;
 
+/// The jumper. Still for 54 frames, then a 32 px hop 15 px high over 48, on a
+/// fixed table of rises rather than an accumulating speed
+/// (`tools/trace_jumper.py`). It turns at a wall and hops off a ledge. World
+/// 1-1's list uses it five times in normal play.
+pub const HOPPER: u8 = 0x0E;
+
 /// The two lift kinds. World 1-1 uses one of each, at columns 284 and 293,
 /// either side of its exit door. Dropping Mario onto both showed they carry
 /// him (`tools/probe_lift.py`), and their cycles were measured from the
@@ -190,11 +196,20 @@ pub fn lift_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize, b
         .collect()
 }
 
+/// Where a level puts its jumpers, as (column, row).
+pub fn hopper_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == HOPPER)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// Where a level puts its ground walkers, as (column, row, turns at ledges).
 ///
-/// Deliberately only these two kinds. The others spawn and move, but nothing
-/// about how they move has been measured, so a level file is short of enemies
-/// rather than carrying invented ones.
+/// Deliberately only these two kinds. The remaining kinds spawn and move in the
+/// cartridge, and nothing about how they move has been measured, so a level
+/// file is short of enemies rather than carrying invented ones.
 pub fn walker_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize, bool)> {
     spawning_in(records, mode)
         .iter()

@@ -209,6 +209,7 @@ fn spawn_enemies(level: &Level) -> Vec<Enemy> {
             EnemyKind::Goomba => Enemy::goomba(px, py, true),
             EnemyKind::LedgeTurner => Enemy::ledge_turner(px, py, true),
             EnemyKind::Fly => Enemy::fly(px, py, true),
+            EnemyKind::Hopper => Enemy::hopper(px, py, true),
         })
         .collect()
 }

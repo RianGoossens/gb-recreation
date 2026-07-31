@@ -34,9 +34,9 @@ fn extracted_level_has_the_shape_the_rom_decodes_to() {
 #[test]
 fn the_extracted_level_carries_the_cartridge_s_walkers() {
     let Some(level) = extracted() else { return };
-    // The ten kind 0x00 records in World 1-1's object list, plus its one kind
-    // 0x04. Only those two are written out, being the only ones whose
-    // movement has been measured.
+    // The ten kind 0x00 records in World 1-1's object list, its one kind 0x04,
+    // and its three kind 0x0E. Only those three kinds are written out, being
+    // the only ones whose movement has been measured.
     let mut placed: Vec<(i32, i32)> =
         level.enemy_spawns.iter().map(|&(x, y, _)| (x, y)).collect();
     placed.sort_unstable();
@@ -46,9 +46,15 @@ fn the_extracted_level_carries_the_cartridge_s_walkers() {
         .filter(|&&(_, _, kind)| kind == EnemyKind::LedgeTurner)
         .count();
     assert_eq!(turners, 1, "World 1-1 has exactly one of the ledge-turning kind");
-    // Every walker in World 1-1's list, at 16 * x across and 8 * row down.
-    // Seven stand on the ground at row 13, four are higher up. The one at
-    // pixel 944 is the kind 0x04 record, `3B 0F 04`.
+    let hoppers = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Hopper)
+        .count();
+    assert_eq!(hoppers, 3, "and three jumpers");
+    // Every one of them, at 16 * x across and 8 * row down. The one at pixel
+    // 944 is the kind 0x04 record, `3B 0F 04`; 1320, 1872 and 1952 are the
+    // kind 0x0E ones.
     assert_eq!(
         placed,
         vec![
@@ -58,18 +64,21 @@ fn the_extracted_level_carries_the_cartridge_s_walkers() {
             (656, 16),
             (944, 104),
             (1264, 104),
+            (1320, 104),
             (1360, 104),
             (1488, 80),
             (1568, 80),
             (1600, 104),
             (1680, 104),
+            (1872, 104),
+            (1952, 104),
         ]
     );
     for &(x, y, _) in &level.enemy_spawns {
         let (column, row) = (x / 8, y / 8);
         assert!(
             !level.solids.is_solid(column, row),
-            "a walker was placed inside a solid tile at {column},{row}"
+            "an enemy was placed inside a solid tile at {column},{row}"
         );
     }
 }

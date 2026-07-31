@@ -41,6 +41,24 @@ pub const HOP_VELOCITY: i32 = 520;
 /// Frames a Fly waits on the ground between hops.
 pub const HOP_INTERVAL: u32 = 40;
 
+/// The cartridge's jumper (object kind `0x0E`) runs on a fixed cycle of 102
+/// frames, traced with the camera held still (`tools/trace_jumper.py`). It
+/// moves on every third frame of the first 48 and then stands perfectly still
+/// for the other 54.
+pub const HOP_CYCLE: u32 = 102;
+/// Frames between position updates while it is in the air.
+pub const HOP_STEP_FRAMES: u32 = 3;
+/// Pixels it covers sideways on each update, so 32 px over a whole hop.
+pub const HOP_STEP: i32 = 2;
+/// How far it rises on each of the sixteen updates of a hop. Read straight off
+/// the trace rather than fitted: the shape is not constant deceleration, so it
+/// is a table in the cartridge and a table here.
+pub const HOP_RISE: [i32; 16] = [4, 4, 2, 2, 1, 1, 1, 0, 0, -1, -1, -1, -2, -2, -4, -4];
+/// Frames of a cycle spent in the air.
+pub const HOP_FRAMES: u32 = HOP_RISE.len() as u32 * HOP_STEP_FRAMES;
+/// The peak of the arc, which is what the table sums to at its highest point.
+pub const HOP_HEIGHT: i32 = 15;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
@@ -54,6 +72,12 @@ pub enum EnemyKind {
     LedgeTurner,
     /// Walks but hops on a timer, so it does not respect ledges.
     Fly,
+    /// The cartridge's jumper: still for 54 frames, then a 32 px hop 15 px
+    /// high over 48. It turns at a wall and hops straight off a ledge, both
+    /// settled against a control run with no obstacle
+    /// (`tools/probe_walker_turn.py`), which a hopper needs because it
+    /// reverses and falls on its own anyway.
+    Hopper,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +92,8 @@ pub struct Enemy {
     pub kind: EnemyKind,
     /// Countdown to the next hop, for a Fly. Ignored by other kinds.
     pub hop_timer: u32,
+    /// Frames into the current cycle, for a Hopper. Ignored by other kinds.
+    pub phase: u32,
 }
 
 impl Enemy {
@@ -83,6 +109,7 @@ impl Enemy {
             alive: true,
             kind,
             hop_timer: HOP_INTERVAL,
+            phase: 0,
         }
     }
 
@@ -101,6 +128,15 @@ impl Enemy {
         Self::new(pixel_x, pixel_y, going_left, EnemyKind::Fly)
     }
 
+    /// The cartridge's jumper, resting at the start of its cycle.
+    pub fn hopper(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        let mut hopper = Self::new(pixel_x, pixel_y, going_left, EnemyKind::Hopper);
+        // The still half of the cycle comes second in the trace, but starting
+        // there gives it a moment on the ground before its first hop.
+        hopper.phase = HOP_FRAMES;
+        hopper
+    }
+
     pub fn pixel_x(&self) -> i32 {
         self.x.div_euclid(crate::core::entity::SUBPIXEL)
     }
@@ -117,10 +153,62 @@ impl Enemy {
     }
 }
 
+/// One position update of a hop: sideways, then the table's rise or fall.
+fn step_hop(enemy: &mut Enemy, solids: &Solids, rise: i32) {
+    use crate::core::entity::pixels;
+
+    let dx = if enemy.vx < 0 { -HOP_STEP } else { HOP_STEP };
+    enemy.x += pixels(dx);
+    let (l, t, r, b) = enemy.edges();
+    if dx > 0 && solids.rect_hits_solid(r, t, r, b) {
+        enemy.x = pixels(r.div_euclid(TILE) * TILE - ENEMY_SIZE);
+        enemy.vx = -enemy.vx;
+    } else if dx < 0 && solids.rect_hits_solid(l, t, l, b) {
+        enemy.x = pixels(l.div_euclid(TILE) * TILE + TILE);
+        enemy.vx = -enemy.vx;
+    }
+
+    enemy.y -= pixels(rise);
+    if rise < 0 {
+        let (l, _t, r, b) = enemy.edges();
+        if solids.rect_hits_solid(l, b, r, b) {
+            enemy.y = pixels(b.div_euclid(TILE) * TILE - ENEMY_SIZE);
+        }
+    }
+}
+
+/// Advance the cartridge's jumper a frame.
+///
+/// It ignores the velocity model the walkers use. The trace shows a fixed
+/// table of rises applied every third frame; running it off a counter is what
+/// reproduces the arc.
+fn update_hopper(enemy: &mut Enemy, solids: &Solids) {
+    if enemy.phase < HOP_FRAMES {
+        if enemy.phase.is_multiple_of(HOP_STEP_FRAMES) {
+            let step = (enemy.phase / HOP_STEP_FRAMES) as usize;
+            step_hop(enemy, solids, HOP_RISE[step]);
+        }
+    } else {
+        // Standing still, unless it came down over a pit, in which case it
+        // keeps going the way any other enemy does.
+        let (l, _t, r, b) = enemy.edges();
+        if !solids.rect_hits_solid(l, b + 1, r, b + 1) {
+            enemy.y += ENEMY_FALL_SPEED;
+        }
+    }
+    enemy.phase = (enemy.phase + 1) % HOP_CYCLE;
+    let (l, _t, r, b) = enemy.edges();
+    enemy.on_ground = solids.rect_hits_solid(l, b + 1, r, b + 1);
+}
+
 /// Advance one enemy a frame: walk, reverse at walls, fall, land on floors.
 pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     use crate::core::entity::pixels;
     if !enemy.alive {
+        return;
+    }
+    if enemy.kind == EnemyKind::Hopper {
+        update_hopper(enemy, solids);
         return;
     }
 
@@ -373,6 +461,93 @@ mod tests {
             }
         }
         assert!(rose, "a Fly should hop above its resting height");
+    }
+
+    /// The whole traced cycle, checked against the numbers the cartridge gave.
+    #[test]
+    fn a_hopper_reproduces_the_traced_arc() {
+        let solids = floor();
+        let mut h = Enemy::hopper(80, 16, true);
+        update_enemy(&mut h, &solids);
+        assert!(h.on_ground);
+        let (rest_x, rest_y) = (h.pixel_x(), h.pixel_y());
+
+        let mut peak = rest_y;
+        let mut airborne = 0;
+        for _ in 0..HOP_CYCLE {
+            update_enemy(&mut h, &solids);
+            peak = peak.min(h.pixel_y());
+            if h.pixel_y() < rest_y {
+                airborne += 1;
+            }
+        }
+        assert_eq!(rest_y - peak, HOP_HEIGHT, "15 px high");
+        assert_eq!(rest_x - h.pixel_x(), 32, "32 px sideways per hop");
+        assert_eq!(h.pixel_y(), rest_y, "and back on the ground");
+        // 48 frames of the cycle move it; the first update leaves the ground
+        // and the last one puts it back, so 45 are spent above the row.
+        assert_eq!(airborne, 45);
+    }
+
+    #[test]
+    fn a_hopper_stands_perfectly_still_between_hops() {
+        let solids = floor();
+        let mut h = Enemy::hopper(80, 16, true);
+        for _ in 0..2 {
+            update_enemy(&mut h, &solids);
+        }
+        let at = (h.pixel_x(), h.pixel_y());
+        // It starts in the still half of the cycle, so nothing should move
+        // until the hop comes round.
+        for _ in 0..(HOP_CYCLE - HOP_FRAMES - 4) {
+            update_enemy(&mut h, &solids);
+            assert_eq!((h.pixel_x(), h.pixel_y()), at);
+        }
+    }
+
+    #[test]
+    fn a_hopper_turns_at_a_wall() {
+        let mut rows = [
+            "....................".to_string(),
+            "....................".to_string(),
+            "....................".to_string(),
+            "####################".to_string(),
+        ];
+        for row in rows.iter_mut().take(3) {
+            row.replace_range(7..8, "#");
+        }
+        let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
+        let solids = Solids::from_rows(&refs);
+
+        let mut h = Enemy::hopper(40, 16, false); // hopping toward the wall
+        let mut reversed = false;
+        for _ in 0..(HOP_CYCLE * 3) {
+            update_enemy(&mut h, &solids);
+            if h.vx < 0 {
+                reversed = true;
+            }
+            assert!(h.pixel_x() <= 48, "it must never pass the wall at x=56");
+        }
+        assert!(reversed);
+    }
+
+    #[test]
+    fn a_hopper_goes_off_a_ledge_rather_than_turning() {
+        let mut floor_row = ".".repeat(20);
+        floor_row.replace_range(5..10, "#####");
+        let solids = Solids::from_rows(&[
+            &".".repeat(20),
+            &".".repeat(20),
+            &".".repeat(20),
+            &floor_row,
+        ]);
+        let mut h = Enemy::hopper(48, 16, false);
+        let start_y = h.pixel_y();
+        for _ in 0..(HOP_CYCLE * 3) {
+            update_enemy(&mut h, &solids);
+        }
+        assert!(h.pixel_x() >= 80, "it should have hopped past the ledge");
+        assert!(h.pixel_y() > start_y, "and be on its way down");
     }
 
     #[test]

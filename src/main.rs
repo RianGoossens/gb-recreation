@@ -258,6 +258,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     };
     let walkers = object::walker_spawns(&records, mode);
     let lifts = object::lift_spawns(&records, mode);
+    let hoppers = object::hopper_spawns(&records, mode);
     let mut objects: Vec<(usize, usize, u8)> =
         walkers
             .iter()
@@ -268,6 +269,7 @@ fn extract_level(args: &[String]) -> ExitCode {
             .iter()
             .map(|&(c, r, up)| (c, r, if up { b'V' } else { b'H' })),
     );
+    objects.extend(hoppers.iter().map(|&(c, r)| (c, r, b'J')));
 
     let text = level::to_level_text_with_objects(&columns, &objects);
     if let Err(e) = std::fs::write(path, text) {
@@ -294,8 +296,10 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!(
-        "  {} ground walkers and {} lifts, from {} object records ({} spawn in {} mode)",
+        "  {} ground walkers, {} jumpers and {} lifts, from {} object records \
+({} spawn in {} mode)",
         walkers.len(),
+        hoppers.len(),
         lifts.len(),
         records.len(),
         object::spawning_in(&records, mode).len(),

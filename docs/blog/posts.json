@@ -1,5 +1,11 @@
 [
   {
+    "title": "The half of the list you never see",
+    "date": "2026-07-31",
+    "slug": "2026-07-31-the-half-of-the-list-you-never-see",
+    "summary": "A brute-force sweep of memory finds what the object list's skip bit is for, Mario measures 11 by 12 instead of 8 by 8, and the jumper runs off a table."
+  },
+  {
     "title": "Two walkers and a lift",
     "date": "2026-07-31",
     "slug": "2026-07-31-two-walkers-and-a-lift",

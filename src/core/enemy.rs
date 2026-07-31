@@ -12,8 +12,20 @@ use crate::SCREEN_WIDTH;
 
 /// Enemies are one tile square.
 pub const ENEMY_SIZE: i32 = 8;
-/// Horizontal walk speed in subpixels per frame. Provisional.
-pub const ENEMY_WALK_SPEED: i32 = 96;
+/// Horizontal walk speed in subpixels per frame.
+///
+/// Measured from the cartridge with `tools/measure_enemy_walk.py`, on the
+/// object kind World 1-1's list uses nine times. The camera in Super Mario
+/// Land only moves while Mario does, so letting go of right freezes it and
+/// leaves the object's slot X moving under its own power alone: it stepped one
+/// pixel left 143 times, and every one of the 142 gaps between steps was
+/// exactly 3 frames. So the walk is a counter rather than an accumulator, at
+/// one pixel per three frames.
+///
+/// 256 subpixels make a pixel here, and 256/3 is not a whole number, so 85 is
+/// as close as this representation gets: 0.4% slow, about a pixel behind the
+/// cartridge every 750 frames.
+pub const ENEMY_WALK_SPEED: i32 = 85;
 /// How far past the screen edges an enemy may be before it despawns.
 pub const DESPAWN_MARGIN: i32 = 32;
 /// Upward speed a Fly gets on each hop. Provisional.
@@ -196,6 +208,20 @@ mod tests {
         }
         assert!(e.x < start, "should have walked left");
         assert!(e.on_ground);
+    }
+
+    #[test]
+    fn enemy_walks_a_pixel_every_three_frames() {
+        // What the cartridge does: 143 steps of one pixel, 3 frames apart
+        // every time. Over 300 frames that is 100 pixels, and ours lands on
+        // the same pixel.
+        let solids = floor();
+        let mut e = Enemy::goomba(160, 16, true);
+        let start = e.pixel_x();
+        for _ in 0..300 {
+            update_enemy(&mut e, &solids);
+        }
+        assert_eq!(start - e.pixel_x(), 100);
     }
 
     #[test]

@@ -1,5 +1,11 @@
 [
   {
+    "title": "The levels look like the game now",
+    "date": "2026-07-31",
+    "slug": "2026-07-31-the-levels-look-like-the-game-now",
+    "summary": "World 1 drawn from the ROM with the cartridge's own tile graphics, scored at 99.60% of playfield pixels against the emulator. The tile data was in a block everyone already knew about, copied to video RAM addresses nobody had checked."
+  },
+  {
     "title": "All of World 1, out of the cartridge",
     "date": "2026-07-31",
     "slug": "2026-07-31-all-of-world-1-out-of-the-cartridge",

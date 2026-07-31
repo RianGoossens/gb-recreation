@@ -165,8 +165,11 @@ Three of the four come from `0x04032` onward, which is bank 1 plus `0x32`.
 World 1's tiles are at `0x08032`, bank 2 plus `0x32`. So a world's own tiles
 sit at the same offset into whichever bank holds its levels.
 
-`level::tiles_for_level` applies the overlay. Measured from 2-1 only; whether
-2-2 and 2-3 load the same spans is not checked.
+`level::tiles_for_level` applies the overlay. Measured on 2-1 and 2-2, which
+load byte-identical block layouts, so it is per world rather than per level.
+2-3 is not measured (the run to reach it kills the machine), but it renders as
+a coherent underwater scene through the same overlay, which is evidence rather
+than a measurement.
 
 One trap worth keeping: background tiles use the signed addressing mode, so an
 id below 128 reads from `0x9000` and the rest from `0x8800`. Computing

@@ -528,8 +528,9 @@ pub fn gameplay_tiles(rom: &[u8]) -> Result<&[u8], AssetError> {
 /// offset into its own bank that World 1's `0x08032` is into bank 2, so a
 /// world's own tiles sit at the start of the bank holding its levels.
 ///
-/// Measured from 2-1 only. Whether 2-2 and 2-3 load the same overlay is not
-/// checked.
+/// Measured on 2-1 and 2-2, which load byte-identical block layouts, so the
+/// overlay is per world rather than per level. 2-3 is not measured, but it
+/// renders as a coherent underwater scene through the same spans.
 pub const WORLD_2_TILE_BLOCKS: [(usize, usize, usize); 4] = [
     (0x04032, 0x8A00, 0x03C0),
     (0x04432, 0x9340, 0x0100),

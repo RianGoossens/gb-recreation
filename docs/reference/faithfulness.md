@@ -38,6 +38,12 @@ playing it faithfully.
 | Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls). Its movement is now measured, on object kind `0x00`, the one World 1-1's list uses ten times: one pixel left every three frames without exception over 143 steps (`tools/measure_enemy_walk.py`), and it walks off a ledge rather than turning, falling straight down at a flat pixel per frame with its X frozen (`tools/probe_enemy_ledge.py`). The ledge-turn our engine used to do was carried over from another game and is gone. Still unverified: the mapping of kind `0x00` to this entity, and its sprite. |
 | Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Gated the same way as the star. Still worth replacing with a real SML enemy rather than only hiding it. |
 
+## Open discrepancies
+
+| Piece | Notes |
+|-------|-------|
+| Small Mario's collision width | Ours is 8 px. Dropping him onto World 1-1's lift holds him across a 29 px window of his own X, and the lift is 16 px wide (two 8-px sprites), which puts the cartridge's small Mario nearer 14 px. Not yet chased: changing Mario's box touches every collision case, so it wants its own measurement rather than being inferred from one experiment. |
+
 ## Items, blocks, scoring
 
 | Piece | Label | Notes |

@@ -243,6 +243,34 @@ object's 48 and stays there for 195 frames.
 So neither is an enemy. Both carry Mario, which is what makes the level's upper
 exit reachable.
 
+### How big a lift is
+
+Building one needs its surface, and `tools/measure_lift.py` drops Mario at
+every offset either side of it. He is held from an X byte of 134 to one of 162,
+with the lift's slot X at 136: a window 29 pixels wide. Outside it he falls
+straight past to the floor.
+
+The height is exact and comes out on a tile boundary. Mario's Y byte reads 134
+while he stands on World 1-1's ordinary ground, whose top edge is screen y 128,
+so his Y byte is his feet plus 6. On the lift he rests at the slot's Y minus 10,
+which puts his feet at `slotY - 16`, and that is the slot's Y as a screen
+coordinate. In other words his feet sit exactly on the top of the row the
+record decodes to. The walker agrees from the other direction: its slot Y of
+136 puts its own top at screen y 120 and its bottom on the ground at 128.
+
+The width does not resolve as cleanly. The lift is drawn from two 8-pixel
+sprites, so 16 pixels across, and a 16-pixel platform under an 8-pixel Mario
+would give a window of 23 rather than 29. The extra 6 says the cartridge's
+small Mario is about 14 pixels wide for this test, against the 8 our engine
+uses. The discrepancy sits in Mario's box. It is recorded in
+`docs/reference/faithfulness.md` rather than papered over by widening the lift.
+
+One note on method, because it cost a while. Taking a save state once the lift
+is on screen and restoring it per offset looks like the tidy way to run this
+sweep, and it silently breaks the experiment: restoring and then placing Mario
+drops him through the lift at every offset, including the ones a plain run
+holds him at. Every offset has to run inside the same continuous approach.
+
 None of these has a name yet. Naming them means matching a 16-pixel sprite to
 an SML enemy, and a wrong guess would put an invented enemy in the game through
 the back door, so the ids stay as ids.
@@ -268,5 +296,6 @@ the back door, so the ids stay as ids.
 | `tools/probe_object_type_flag.py` | what the kind byte's top bit does |
 | `tools/measure_enemy_walk.py` | how a kind moves, with the camera frozen |
 | `tools/probe_lift.py` | whether an object holds Mario up |
+| `tools/measure_lift.py` | a lift's surface: how wide, and how high Mario rests |
 | `tools/find_object_lists.py` | where each World 1 level's list starts |
 | `tools/trace_level_objects.py` | the same trace in any World 1 level |

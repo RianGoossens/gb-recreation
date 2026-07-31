@@ -116,3 +116,29 @@ cargo run --features gui -- run levels/example.txt [tuning.txt]
 # tuning.txt is optional here too
 cargo run -- play shot.png 1 "" levels/example.txt [tuning.txt]
 ```
+
+## The pointers before a level
+
+Every screen list in the ROM starts a few pointers before the level's own
+first screen: three for five of the six pinned levels, four for World 1-1.
+What they were for was open from the moment the first list was found.
+
+They are the level's bonus rooms, the coin chambers the raised exit door
+leads to. Decoding the last two of them shows closed boxes with a solid floor
+across their whole width, filled with coins, where a level's own screens have
+gaps in the ground. That pair of properties separates all twelve bonus rooms
+from all six opening screens, so `sml bonus-rooms <level>` draws them and
+`level::is_bonus_room` tests for one.
+
+A left wall is not part of the rule. Most of the rooms have one; World 2-3's
+is an underwater chamber walled on both sides and open across the top two
+rows, and requiring the wall threw it out.
+
+A level with one bonus room stores the same pointer twice: World 2-3 has
+`0x6327` in both places.
+
+What the pointer before those two is for is still open. World 1's three levels
+all carry `0x62BE` there, which is 1-1's own opening screen, and World 2's
+three all carry `0x56CD`, which is 2-1's. The lists that are not yet tied to a
+level do not follow that, so it is a pattern across two worlds rather than a
+rule.

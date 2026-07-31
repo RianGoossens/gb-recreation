@@ -6,6 +6,7 @@
 //!   extract-level [level] [out]             decode a level into a level file
 //!                 [--expert]                include the expert-mode objects
 //!   scan-levels                             list every screen list in the ROM
+//!   bonus-rooms <level>                     draw a level's two bonus rooms
 //!   list-objects [1-1|1-2|1-3]              print a level's object list
 //!   render-level <level> <col> <out.png>    draw a level screen with its real tiles
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
@@ -30,6 +31,7 @@ fn main() -> ExitCode {
         Some("extract-title") => extract_title_screen(&args[1..]),
         Some("extract-level") => extract_level(&args[1..]),
         Some("scan-levels") => scan_levels(),
+        Some("bonus-rooms") => bonus_rooms(&args[1..]),
         Some("list-objects") => list_objects(&args[1..]),
         Some("render-level") => render_level(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
@@ -735,4 +737,48 @@ fn usage() {
     println!("\n  run and play accept --allow-non-canonical anywhere in the arguments,");
     println!("  which keeps content Super Mario Land does not have (the star, the Fly).");
     println!("  Without it those spawns are dropped, so the default game is the cartridge's.");
+}
+
+/// `bonus-rooms <level>` draws the two screens sitting immediately before a
+/// level's own first screen in its pointer run. They are the coin chambers the
+/// raised exit door leads to, and they are the reason every list starts a few
+/// pointers before the level does.
+fn bonus_rooms(args: &[String]) -> ExitCode {
+    use sml::assets::level;
+
+    let name = args.first().map(|s| s.as_str()).unwrap_or("1-1");
+    let Some(&(_, list)) = level::KNOWN_LEVELS.iter().find(|(n, _)| *n == name) else {
+        let known: Vec<&str> = level::KNOWN_LEVELS.iter().map(|(n, _)| *n).collect();
+        eprintln!("unknown level {name}; known levels are {}", known.join(", "));
+        return ExitCode::FAILURE;
+    };
+    if let Err(e) = sml::rom::verify_file(DEFAULT_ROM) {
+        eprintln!("{e}");
+        return ExitCode::FAILURE;
+    }
+    let Ok(rom) = std::fs::read(DEFAULT_ROM) else {
+        eprintln!("could not read {DEFAULT_ROM}");
+        return ExitCode::FAILURE;
+    };
+    let Some(pointers) = level::bonus_rooms(&rom, list) else {
+        eprintln!("World {name}'s list has nothing before it");
+        return ExitCode::FAILURE;
+    };
+
+    let bank = level::bank_of(list);
+    for pointer in pointers {
+        let Some(columns) = level::screen(&rom, pointer, bank) else {
+            println!("0x{pointer:04X}: does not decode in bank 0x{bank:05X}");
+            continue;
+        };
+        let sealed = if level::is_bonus_room(&columns) {
+            "coin room"
+        } else {
+            "not a coin room"
+        };
+        println!("World {name}, screen 0x{pointer:04X} ({sealed}):");
+        print!("{}", level::to_level_text(&columns));
+        println!();
+    }
+    ExitCode::SUCCESS
 }

@@ -56,9 +56,9 @@ pub const LEVEL_1_1_LIST: usize = 0x0A198;
 /// (`tools/capture_next_level_opening.py`). It is `0x69A6`, which only this
 /// list points at.
 ///
-/// Each list in the ROM opens with three pointers that are not part of the
-/// level: all three known starts sit six bytes into their run. What those
-/// three are for is not known yet.
+/// Each list in the ROM opens with pointers that are not part of the level:
+/// three for this level and four for 1-1. The last two of them are the level's
+/// bonus rooms, which [`bonus_rooms`] reads.
 pub const LEVEL_1_2_LIST: usize = 0x0A1BD;
 
 /// World 1-3's screen list, reached the same way: the walkthrough plays
@@ -81,6 +81,9 @@ pub const WORLD_1: [(&str, usize); 3] = [
 /// The columns confirm it: the walkthrough's capture of 2-1 matches all 320
 /// of the decoded columns and 2-2 matches all 280. The run lost its last life
 /// partway through 2-3, so that one is matched for 261 of its 360 columns.
+///
+/// The three pointers before each of them are the same shape as World 1's:
+/// the last two decode to sealed coin rooms (see [`bonus_rooms`]).
 pub const LEVEL_2_1_LIST: usize = 0x055C1;
 pub const LEVEL_2_2_LIST: usize = 0x055E8;
 pub const LEVEL_2_3_LIST: usize = 0x0560B;
@@ -283,6 +286,49 @@ pub fn far_end(columns: &[Column]) -> Option<(usize, usize)> {
             .find(|&r| standing(c, r) && standing(c - 1, r))
             .map(|r| (c, r))
     })
+}
+
+/// The two screens sitting immediately before a level's own first screen in
+/// its pointer run.
+///
+/// Every list the scan finds opens with pointers that are not part of the
+/// level: three for five of the six pinned levels and four for World 1-1.
+/// The last two of them are the level's bonus rooms, the coin chambers the
+/// raised exit door leads to. Decoding them shows what they are: enclosed
+/// boxes with a solid floor and a solid left wall, filled with coins, where
+/// the level's own screens are open terrain.
+///
+/// A level with only one bonus room stores the same pointer twice (World 2-3
+/// has `0x6327` in both places).
+pub fn bonus_rooms(rom: &[u8], list_start: usize) -> Option<[u16; 2]> {
+    let first = list_start.checked_sub(4)?;
+    Some([
+        u16::from_le_bytes([*rom.get(first)?, *rom.get(first + 1)?]),
+        u16::from_le_bytes([*rom.get(first + 2)?, *rom.get(first + 3)?]),
+    ])
+}
+
+/// The 20 columns a single screen pointer draws, resolved in `bank`.
+pub fn screen(rom: &[u8], pointer: u16, bank: usize) -> Option<Vec<Column>> {
+    decode_screen(rom, pointer, bank)
+}
+
+/// The bank a ROM offset falls in, for resolving that offset's own pointers.
+pub fn bank_of(offset: usize) -> usize {
+    bank_base(offset)
+}
+
+/// Whether a screen is one of the coin rooms rather than open terrain: a solid
+/// floor all the way across, and at least one coin.
+///
+/// That pair separates all twelve of the pinned levels' bonus rooms from all
+/// six of their opening screens. A left wall is not part of the rule: most of
+/// the rooms have one, and World 2-3's is an underwater chamber walled on both
+/// sides but open across the top two rows.
+pub fn is_bonus_room(columns: &[Column]) -> bool {
+    let floor = columns.iter().all(|c| is_solid(c[ROWS - 1]));
+    let coins = columns.iter().flatten().any(|&t| is_coin(t));
+    floor && coins
 }
 
 /// The exit door's top-left cell, if the level has one.

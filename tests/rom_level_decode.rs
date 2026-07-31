@@ -364,3 +364,44 @@ fn the_gameplay_tile_block_is_one_contiguous_copy() {
         "the block should be mostly real tile data"
     );
 }
+
+/// Every list opens with pointers that are not part of the level, which was an
+/// open question for as long as only World 1 was decoded. The last two of them
+/// are the level's bonus rooms: closed boxes with a solid floor across their
+/// whole width, filled with coins, where a level's own screens have gaps.
+///
+/// World 2-3 stores the same pointer twice, so a level with one bonus room
+/// repeats it rather than leaving a gap.
+#[test]
+fn the_pointers_before_a_level_are_its_bonus_rooms() {
+    let Some(data) = rom() else { return };
+    for (name, list) in level::KNOWN_LEVELS {
+        let rooms = level::bonus_rooms(&data, list).expect("a list to have a run before it");
+        let bank = level::bank_of(list);
+        for pointer in rooms {
+            let columns = level::screen(&data, pointer, bank)
+                .unwrap_or_else(|| panic!("World {name}'s 0x{pointer:04X} should decode"));
+            assert!(
+                level::is_bonus_room(&columns),
+                "World {name}'s 0x{pointer:04X} should be a coin room"
+            );
+        }
+    }
+    let rooms = level::bonus_rooms(&data, level::LEVEL_2_3_LIST).unwrap();
+    assert_eq!(rooms[0], rooms[1], "World 2-3 has one bonus room, stored twice");
+}
+
+/// A level's own opening screen is not a coin room, which is what makes the test
+/// above a real distinction rather than something every screen passes.
+#[test]
+fn a_levels_own_opening_screen_is_not_a_sealed_room() {
+    let Some(data) = rom() else { return };
+    for (name, list) in level::KNOWN_LEVELS {
+        let pointer = level::screen_list(&data, list)[0];
+        let columns = level::screen(&data, pointer, level::bank_of(list)).unwrap();
+        assert!(
+            !level::is_bonus_room(&columns),
+            "World {name} opens on a coin room, so the test proves nothing"
+        );
+    }
+}

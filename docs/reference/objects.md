@@ -232,12 +232,46 @@ y: 96 moves of [-1, 1] px, 96 px travelled, +0 px net
 frame, with no gap anywhere, until it left the level and its slot emptied. In
 the one trace taken it stood still for 125 frames first.
 
-What neither measurement settles is whether these carry Mario or hurt him.
-Dropping him onto a `0x02` (`probe_lift.py 0x02 1-3`) leaves him resting 8
-pixels above its top edge, which is the terrain those records sit inside rather
-than the object, so the drop answers nothing. Both stay out of the extracted
-levels until that is pinned. Whether `0x0C`'s 125-frame wait is a fixed timer
-or something Mario triggers is also open.
+### What they do on contact
+
+Motion alone does not say what an object is. A 16 pixel oscillation fits a lift
+and a crusher equally well. `probe_object_contact.py` writes Mario's position
+straight into the two bytes the game reads, holds him there, and watches the
+life counter, sweeping the whole vertical overlap rather than one offset.
+
+Two controls run first, because an instrument that answers "hurt" to everything
+is worth nothing. Both were needed. The positive control is World 1-1's kind
+`0x00`, definitely an enemy:
+
+```
+positive control, World 1-1 kind 0x00 (a walker):
+  offset +10: unharmed (and the object went away)
+  offset  +6: lost a life
+  ...
+  offset  -8: lost a life
+negative control, Mario 60 px to the side: unharmed
+```
+
+`+10` is feet on top, which is a stomp: Mario survives and the object goes. The
+first version of this probe tested only that offset and reported the walker as
+harmless. It also used a 180-frame window, and a forced death costs a life on
+frame 212, after an animation the counter does not move during.
+
+With the controls behaving, the two kinds separate cleanly.
+
+**`0x02` is harmless.** Unharmed at every offset, through two full cycles of its
+own motion. It does not hold Mario up either: carving the background tilemap
+away so nothing else can catch him (`probe_lift.py 0x02 1-3 carve`) and dropping
+him on it sends him straight past to the bottom of the screen. So it is neither
+an enemy nor a platform.
+
+**`0x0C` is an enemy.** Its sweep matches the walker's exactly: a stomp at `+10`
+and a lost life at every offset from `+6` down. So it is a stompable hazard
+that falls.
+
+Still open on `0x0C`: whether its 125-frame wait is a fixed timer or something
+Mario triggers. Until that is answered it stays out of the levels, since a
+falling hazard with the wrong trigger is a different obstacle.
 
 ### What World 1-3 added
 
@@ -400,8 +434,9 @@ the back door, so the ids stay as ids.
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
   All five now have their movement measured; only the names are missing.
-- Whether `0x02` and `0x0C` carry Mario or hurt him. Their motion is measured
-  (see above); what they do on contact is not, so they stay out of the levels.
+- What starts `0x0C` falling. Its motion and its contact behaviour are both
+  measured; whether the wait before the fall is a timer or a trigger is not.
+- What `0x02` is for, given it neither hurts Mario nor holds him up.
 - Why 1-3 starts them inside solid tiles.
 - The rest of a slot's 16 bytes.
 
@@ -423,5 +458,6 @@ the back door, so the ids stay as ids.
 | `tools/trace_level_objects.py` | the same trace in any World 1 level |
 | `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
 | `tools/measure_level_kind.py` | how a kind moves, in 1-2 and 1-3 as well as 1-1 |
+| `tools/probe_object_contact.py` | whether touching a kind costs Mario a life |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |
 | `tools/verify_skip_flag.py` | that byte across a whole level |

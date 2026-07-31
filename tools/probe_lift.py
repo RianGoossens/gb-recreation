@@ -20,7 +20,12 @@ World 1-3 introduces two more kinds that move on one axis only, `0x02`
 then straight down at a pixel a frame). The same question applies to both, so
 the probe takes a level as well as a kind.
 
-Usage: uv run tools/probe_lift.py [kind] [1-1|1-2|1-3]
+A third argument, `carve`, clears the background tilemap around the object
+before the drop. World 1-3's records sit inside terrain, so Mario lands on that
+and the drop answers nothing; with the terrain gone the object is the only
+thing left that can hold him.
+
+Usage: uv run tools/probe_lift.py [kind] [1-1|1-2|1-3] [carve]
 """
 
 import sys
@@ -28,7 +33,7 @@ import sys
 sys.path.insert(0, "tools")
 
 from dump_object_slots import EMPTY, SLOTS, slot
-from run_through_levels import FLY_Y, MARIO_Y, PHASE, SPAWN_X
+from run_through_levels import FLY_Y, MAP_BASE, MAP_WIDTH, MARIO_Y, PHASE, SPAWN_X
 from sml_boot import boot_to_gameplay
 from trace_level_objects import NAMES, reach_level
 
@@ -41,6 +46,7 @@ WATCH = 200
 def main():
     want = int(sys.argv[1], 0) if len(sys.argv) > 1 else 0x0A
     level = sys.argv[2] if len(sys.argv) > 2 else "1-1"
+    carve = len(sys.argv) > 3 and sys.argv[3] == "carve"
     if level == "1-1":
         pb = boot_to_gameplay()
         pb.button_press("right")
@@ -71,6 +77,13 @@ def main():
 
     state = slot(pb, found)
     print(f"kind 0x{want:02X} in slot {found} at x {state[3]}, y {state[2]}")
+
+    if carve:
+        # Everything except the object, so nothing else can catch him.
+        for row in range(2, 18):
+            for column in range(MAP_WIDTH):
+                pb.memory[MAP_BASE + row * MAP_WIDTH + column] = 0x00
+        print("cleared the background tilemap around it")
 
     # Line Mario up over it and drop him from a little way above.
     for _ in range(4):

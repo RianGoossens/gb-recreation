@@ -1,5 +1,11 @@
 [
   {
+    "title": "Flying Mario through his own level",
+    "date": "2026-07-30",
+    "slug": "2026-07-30-flying-mario-through-his-own-level",
+    "summary": "Only 88 of World 1-1's 300 columns had ever been checked against the real game, because that is where a scripted walker died. Replacing the terrain with a non-solid tile and pinning Mario in the air gets the cartridge to its own exit, and all 300 columns now match."
+  },
+  {
     "title": "Asking the cartridge which tiles are solid",
     "date": "2026-07-30",
     "slug": "2026-07-30-asking-the-cartridge-which-tiles-are-solid",

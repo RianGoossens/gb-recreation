@@ -73,6 +73,35 @@ pub const WORLD_1: [(&str, usize); 3] = [
     ("1-3", LEVEL_1_3_LIST),
 ];
 
+/// World 2's screen lists, in ROM bank 1, reached by playing through all of
+/// World 1 (`tools/run_through_levels.py`). 2-1 opens on `0x56CD`, 2-2 on
+/// `0x5BA3` and 2-3 on `0x6100`, and each start is six bytes into the run the
+/// scan finds, the same three-pointer prefix every World 1 list carries.
+///
+/// The columns confirm it: the walkthrough's capture of 2-1 matches all 320
+/// of the decoded columns and 2-2 matches all 280. The run lost its last life
+/// partway through 2-3, so that one is matched for 261 of its 360 columns.
+pub const LEVEL_2_1_LIST: usize = 0x055C1;
+pub const LEVEL_2_2_LIST: usize = 0x055E8;
+pub const LEVEL_2_3_LIST: usize = 0x0560B;
+
+/// The three levels of World 2, in order.
+pub const WORLD_2: [(&str, usize); 3] = [
+    ("2-1", LEVEL_2_1_LIST),
+    ("2-2", LEVEL_2_2_LIST),
+    ("2-3", LEVEL_2_3_LIST),
+];
+
+/// Every level whose screen list has been pinned by playing to it.
+pub const KNOWN_LEVELS: [(&str, usize); 6] = [
+    ("1-1", LEVEL_1_1_LIST),
+    ("1-2", LEVEL_1_2_LIST),
+    ("1-3", LEVEL_1_3_LIST),
+    ("2-1", LEVEL_2_1_LIST),
+    ("2-2", LEVEL_2_2_LIST),
+    ("2-3", LEVEL_2_3_LIST),
+];
+
 /// A switchable ROM bank is 16 KB, and the CPU sees it at `0x4000`. World 1's
 /// data is in bank 2, so a pointer of `0x62BE` is ROM file offset `0xA2BE`.
 /// Later worlds live in other banks, which is why the bank is derived from

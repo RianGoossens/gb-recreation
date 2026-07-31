@@ -176,11 +176,13 @@ fn every_found_list_decodes_fully_in_its_own_bank() {
 ///
 /// The capture file is written by `tools/run_through_levels.py` and is
 /// gitignored, so this skips when it is absent. Each captured level is matched
-/// against whichever of World 1's levels it starts like, and then has to agree
+/// against whichever pinned level it starts like, and then has to agree
 /// exactly for as far as the run got. Short blocks are Mario dying early and
 /// the level restarting, which is still a real comparison, just a shorter one.
 /// A block that starts mid-level (World 1-3 restarts from a checkpoint) is
-/// skipped rather than mismatched.
+/// skipped rather than mismatched, and so is one longer than the level it
+/// matches, which means the run lost a life and the block runs on into a
+/// restart (World 2-3 does this).
 #[test]
 fn the_decode_matches_every_column_the_real_game_draws() {
     let Ok(text) = std::fs::read_to_string(CAPTURE) else { return };
@@ -188,13 +190,21 @@ fn the_decode_matches_every_column_the_real_game_draws() {
 
     let mut checked: Vec<(&str, usize)> = Vec::new();
     for captured in captured_levels(&text) {
-        let Some((name, columns)) = level::WORLD_1
+        let Some((name, columns)) = level::KNOWN_LEVELS
             .iter()
             .map(|&(name, list)| (name, level::decode_level(&data, list)))
-            .find(|(_, columns)| columns[0][..] == captured[0][..])
+            // A whole screen, not one column: World 2-1 and 2-2 open on the
+            // same first column and only part company later in the screen.
+            .find(|(_, columns)| {
+                let n = level::SCREEN_COLUMNS.min(captured.len());
+                (0..n).all(|i| columns[i][..] == captured[i][..])
+            })
         else {
             continue;
         };
+        if captured.len() > columns.len() {
+            continue;
+        }
         let reached = captured.len().min(columns.len());
         let mismatches: Vec<usize> = (0..reached)
             .filter(|&i| columns[i][..] != captured[i][..])
@@ -217,6 +227,25 @@ fn the_decode_matches_every_column_the_real_game_draws() {
     assert_eq!(best("1-1"), 300, "the whole of World 1-1 should be covered");
     assert_eq!(best("1-2"), 280, "the whole of World 1-2 should be covered");
     assert_eq!(best("1-3"), 300, "the whole of World 1-3 should be covered");
+    assert_eq!(best("2-1"), 320, "the whole of World 2-1 should be covered");
+    assert_eq!(best("2-2"), 280, "the whole of World 2-2 should be covered");
+}
+
+/// Each of World 2's lists starts on the screen the game opens that level
+/// with, read off the running cartridge by playing through all of World 1.
+#[test]
+fn world_2_starts_on_the_screens_the_game_opens_it_with() {
+    let Some(data) = rom() else { return };
+    let opening = [
+        (level::LEVEL_2_1_LIST, 0x56CD, 16),
+        (level::LEVEL_2_2_LIST, 0x5BA3, 14),
+        (level::LEVEL_2_3_LIST, 0x6100, 18),
+    ];
+    for (list, first, screens) in opening {
+        let pointers = level::screen_list(&data, list);
+        assert_eq!(pointers.first(), Some(&first), "list at {list:#07X}");
+        assert_eq!(pointers.len(), screens, "list at {list:#07X}");
+    }
 }
 
 /// World 1-3's list start, reached by playing through 1-1 and 1-2. It opens on

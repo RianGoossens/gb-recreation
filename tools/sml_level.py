@@ -19,9 +19,20 @@ FILLER = 44
 REPEAT = 0xFD
 COLUMN_END = 0xFE
 LIST_END = 0xFF
-BANK_BASE = 0x8000
 BANK_WINDOW = 0x4000
-LIST_STARTS = (0x0A190, 0x0A1B7, 0x0A1DA)
+# Every screen list the ROM scan finds, in all three switchable banks. Six in
+# bank 1, World 1's three in bank 2, three in bank 3: twelve lists for the
+# cartridge's twelve levels. A pointer resolves against the bank its list was
+# found in, so the bank comes from the list offset rather than being fixed.
+LIST_STARTS = (
+    0x055BB, 0x055E2, 0x05605, 0x05630, 0x05665, 0x056AE,
+    0x0A190, 0x0A1B7, 0x0A1DA,
+    0x0D03F, 0x0D074, 0x0D0A7,
+)
+
+
+def bank_base(offset):
+    return offset & ~(BANK_WINDOW - 1)
 
 
 def decode_column(rom, i):
@@ -46,9 +57,11 @@ def decode_column(rom, i):
     return None, i
 
 
-def decode_screen(rom, pointer):
+def decode_screen(rom, pointer, bank):
     columns = []
-    i = pointer - BANK_WINDOW + BANK_BASE
+    if not BANK_WINDOW <= pointer < 2 * BANK_WINDOW:
+        return None
+    i = pointer - BANK_WINDOW + bank
     for _ in range(VISIBLE_COLUMNS):
         column, i = decode_column(rom, i)
         if column is None:
@@ -63,10 +76,11 @@ def known_screens():
     screens = {}
     for start in LIST_STARTS:
         i = start
+        bank = bank_base(start)
         while rom[i] != LIST_END:
             pointer = rom[i] | (rom[i + 1] << 8)
             i += 2
-            columns = decode_screen(rom, pointer)
+            columns = decode_screen(rom, pointer, bank)
             if columns is not None:
                 screens.setdefault(repr(columns), []).append((start, pointer))
     return screens
@@ -85,8 +99,9 @@ def screen_list(rom, start):
 
 def decode_level(rom, start):
     columns = []
+    bank = bank_base(start)
     for pointer in screen_list(rom, start):
-        screen = decode_screen(rom, pointer)
+        screen = decode_screen(rom, pointer, bank)
         if screen is None:
             break
         columns += screen

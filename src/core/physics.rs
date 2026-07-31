@@ -114,8 +114,9 @@ pub fn step_motion(mario: &mut Mario, buttons: Buttons, solids: &Solids, t: &Tun
     apply_jump(mario, buttons, t);
     apply_vertical_accel(mario, buttons, t);
 
+    let was_above = edges(mario).3;
     mario.y += mario.vy;
-    resolve_vertical(mario, solids);
+    resolve_vertical(mario, solids, was_above);
 
     mario.on_ground = grounded(mario, solids);
     if mario.on_ground {
@@ -196,10 +197,17 @@ fn resolve_horizontal(mario: &mut Mario, solids: &Solids) {
     }
 }
 
-fn resolve_vertical(mario: &mut Mario, solids: &Solids) {
+/// `was_above` is Mario's bottom edge before this frame's move, which is what
+/// decides a one-way platform: he lands on it only if his feet started above
+/// its top. Coming up from underneath or standing inside it, it is not there.
+fn resolve_vertical(mario: &mut Mario, solids: &Solids, was_above: i32) {
     let (_w, h) = mario.size();
     let (left, top, right, bottom) = edges(mario);
     if mario.vy > 0 && solids.rect_hits_solid(left, bottom, right, bottom) {
+        let floor_top = bottom.div_euclid(TILE) * TILE;
+        mario.y = pixels(floor_top - h);
+        mario.vy = 0;
+    } else if mario.vy > 0 && landed_on_platform(solids, left, right, bottom, was_above) {
         let floor_top = bottom.div_euclid(TILE) * TILE;
         mario.y = pixels(floor_top - h);
         mario.vy = 0;
@@ -210,10 +218,29 @@ fn resolve_vertical(mario: &mut Mario, solids: &Solids) {
     }
 }
 
-/// True when a solid sits directly under Mario's feet.
+/// A one-way platform catches a fall only if the feet crossed its top edge
+/// during this frame.
+fn landed_on_platform(
+    solids: &Solids,
+    left: i32,
+    right: i32,
+    bottom: i32,
+    was_above: i32,
+) -> bool {
+    match solids.platform_under(left, right, bottom) {
+        Some(ty) => was_above < ty * TILE,
+        None => false,
+    }
+}
+
+/// True when something sits directly under Mario's feet, solid or platform.
+///
+/// A platform only counts while he is not moving up, or jumping through one
+/// would stop him at the apex with its top an inch under his feet.
 fn grounded(mario: &Mario, solids: &Solids) -> bool {
     let (left, _top, right, bottom) = edges(mario);
     solids.rect_hits_solid(left, bottom + 1, right, bottom + 1)
+        || (mario.vy >= 0 && solids.platform_under(left, right, bottom + 1).is_some())
 }
 
 /// Move a velocity toward zero by `amount`, without overshooting past zero.
@@ -564,5 +591,96 @@ mod tests {
         // He cannot enter the ceiling: top is pushed back to y=8, vy cleared.
         assert_eq!(m.pixel_y(), 8);
         assert_eq!(m.vy, 0);
+    }
+}
+
+#[cfg(test)]
+mod platform_tests {
+    use super::*;
+    use crate::core::level::Solids;
+
+    /// Four tile ids hold Mario up without blocking him sideways, measured
+    /// from the cartridge by `tools/probe_solidity.py`. World 1-2 lays them
+    /// out as horizontal runs with distinct end caps.
+    fn ledge() -> Solids {
+        Solids::from_rows(&[
+            "........",
+            "........",
+            "..^^^^..",
+            "........",
+            "########",
+        ])
+    }
+
+    fn drop_onto(start_y: i32) -> Mario {
+        let solids = ledge();
+        let t = Tuning::default();
+        let mut mario = Mario::new(3 * TILE, start_y);
+        for _ in 0..60 {
+            step_motion(&mut mario, Buttons::default(), &solids, &t);
+        }
+        mario
+    }
+
+    #[test]
+    fn a_platform_catches_a_fall_from_above() {
+        let mario = drop_onto(0);
+        assert!(mario.on_ground, "should be standing on the platform");
+        let (_w, h) = mario.size();
+        assert_eq!(mario.pixel_y(), 2 * TILE - h, "resting on the platform top");
+    }
+
+    #[test]
+    fn a_platform_does_not_stop_a_jump_from_below() {
+        let solids = ledge();
+        let t = Tuning::default();
+        let mut mario = Mario::new(3 * TILE, 3 * TILE);
+        let mut buttons = Buttons::default();
+        buttons.set(Button::A, true);
+        let mut highest = mario.pixel_y();
+        for _ in 0..40 {
+            step_motion(&mut mario, buttons, &solids, &t);
+            highest = highest.min(mario.pixel_y());
+        }
+        assert!(
+            highest < 2 * TILE - 8,
+            "Mario should pass up through the platform, highest was {highest}"
+        );
+    }
+
+    #[test]
+    fn a_platform_does_not_block_sideways() {
+        let solids = ledge();
+        let t = Tuning::default();
+        // Standing on the ground row, walking right under the platform row.
+        let mut mario = Mario::new(0, 3 * TILE);
+        let mut buttons = Buttons::default();
+        buttons.set(Button::Right, true);
+        for _ in 0..120 {
+            step_motion(&mut mario, buttons, &solids, &t);
+        }
+        assert!(
+            mario.pixel_x() > 5 * TILE,
+            "should have walked past the platform, got {}",
+            mario.pixel_x()
+        );
+    }
+
+    #[test]
+    fn without_a_platform_he_falls_to_the_floor() {
+        let solids = Solids::from_rows(&[
+            "........",
+            "........",
+            "........",
+            "........",
+            "########",
+        ]);
+        let t = Tuning::default();
+        let mut mario = Mario::new(3 * TILE, 0);
+        for _ in 0..60 {
+            step_motion(&mut mario, Buttons::default(), &solids, &t);
+        }
+        let (_w, h) = mario.size();
+        assert_eq!(mario.pixel_y(), 4 * TILE - h);
     }
 }

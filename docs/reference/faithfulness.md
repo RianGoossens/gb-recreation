@@ -96,9 +96,16 @@ playing it faithfully.
   | `0x68`, `0x69`, `0x6A`, `0x7C` | support from above, no sideways block |
   | everything else `>= 0x60` | solid |
 
-  The four semi-solid ids do not appear in World 1-1 and our level format has
-  one notion of solid, so they are flattened to solid. That is the one piece
-  still to settle, and it needs a level that uses them.
+  The four semi-solid ids are one-way platforms in the engine now, written
+  `^` in the level format: Mario lands on one from above and walks or jumps
+  straight through it otherwise. World 1-1 contains none of them, so its
+  extracted file is unchanged. The second screen list in the ROM (the
+  candidate World 1-2) contains 183 of them, laid out as horizontal runs like
+  `104 105 105 105 106`, a left cap, a repeated middle and a right cap, with
+  tile 55 hanging beneath as a support. That shape is what a platform looks
+  like, and it agrees with what the probe measured. It is still untested
+  against the running game in a real level, because 1-2 has not been reached
+  in the emulator yet.
 
   Two earlier readings of this were wrong and shipped. The first was an
   allow-list of `{96}` plus two invented structural rules, which Rian caught

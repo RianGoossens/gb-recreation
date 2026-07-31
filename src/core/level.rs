@@ -17,16 +17,46 @@ pub struct Solids {
     pub width: usize,
     pub height: usize,
     cells: Vec<bool>,
+    /// Tiles that hold Mario up from above but do not block him sideways or
+    /// from below. Measured from the cartridge: `tools/probe_solidity.py`
+    /// finds four such tile ids, and World 1-2 lays them out as horizontal
+    /// runs with distinct end caps, which is the shape of a platform.
+    platforms: Vec<bool>,
 }
 
 impl Solids {
     pub fn new(width: usize, height: usize, cells: Vec<bool>) -> Self {
         assert_eq!(width * height, cells.len(), "cells must be width*height");
+        let platforms = vec![false; cells.len()];
         Self {
             width,
             height,
             cells,
+            platforms,
         }
+    }
+
+    /// Mark the tile at (tx, ty) as a one-way platform.
+    pub fn set_platform(&mut self, tx: usize, ty: usize) {
+        if tx < self.width && ty < self.height {
+            self.platforms[ty * self.width + tx] = true;
+        }
+    }
+
+    /// Is the tile at (tx, ty) a one-way platform? Out of range is not.
+    pub fn is_platform(&self, tx: i32, ty: i32) -> bool {
+        if tx < 0 || ty < 0 || tx as usize >= self.width || ty as usize >= self.height {
+            return false;
+        }
+        self.platforms[ty as usize * self.width + tx as usize]
+    }
+
+    /// The topmost platform row touched by the pixel span, if any.
+    pub fn platform_under(&self, left: i32, right: i32, bottom: i32) -> Option<i32> {
+        let ty = bottom.div_euclid(TILE);
+        let tx0 = left.div_euclid(TILE);
+        let tx1 = right.div_euclid(TILE);
+        (tx0..=tx1).any(|tx| self.is_platform(tx, ty)).then_some(ty)
     }
 
     pub fn empty(width: usize, height: usize) -> Self {
@@ -46,7 +76,15 @@ impl Solids {
                 cells.push(matches!(ch, '#' | '?' | 'B' | 'P'));
             }
         }
-        Self::new(width, height, cells)
+        let mut solids = Self::new(width, height, cells);
+        for (y, row) in rows.iter().enumerate() {
+            for (x, ch) in row.chars().enumerate() {
+                if ch == '^' {
+                    solids.set_platform(x, y);
+                }
+            }
+        }
+        solids
     }
 
     /// Make the tile at (tx, ty) empty (for example, a broken brick). No effect

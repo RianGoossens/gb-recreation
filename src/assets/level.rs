@@ -77,13 +77,21 @@ pub const SOLID_FROM: u8 = 0x60;
 /// in open sky with nothing beneath it.
 pub const PASSABLE: [u8; 1] = [0xF4];
 
-/// Ids that hold Mario up but do not block him sideways. None of them appear
-/// in World 1-1 and our level format carries one notion of solid, so
-/// [`is_solid`] treats them as solid until a level needs the distinction.
+/// Ids that hold Mario up from above but do not block him sideways. The
+/// second screen list in the ROM (the candidate World 1-2) lays `0x68`,
+/// `0x69` and `0x6A` out as horizontal runs with distinct end caps over
+/// hanging supports, which is the shape of a platform. World 1-1 barely uses
+/// them.
 pub const SEMI_SOLID: [u8; 4] = [0x68, 0x69, 0x6A, 0x7C];
 
+/// Blocks Mario from every direction.
 pub fn is_solid(tile: u8) -> bool {
-    tile >= SOLID_FROM && !PASSABLE.contains(&tile)
+    tile >= SOLID_FROM && !PASSABLE.contains(&tile) && !is_platform(tile)
+}
+
+/// Holds Mario up from above only.
+pub fn is_platform(tile: u8) -> bool {
+    SEMI_SOLID.contains(&tile)
 }
 
 /// One column record starting at `rom[i]`. Returns the column and the offset
@@ -173,14 +181,19 @@ const SPAWN_COLUMN: usize = 6;
 const GROUND_ROW: usize = 14;
 
 /// Render decoded columns as our plain-text level format, which
-/// `Level::from_file` loads: `#` solid, `.` empty, `M` spawn, `E` end trigger.
+/// `Level::from_file` loads: `#` solid, `^` a one-way platform, `.` empty,
+/// `M` spawn, `E` end trigger.
 pub fn to_level_text(columns: &[Column]) -> String {
     let width = columns.len();
     let mut rows: Vec<Vec<u8>> = (0..ROWS)
         .map(|r| {
             columns
                 .iter()
-                .map(|c| if is_solid(c[r]) { b'#' } else { b'.' })
+                .map(|c| match c[r] {
+                    t if is_solid(t) => b'#',
+                    t if is_platform(t) => b'^',
+                    _ => b'.',
+                })
                 .collect()
         })
         .collect();
@@ -201,7 +214,7 @@ pub fn pits(columns: &[Column]) -> Vec<usize> {
     columns
         .iter()
         .enumerate()
-        .filter(|(_, c)| !c.iter().any(|&t| is_solid(t)))
+        .filter(|(_, c)| !c.iter().any(|&t| is_solid(t) || is_platform(t)))
         .map(|(i, _)| i)
         .collect()
 }
@@ -234,7 +247,7 @@ pub fn find_screen_lists(rom: &[u8]) -> Vec<(usize, Vec<u16>)> {
         }
         let solid = columns
             .iter()
-            .filter(|c| c.iter().any(|&t| is_solid(t)))
+            .filter(|c| c.iter().any(|&t| is_solid(t) || is_platform(t)))
             .count();
         if (solid as f32) < columns.len() as f32 * MIN_SOLID {
             continue;
@@ -313,7 +326,8 @@ mod tests {
         assert!(is_solid(0xFF));
         assert!(!is_solid(0xF4), "0xF4 is decoration the game lets Mario through");
         for tile in SEMI_SOLID {
-            assert!(is_solid(tile), "semi-solid ids are flattened to solid");
+            assert!(is_platform(tile), "these hold Mario up from above only");
+            assert!(!is_solid(tile), "and do not block him sideways");
         }
     }
 

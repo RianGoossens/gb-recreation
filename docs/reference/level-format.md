@@ -10,6 +10,7 @@ code with `Level::from_file` / `Level::from_text`.
 | Char | Meaning |
 |------|---------|
 | `#` | solid tile (wall, floor, ceiling) |
+| `^` | one-way platform: stands on it from above, walks and jumps through it otherwise |
 | `.` | empty space |
 | `M` | Mario's spawn (use one) |
 | `G` | a Goomba enemy |

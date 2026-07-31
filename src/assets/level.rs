@@ -280,12 +280,46 @@ pub fn far_end(columns: &[Column]) -> Option<(usize, usize)> {
     let standing = |c: usize, r: usize| {
         !is_solid(columns[c][r]) && !is_solid(columns[c][r - 1]) && is_solid(columns[c][r + 1])
     };
+    let open = reachable(columns);
+    let at = |c: usize, r: usize| c * ROWS + r;
     (1..columns.len()).rev().find_map(|c| {
         (1..ROWS - 1)
             .rev()
-            .find(|&r| standing(c, r) && standing(c - 1, r))
+            .find(|&r| standing(c, r) && standing(c - 1, r) && open[at(c, r)])
             .map(|r| (c, r))
     })
+}
+
+/// Which cells of the level Mario could get to from the spawn, ignoring
+/// gravity: a flood fill over everything that is not solid.
+///
+/// The end-trigger placement needs this. Picking the rightmost cell that
+/// merely looks like a floor put World 1-3's trigger in a one-tile pocket
+/// sealed on four sides and World 2-3's in another, and in both cases the
+/// level could not be finished. A cell the fill never reaches is no good
+/// however much it looks like somewhere to stand.
+fn reachable(columns: &[Column]) -> Vec<bool> {
+    let width = columns.len();
+    let mut seen = vec![false; width * ROWS];
+    let at = |c: usize, r: usize| c * ROWS + r;
+    let start = (SPAWN_COLUMN.min(width - 1), GROUND_ROW - 1);
+    let mut queue = vec![start];
+    seen[at(start.0, start.1)] = true;
+    while let Some((c, r)) = queue.pop() {
+        for (dc, dr) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+            let (nc, nr) = (c as i32 + dc, r as i32 + dr);
+            if nc < 0 || nr < 0 || nc >= width as i32 || nr >= ROWS as i32 {
+                continue;
+            }
+            let (nc, nr) = (nc as usize, nr as usize);
+            if seen[at(nc, nr)] || is_solid(columns[nc][nr]) {
+                continue;
+            }
+            seen[at(nc, nr)] = true;
+            queue.push((nc, nr));
+        }
+    }
+    seen
 }
 
 /// The two screens sitting immediately before a level's own first screen in

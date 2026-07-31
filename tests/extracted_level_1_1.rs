@@ -298,7 +298,7 @@ fn mario_fits_through_the_real_level_at_his_measured_size() {
 /// does not.
 #[test]
 fn every_world_1_end_trigger_is_reachable_from_the_spawn() {
-    for (i, path) in ["1_1", "1_2", "1_3"].iter().enumerate() {
+    for (i, path) in ["1_1", "1_2", "1_3", "2_1", "2_2", "2_3"].iter().enumerate() {
         let file = format!("assets/extracted/level_{path}.txt");
         if !std::path::Path::new(&file).exists() {
             continue;
@@ -329,8 +329,9 @@ fn every_world_1_end_trigger_is_reachable_from_the_spawn() {
         let cell = (end.0 / 8, end.1 / 8);
         assert!(
             seen[(cell.1 * w + cell.0) as usize],
-            "World 1-{} walls its end trigger in at column {}, row {}",
-            i + 1,
+            "World {}-{} walls its end trigger in at column {}, row {}",
+            i / 3 + 1,
+            i % 3 + 1,
             cell.0,
             cell.1
         );
@@ -367,4 +368,58 @@ fn world_1_3_carries_its_fallers() {
     let game = Game::new(level);
     assert!(game.enemies.is_empty());
     assert_eq!(game.pending_enemy_count(), 6);
+}
+
+/// World 2-1 and 2-2 carry the cartridge's own exit door, the 2x2 block of
+/// `0x13 0x21` over `0x24 0x39`, in the same place World 1's levels do: twice
+/// in one column, a raised one for the bonus route and one at ground level.
+/// So the door rule that replaced "two columns from the right edge" holds in a
+/// world it was not derived from.
+///
+/// 2-3 has no door, like 1-3, because it ends the world rather than leading to
+/// another level, and falls back to the far-end placement.
+#[test]
+fn world_2_ends_on_the_cartridges_own_door() {
+    let door = |name: &str| -> Option<(usize, usize)> {
+        let path = format!("assets/extracted/level_{name}.txt");
+        let level = Level::from_file(&path).ok()?;
+        level.end.map(|(x, y)| (x as usize / 8, y as usize / 8))
+    };
+    let Some(exit) = door("2_1") else { return };
+    assert_eq!(exit, (318, 13), "World 2-1's door is at column 318");
+    assert_eq!(door("2_2"), Some((278, 13)), "World 2-2's door is at column 278");
+    assert_eq!(door("2_3"), Some((353, 14)), "World 2-3 has no door to find");
+}
+
+/// Every extracted level has to put Mario somewhere he can stand. A spawn in
+/// mid-air or inside terrain is what a mis-decoded opening screen looks like,
+/// and World 2's levels are decoded from a bank the extractor had never read
+/// before.
+#[test]
+fn mario_can_stand_at_every_world_2_spawn() {
+    for name in ["2_1", "2_2", "2_3"] {
+        let path = format!("assets/extracted/level_{name}.txt");
+        if !std::path::Path::new(&path).exists() {
+            continue;
+        }
+        let level = Level::from_file(&path).expect("extracted level parses");
+        let column = level.spawn.0 / 8;
+        assert!(
+            (0..ROWS).any(|row| level.solids.is_solid(column, row)),
+            "World {name} has nothing under Mario's spawn"
+        );
+        let mut game = Game::new(level.clone());
+        let start = game.mario.pixel_x();
+        let mut buttons = Buttons::default();
+        buttons.set(Button::Right, true);
+        let mut furthest = start;
+        for _ in 0..120 {
+            game.step(buttons);
+            furthest = furthest.max(game.mario.pixel_x());
+        }
+        assert!(
+            furthest > start,
+            "World {name} never lets Mario move right from the spawn"
+        );
+    }
 }

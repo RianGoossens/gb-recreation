@@ -207,6 +207,7 @@ fn spawn_enemies(level: &Level) -> Vec<Enemy> {
         .iter()
         .map(|&(px, py, kind)| match kind {
             EnemyKind::Goomba => Enemy::goomba(px, py, true),
+            EnemyKind::LedgeTurner => Enemy::ledge_turner(px, py, true),
             EnemyKind::Fly => Enemy::fly(px, py, true),
         })
         .collect()

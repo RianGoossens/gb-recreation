@@ -133,11 +133,13 @@ pub fn spawning(records: &[ObjectRecord]) -> Vec<ObjectRecord> {
     records.iter().copied().filter(|r| !r.skipped()).collect()
 }
 
-/// The ground walker, the one kind whose movement has been measured off the
-/// cartridge: one pixel every three frames, off a ledge rather than turning at
-/// it, straight down at a pixel a frame (`docs/reference/faithfulness.md`).
-/// World 1-1's list uses it ten times, World 1-2 four, World 1-3 not at all.
+/// The two ground walkers. Both move one pixel every three frames and turn at
+/// a wall; they differ at a ledge, where `WALKER` steps off and falls straight
+/// down and `LEDGE_TURNER` turns around. Measured by writing a wall and then a
+/// pit into the tilemap in front of each (`tools/probe_walker_turn.py`).
+/// World 1-1's list uses `WALKER` ten times and `LEDGE_TURNER` once.
 pub const WALKER: u8 = 0x00;
+pub const LEDGE_TURNER: u8 = 0x04;
 
 /// The two lift kinds. World 1-1 uses one of each, at columns 284 and 293,
 /// either side of its exit door. Dropping Mario onto both showed they carry
@@ -159,16 +161,20 @@ pub fn lift_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize, bool)> {
         .collect()
 }
 
-/// Where a level puts its ground walkers, as (column, row).
+/// Where a level puts its ground walkers, as (column, row, turns at ledges).
 ///
-/// Deliberately only this kind. The other kinds spawn and move, but nothing
+/// Deliberately only these two kinds. The others spawn and move, but nothing
 /// about how they move has been measured, so a level file is short of enemies
 /// rather than carrying invented ones.
-pub fn walker_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize)> {
+pub fn walker_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize, bool)> {
     spawning(records)
         .iter()
-        .filter(|r| r.kind == WALKER)
-        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .filter(|r| matches!(r.kind, WALKER | LEDGE_TURNER))
+        .filter_map(|r| {
+            usize::try_from(r.row())
+                .ok()
+                .map(|row| (r.column(), row, r.kind == LEDGE_TURNER))
+        })
         .collect()
 }
 

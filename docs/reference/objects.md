@@ -204,14 +204,22 @@ All five kinds World 1-1 spawns:
 | kind | count | horizontal | vertical |
 |---|---|---|---|
 | `0x00` | 10 | 1 px left every 3 frames, 143 steps, no reversal | none |
-| `0x04` | 1 | 1 px every 3 frames, one reversal in 888 frames | none |
+| `0x04` | 1 | 1 px every 3 frames, turns at walls and at ledges | none |
 | `0x0E` | 3 | 1 to 4 px steps in bursts, net about zero | same, with 54-frame pauses |
 | `0x0A` | 1 | none | 1 px every 2 frames, reversing every 120 frames (a lift) |
 | `0x0B` | 1 | 1 px every 2 frames, reversing every 106 frames (a lift) | none |
 
-`0x00` and `0x04` share a cadence, which is a reason to think they are the same
-sort of thing. `0x00` never turned in 143 steps and `0x04` turned once, so what
-makes it turn is not settled: one reversal cannot separate a wall from a timer.
+`0x00` and `0x04` share a cadence exactly, and they part company at a ledge.
+Writing a wall and then a pit into the tilemap in front of each
+(`tools/probe_walker_turn.py`) separates them cleanly:
+
+| kind | wall ahead | pit ahead |
+|---|---|---|
+| `0x00` | turns | walks off and falls |
+| `0x04` | turns | turns |
+
+So the cartridge has both a walker that ignores ledges and one that respects
+them, which is why the engine carries two.
 
 `0x0E`'s bursts with long pauses and its steps of up to 4 pixels per frame in
 both axes are the shape of something that jumps.
@@ -281,7 +289,6 @@ the back door, so the ids stay as ids.
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
 - What kinds `0x02` and `0x0C` are, and why 1-3 starts them inside solid tiles.
-- What makes `0x04` turn around.
 - The rest of a slot's 16 bytes.
 
 ## Tools
@@ -297,5 +304,6 @@ the back door, so the ids stay as ids.
 | `tools/measure_enemy_walk.py` | how a kind moves, with the camera frozen |
 | `tools/probe_lift.py` | whether an object holds Mario up |
 | `tools/measure_lift.py` | a lift's surface: how wide, and how high Mario rests |
+| `tools/probe_walker_turn.py` | whether a walker turns at a wall or a ledge |
 | `tools/find_object_lists.py` | where each World 1 level's list starts |
 | `tools/trace_level_objects.py` | the same trace in any World 1 level |

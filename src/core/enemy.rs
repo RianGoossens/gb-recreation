@@ -45,6 +45,13 @@ pub const HOP_INTERVAL: u32 = 40;
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
     Goomba,
+    /// Walks the same way but turns at a ledge instead of walking off it.
+    ///
+    /// A separate kind because the cartridge has both. Writing a wall and then
+    /// a pit into the tilemap in front of each (`tools/probe_walker_turn.py`)
+    /// gets object kind `0x00` to turn at the wall and fall into the pit, and
+    /// kind `0x04` to turn at both. They share a walk speed exactly.
+    LedgeTurner,
     /// Walks but hops on a timer, so it does not respect ledges.
     Fly,
 }
@@ -84,6 +91,11 @@ impl Enemy {
         Self::new(pixel_x, pixel_y, going_left, EnemyKind::Goomba)
     }
 
+    /// The walker that turns at a ledge rather than walking off it.
+    pub fn ledge_turner(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        Self::new(pixel_x, pixel_y, going_left, EnemyKind::LedgeTurner)
+    }
+
     /// A Fly at a whole-pixel position: it walks and hops.
     pub fn fly(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
         Self::new(pixel_x, pixel_y, going_left, EnemyKind::Fly)
@@ -110,6 +122,16 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     use crate::core::entity::pixels;
     if !enemy.alive {
         return;
+    }
+
+    // One of the two ground walkers stops at a ledge. Probe the ground just
+    // past its leading foot and turn before stepping off.
+    if enemy.on_ground && enemy.kind == EnemyKind::LedgeTurner && enemy.vx != 0 {
+        let (l, _t, r, b) = enemy.edges();
+        let ahead = if enemy.vx > 0 { r + 1 } else { l - 1 };
+        if !solids.rect_hits_solid(ahead, b + 1, ahead, b + 1) {
+            enemy.vx = -enemy.vx;
+        }
     }
 
     // Walking stops while airborne. Measured: the walker's screen X does not
@@ -282,6 +304,28 @@ mod tests {
         }
         assert!(e.pixel_x() >= edge_x, "should have walked off the end");
         assert!(!e.on_ground, "and be falling");
+    }
+
+    #[test]
+    fn a_ledge_turner_stays_on_its_platform() {
+        // A short platform (tiles 5..9 on the floor row) with empty space
+        // beyond, so a walker that ignores the edge leaves it.
+        let mut floor_row = ".".repeat(20);
+        floor_row.replace_range(5..10, "#####");
+        let solids = Solids::from_rows(&[
+            &".".repeat(20),
+            &".".repeat(20),
+            &".".repeat(20),
+            &floor_row,
+        ]);
+        let mut e = Enemy::ledge_turner(48, 16, false);
+        e.on_ground = true;
+        for _ in 0..300 {
+            update_enemy(&mut e, &solids);
+        }
+        let (l, _t, r, b) = e.edges();
+        assert!(e.on_ground, "it should never have left the platform");
+        assert!(solids.rect_hits_solid(l, b + 1, r, b + 1));
     }
 
     #[test]

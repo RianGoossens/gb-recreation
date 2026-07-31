@@ -13,7 +13,8 @@ code with `Level::from_file` / `Level::from_text`.
 | `^` | one-way platform: stands on it from above, walks and jumps through it otherwise |
 | `.` | empty space |
 | `M` | Mario's spawn (use one) |
-| `G` | a Goomba enemy |
+| `G` | a ground walker: turns at walls, walks off ledges |
+| `T` | a ground walker that turns at ledges too |
 | `F` | a Fly enemy (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility), see the note on non-cartridge content |

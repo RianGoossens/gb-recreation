@@ -146,6 +146,7 @@ pub struct Level {
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `^` a one-way
     /// platform, `M` marks Mario's spawn, `G` a Goomba, `F` a Fly, `C` a coin,
+    /// `T` a walker that turns at ledges,
     /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
     /// `E` the level-end trigger, `V` and `H` a lift running up and down or
     /// side to side.
@@ -167,6 +168,7 @@ impl Level {
                 match ch {
                     'M' => spawn = (px, py),
                     'G' => enemy_spawns.push((px, py, EnemyKind::Goomba)),
+                    'T' => enemy_spawns.push((px, py, EnemyKind::LedgeTurner)),
                     'F' => enemy_spawns.push((px, py, EnemyKind::Fly)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),

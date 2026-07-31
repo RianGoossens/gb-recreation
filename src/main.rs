@@ -246,7 +246,10 @@ fn extract_level(args: &[String]) -> ExitCode {
     let walkers = object::walker_spawns(&records);
     let lifts = object::lift_spawns(&records);
     let mut objects: Vec<(usize, usize, u8)> =
-        walkers.iter().map(|&(c, r)| (c, r, b'G')).collect();
+        walkers
+            .iter()
+            .map(|&(c, r, turns)| (c, r, if turns { b'T' } else { b'G' }))
+            .collect();
     objects.extend(
         lifts
             .iter()

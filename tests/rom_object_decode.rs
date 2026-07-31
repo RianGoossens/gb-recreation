@@ -57,9 +57,17 @@ fn the_last_record_sits_near_the_level_end() {
     let Some(records) = records() else { return };
     let last = *records.last().unwrap();
     assert_eq!((last.x, last.y, last.kind), (0x92, 0x84, 0x0B));
-    assert_eq!(last.column(), 292);
+    // The high nibble of 0x84 shifts it half a step right of column 292.
+    assert_eq!(last.pixel_x(), 0x92 * 16 + 8);
+    assert_eq!(last.column(), 293);
     // World 1-1 is 300 columns, so the list runs to the far end of it.
     assert!(last.column() < 300);
+}
+
+/// The tile a record's position lands on, or `None` if it is off the playfield.
+fn tile_under(columns: &[level::Column], r: &ObjectRecord) -> Option<u8> {
+    let row = usize::try_from(r.row()).ok()?;
+    columns.get(r.column())?.get(row).copied()
 }
 
 #[test]
@@ -68,7 +76,7 @@ fn every_object_stands_in_an_empty_cell() {
     let columns = level::decode_level(&data, level::LEVEL_1_1_LIST);
     let records = object::object_list(&data, object::LEVEL_1_1_OBJECTS);
     for r in &records {
-        let tile = columns[r.column()][r.row()];
+        let tile = tile_under(&columns, r).expect("1-1 places every record on the playfield");
         assert!(
             !level::is_solid(tile),
             "record {:02X} {:02X} {:02X} lands inside solid tile {tile} at column {} row {}",
@@ -92,7 +100,7 @@ fn the_ground_level_records_have_ground_under_them() {
     let ground_level: Vec<&ObjectRecord> = records.iter().filter(|r| r.row() == 13).collect();
     assert_eq!(ground_level.len(), 16);
     for r in ground_level {
-        let below = columns[r.column()][r.row() + 1];
+        let below = columns[r.column()][r.row() as usize + 1];
         assert!(
             level::is_solid(below),
             "record at column {} row {} has nothing to stand on",
@@ -136,8 +144,9 @@ fn world_1_2_places_every_record_the_same_way_1_1_does() {
     let Some(data) = rom() else { return };
     let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
     for r in object::object_list(&data, object::LEVEL_1_2_OBJECTS) {
+        let tile = tile_under(&columns, &r).expect("1-2 places every record on the playfield");
         assert!(
-            !level::is_solid(columns[r.column()][r.row()]),
+            !level::is_solid(tile),
             "record {:02X} {:02X} {:02X} lands inside a solid tile",
             r.x,
             r.y,
@@ -147,22 +156,43 @@ fn world_1_2_places_every_record_the_same_way_1_1_does() {
 }
 
 #[test]
-fn world_1_3_has_records_the_position_mapping_does_not_explain() {
+fn world_1_3_starts_some_kinds_inside_the_terrain() {
     let Some(data) = rom() else { return };
     let columns = level::decode_level(&data, level::LEVEL_1_3_LIST);
     let records = object::object_list(&data, object::LEVEL_1_3_OBJECTS);
-    let missed: Vec<&ObjectRecord> = records
+    let inside: Vec<&ObjectRecord> = records
         .iter()
-        .filter(|r| r.row() >= 16 || level::is_solid(columns[r.column()][r.row()]))
+        .filter(|r| tile_under(&columns, r).is_some_and(level::is_solid))
         .collect();
-    // Pinning the gap rather than hiding it. Every miss is a kind 1-3
-    // introduces, so the mapping is incomplete for those and not wrong for the
-    // rest; this fails loudly if a later change moves the boundary either way.
-    assert_eq!(missed.len(), 17);
-    let mut kinds: Vec<u8> = missed.iter().map(|r| r.kind_id()).collect();
+    // Not a decode error. `tools/trace_level_objects.py` watched the game put
+    // these in a slot at exactly the position decoded here, so 1-3 really does
+    // start these kinds inside solid tiles. The count is pinned so a change to
+    // the position mapping cannot move it unnoticed.
+    assert_eq!(inside.len(), 15);
+    let mut kinds: Vec<u8> = inside.iter().map(|r| r.kind_id()).collect();
     kinds.sort_unstable();
     kinds.dedup();
     assert_eq!(kinds, vec![0x02, 0x0C, 0x36]);
+}
+
+#[test]
+fn only_one_record_in_world_1_falls_off_the_playfield() {
+    let Some(data) = rom() else { return };
+    let mut off = Vec::new();
+    for (name, start) in object::WORLD_1_OBJECTS {
+        let list = level::WORLD_1.iter().find(|(n, _)| *n == name).unwrap().1;
+        let columns = level::decode_level(&data, list);
+        for r in object::object_list(&data, start) {
+            if tile_under(&columns, &r).is_none() {
+                off.push((name, r));
+            }
+        }
+    }
+    // World 1-3's `69 10 84`: a row byte of 0 puts it two rows above the
+    // playfield. It carries the skip bit and never spawns, so nothing reads it.
+    assert_eq!(off.len(), 1);
+    assert_eq!(off[0].0, "1-3");
+    assert!(off[0].1.skipped());
 }
 
 #[test]

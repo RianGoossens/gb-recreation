@@ -316,13 +316,14 @@ fn list_objects(args: &[String]) -> ExitCode {
         }
     };
     println!("World {name}: {} records at 0x{start:05X}", records.len());
-    println!(" bytes     column  row  kind  spawns");
+    println!(" bytes     pixel x  column  row  kind  spawns");
     for r in &records {
         println!(
-            " {:02X} {:02X} {:02X}   {:6}  {:3}  0x{:02X}  {}",
+            " {:02X} {:02X} {:02X}   {:7}  {:6}  {:3}  0x{:02X}  {}",
             r.x,
             r.y,
             r.kind,
+            r.pixel_x(),
             r.column(),
             r.row(),
             r.kind_id(),

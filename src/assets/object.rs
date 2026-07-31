@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! x      position, in units of 16 pixels (two columns)
-//! y      row, plus 2, with the top bit used for something not yet known
+//! y      low nibble is the row plus 2, high nibble is a pixel offset on x
 //! kind   what to create, with the top bit marking a record normal play skips
 //! ```
 //!
@@ -22,10 +22,12 @@
 //! - The pointer steps past a record at an exact, repeatable camera position,
 //!   and tying that to the column counter puts the object's world pixel at
 //!   `16 * x`, with no leftover offset.
-//! - Its slot in work RAM gets a Y of `8 * y + 16`, an OAM coordinate, which
-//!   puts the object in playfield row `y - 2`. Checked against the decoded
-//!   geometry: all 37 of World 1-1's records land on an empty cell, and every
-//!   ground-level one has solid ground directly beneath it.
+//! - Its slot in work RAM gets a Y of `8 * (y & 0x0F) + 16`, an OAM coordinate,
+//!   which puts the object in playfield row `(y & 0x0F) - 2`.
+//! - The slot's X is `0xBF + (y >> 4)`, so the high nibble shifts the object
+//!   within its 16-pixel step. World 1-3 settles this on its own: two records
+//!   at `x = 0x76`, one with `y = 0x0D` and one with `y = 0x8D`, spawn in the
+//!   same frame exactly 8 pixels apart.
 //! - The top bit of `kind` suppresses the record. Clearing it in a scratch copy
 //!   of the cartridge makes that record spawn, at the predicted column
 //!   (`tools/probe_object_type_flag.py`). What the flag selects for is open.
@@ -68,12 +70,10 @@ const LIST_END: u8 = 0xFF;
 
 /// Marks a record the game does not act on during normal play.
 pub const SKIP: u8 = 0x80;
-/// The top bit of the `y` byte, whose meaning is not pinned yet.
-pub const Y_FLAG: u8 = 0x80;
 /// A row byte counts from the top of the screen, above the status bar.
-pub const ROW_OFFSET: u8 = 2;
-/// One step of `x` is two columns.
-pub const COLUMNS_PER_STEP: usize = 2;
+pub const ROW_OFFSET: i32 = 2;
+/// One step of `x` is 16 pixels, two columns.
+pub const PIXELS_PER_STEP: usize = 16;
 
 /// One record of a level's object list, as stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,15 +84,21 @@ pub struct ObjectRecord {
 }
 
 impl ObjectRecord {
-    /// The column the object stands in.
+    /// The object's world position in pixels, left edge.
+    pub fn pixel_x(&self) -> usize {
+        self.x as usize * PIXELS_PER_STEP + (self.y >> 4) as usize
+    }
+
+    /// The column the object starts in.
     pub fn column(&self) -> usize {
-        self.x as usize * COLUMNS_PER_STEP
+        self.pixel_x() / 8
     }
 
     /// The playfield row the object occupies. Ground-standing objects sit one
-    /// row above the ground they rest on.
-    pub fn row(&self) -> usize {
-        (self.y & !Y_FLAG).saturating_sub(ROW_OFFSET) as usize
+    /// row above the ground they rest on. Can be negative: one skipped record
+    /// in World 1-3 has a row byte of 0, which would put it in the status bar.
+    pub fn row(&self) -> i32 {
+        (self.y & 0x0F) as i32 - ROW_OFFSET
     }
 
     /// Whether normal play skips this record.
@@ -104,11 +110,6 @@ impl ObjectRecord {
     /// compared against the kinds that do spawn.
     pub fn kind_id(&self) -> u8 {
         self.kind & !SKIP
-    }
-
-    /// The unexplained top bit of the `y` byte.
-    pub fn y_flag(&self) -> bool {
-        self.y & Y_FLAG != 0
     }
 }
 
@@ -162,23 +163,38 @@ mod tests {
             y: 0x0F,
             kind: 0x00,
         };
+        assert_eq!(record.pixel_x(), 192);
         assert_eq!(record.column(), 24);
         assert_eq!(record.row(), 13);
         assert!(!record.skipped());
-        assert!(!record.y_flag());
     }
 
     #[test]
-    fn the_two_top_bits_are_read_separately() {
-        let record = ObjectRecord {
-            x: 0x8E,
-            y: 0x87,
-            kind: 0x0A,
+    fn the_y_nibbles_are_read_separately() {
+        // World 1-3's pair at x 0x76: same step, same row, 8 pixels apart.
+        let low = ObjectRecord {
+            x: 0x76,
+            y: 0x0D,
+            kind: 0x36,
         };
-        assert_eq!(record.column(), 284);
-        assert_eq!(record.row(), 5);
-        assert!(record.y_flag());
-        assert!(!record.skipped());
-        assert_eq!(record.kind_id(), 0x0A);
+        let high = ObjectRecord {
+            x: 0x76,
+            y: 0x8D,
+            kind: 0x36,
+        };
+        assert_eq!(low.row(), high.row());
+        assert_eq!(high.pixel_x() - low.pixel_x(), 8);
+        assert_eq!(low.pixel_x(), 0x76 * 16);
+    }
+
+    #[test]
+    fn a_row_byte_of_zero_reads_as_above_the_playfield() {
+        let record = ObjectRecord {
+            x: 0x69,
+            y: 0x10,
+            kind: 0x84,
+        };
+        assert_eq!(record.row(), -2);
+        assert!(record.skipped());
     }
 }

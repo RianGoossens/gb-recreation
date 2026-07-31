@@ -44,7 +44,7 @@ lands on `2x + 5` for every single record.
 
 ```
 x      position, in units of 16 pixels (two columns)
-y      row, plus 2, top bit unexplained
+y      low nibble is the row plus 2, high nibble is a pixel offset on x
 kind   what to create, top bit marks a record normal play skips
 ```
 
@@ -81,16 +81,37 @@ world pixel x = (16x - 183) + 183 = 16x
 
 No leftover offset, which is the sign the chain is right rather than fitted.
 
-### Row
+### The y byte is two fields
 
-A filled slot gets a Y of `8 * y + 16`, also an OAM coordinate, putting the
-object at screen y `8 * y`. The playfield starts 16 pixels down, so the object
-occupies playfield row `y - 2`.
+A filled slot gets a Y of `8 * (y & 0x0F) + 16`, an OAM coordinate, putting the
+object at screen y `8 * (y & 0x0F)`. The playfield starts 16 pixels down, so
+the object occupies playfield row `(y & 0x0F) - 2`.
 
-Checked against the geometry decode, for all 37 records: every one lands on a
-cell that is not solid, and all 16 that sit at row 13 have solid ground
-directly beneath them. Getting the row wrong by one would bury half the list in
-the floor.
+Checked against the geometry decode, for all 37 of World 1-1's records: every
+one lands on a cell that is not solid, and all 16 that sit at row 13 have solid
+ground directly beneath them. Getting the row wrong by one would bury half the
+list in the floor.
+
+The high nibble is a horizontal offset, added to the X the slot gets. World 1-1
+gave no way to see this, because it only ever uses nibbles 0 and 8 and the
+whole nibble was small enough to read as part of the row. World 1-3 settles it
+in one frame. Two of its records share an `x` byte and a row and differ only in
+that nibble, and the game consumes both at once:
+
+```
+column 241  record 76 0D 36
+           -> slot 1: 36 00 78 BF 03 00 21 00
+           -> slot 2: 36 00 78 C7 03 00 21 00
+```
+
+Same Y, X eight pixels apart. Across 1-3's records the slot X comes out as
+`0xBF + (y >> 4)` every time: nibble 0 gives `0xBF`, 4 gives `0xC3`, 8 gives
+`0xC7`, C gives `0xCB`. So the full position is
+
+```
+world pixel x = 16 * x + (y >> 4)
+row           = (y & 0x0F) - 2
+```
 
 ### The skip bit
 
@@ -145,29 +166,37 @@ They sit back to back. 1-3 begins one byte past 1-2's terminator. 1-2 begins
 two bytes past 1-1's, because there are two `0xFF` bytes at the end of 1-1's
 list where every other list has one.
 
-### World 1-3 does not fit yet
+### What World 1-3 added
 
-The position mapping places every record of 1-1 and 1-2 on a cell that is not
-solid. It misses on 17 of 1-3's 48.
+1-3 is where the `y` byte's two fields came from, and it is worth saying how,
+because the bytes alone pointed the wrong way.
 
-Every miss is a kind 1-3 introduces: nine of kind `0x02`, seven of `0x0C`, one
-of `0x36`. The nine `0x02` records also carry a `y` byte with a high nibble of
-4 or C, which no record in either of the other two levels uses, and reading
-only the low nibble as the row does not rescue them either: it moves the
-failures around rather than removing them (15 land inside solid instead of 8).
+Reading the whole low seven bits as a row works for 1-1 and 1-2 and puts nine
+of 1-3's records at rows 66 to 77, off the bottom of a 16-row playfield. Those
+nine are all kind `0x02`, all with a `y` high nibble of 4 or C. Switching to
+the low nibble fixes the range and leaves 15 records sitting inside solid
+tiles, which looks like a second error.
 
-So the mapping is incomplete for those kinds rather than wrong for the rest.
-`tests/rom_object_decode.rs` pins the count at 17 so the boundary cannot move
-in either direction unnoticed. Working out what those kinds read is the next
-thing to trace, with the same tools pointed at 1-3.
+`tools/trace_level_objects.py` plays through to 1-3 and reads the slots, and
+says the low nibble is right: record `0D 4D 02` gets a slot Y of `0x78`, which
+is row 11, exactly what the low nibble predicts. The same trace showed the
+high nibble driving the slot X, which is what completed the mapping.
+
+The 15 records inside solid tiles are real. The game puts them there. All of
+them are kinds `0x02` and `0x0C` that 1-3 introduces, and a trace confirms the
+slot position matches the decode, so whatever those kinds are, they start
+inside the terrain. `tests/rom_object_decode.rs` pins the count at 15 so a
+later change to the position mapping cannot move it unnoticed.
+
+One record, 1-3's `69 10 84`, has a row byte of 0, which puts it two rows above
+the playfield. It carries the skip bit and never spawns.
 
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
-- The top bit of the `y` byte. Seven records carry it, five of which also carry
-  the skip bit, so it is independent of that.
+- What kinds `0x02` and `0x0C` are, and why 1-3 starts them inside solid tiles.
 - The rest of a slot's 16 bytes.
 
 ## Tools
@@ -181,3 +210,4 @@ thing to trace, with the same tools pointed at 1-3.
 | `tools/measure_spawn_column.py` | column count against camera scroll |
 | `tools/probe_object_type_flag.py` | what the kind byte's top bit does |
 | `tools/find_object_lists.py` | where each World 1 level's list starts |
+| `tools/trace_level_objects.py` | the same trace in any World 1 level |

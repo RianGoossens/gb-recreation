@@ -141,9 +141,10 @@ pub struct Level {
 }
 
 impl Level {
-    /// Build a level from rows of text. `#` is a solid tile, `M` marks Mario's
-    /// spawn, `G` a Goomba, `F` a Fly, `C` a coin, `S` a star, `?` a question
-    /// block, `P` a power block, `B` a brick block, `E` the level-end trigger.
+    /// Build a level from rows of text. `#` is a solid tile, `^` a one-way
+    /// platform, `M` marks Mario's spawn, `G` a Goomba, `F` a Fly, `C` a coin,
+    /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
+    /// `E` the level-end trigger.
     /// The block markers are also solid; `E`, `S`, and coins are not. Anything
     /// else is empty. Rows must be equal length. This is the human-editable
     /// format levels are authored in.

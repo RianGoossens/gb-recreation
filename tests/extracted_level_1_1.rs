@@ -103,3 +103,61 @@ fn the_level_has_pits_you_can_fall_through() {
         .collect();
     assert_eq!(pits, vec![89, 90, 138, 139, 247, 248, 249, 261, 262]);
 }
+
+/// The three extracted levels load and each has what a level needs.
+#[test]
+fn world_1_loads_when_it_has_been_extracted() {
+    let Some(levels) = sml::session::world_1_levels() else { return };
+    assert_eq!(levels.len(), 3);
+    let widths: Vec<usize> = levels.iter().map(|l| l.solids.width).collect();
+    assert_eq!(widths, vec![300, 280, 300]);
+    for (i, level) in levels.iter().enumerate() {
+        assert!(level.end.is_some(), "level {i} needs its end trigger");
+        let column = level.spawn.0 / 8;
+        assert!(
+            (0..ROWS).any(|row| level.solids.is_solid(column, row)),
+            "level {i} has nothing under Mario's spawn"
+        );
+    }
+}
+
+/// World 1-2 is the level the one-way platforms came from, so its geometry has
+/// to carry them through the loader and not just the extractor.
+#[test]
+fn world_1_2_keeps_its_platforms_through_the_loader() {
+    let Some(levels) = sml::session::world_1_levels() else { return };
+    let solids = &levels[1].solids;
+    let platforms = (0..solids.width as i32)
+        .flat_map(|c| (0..ROWS).map(move |r| (c, r)))
+        .filter(|&(c, r)| solids.is_platform(c, r))
+        .count();
+    assert_eq!(platforms, 183);
+}
+
+/// A smoke test for the two levels the walker cannot finish. World 1-2 and
+/// 1-3 are built over open sky and need real platforming, and our end trigger
+/// is placed by a rule (two columns from the right) rather than at the
+/// cartridge's own exit, so the walker runs off the end of the geometry. What
+/// this does check is that each spawn is somewhere Mario can stand and move
+/// from, which is the part a wrong spawn or a mis-decoded opening breaks.
+#[test]
+fn mario_can_stand_and_move_at_every_world_1_spawn() {
+    let Some(levels) = sml::session::world_1_levels() else { return };
+    for (i, level) in levels.iter().enumerate() {
+        let mut game = Game::new(level.clone());
+        let start = game.mario.pixel_x();
+        let mut buttons = Buttons::default();
+        buttons.set(Button::Right, true);
+        for _ in 0..120 {
+            game.step(buttons);
+        }
+        assert!(
+            game.mario.pixel_x() > start,
+            "level {} left Mario stuck at the spawn",
+            i + 1
+        );
+        // No check that he is still alive: World 1-2's opening ledge ends at
+        // column 8, so holding right walks straight off it. That is the
+        // level, not a fault in the extraction.
+    }
+}

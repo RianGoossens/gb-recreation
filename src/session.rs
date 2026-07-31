@@ -15,6 +15,29 @@ use crate::tuning::Tuning;
 /// cartridge's real levels are extracted. These are not end-goal content; the
 /// shipped game is meant to be the original's levels. Each is a rectangle of the
 /// level-format markers (see docs/reference/level-format.md).
+/// The three levels of World 1, decoded from the cartridge.
+///
+/// The files are written by `sml extract-level` and are gitignored, so this
+/// returns `None` on a checkout without the ROM and callers fall back to the
+/// placeholder campaign.
+pub fn world_1_levels() -> Option<Vec<Level>> {
+    WORLD_1_FILES
+        .iter()
+        .map(|path| Level::from_file(path).ok())
+        .collect()
+}
+
+const WORLD_1_FILES: &[&str] = &[
+    "assets/extracted/level_1_1.txt",
+    "assets/extracted/level_1_2.txt",
+    "assets/extracted/level_1_3.txt",
+];
+
+/// World 1 if it has been extracted, the placeholder campaign otherwise.
+pub fn default_levels() -> Vec<Level> {
+    world_1_levels().unwrap_or_else(campaign_levels)
+}
+
 /// The built-in campaign's levels, unfiltered. Callers that are about to play
 /// them should run [`Level::without_non_canonical`] first unless the user has
 /// explicitly opted into non-cartridge content.

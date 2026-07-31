@@ -75,14 +75,20 @@ playing it faithfully.
   the speed that reproduces that traced arc against the engine's `JUMP_CUT`;
   the raw `2d/t` reading (333) only reached 7px when simulated. See
   `docs/reference/physics.md`.
-- **Levels**: the demo level, the example level, and the demo campaign are test
-  fixtures, documentation, and placeholders. The real levels come from extracting
-  the cartridge's geometry (ROM/emulator). Shipping invented
-  levels is not a goal (see the end-goal note in CLAUDE.md).
-- **World 1-1 geometry**: canonical. All 300 columns decode from the ROM and
-  all 300 match the running game exactly, captured by driving the real
-  cartridge to the level's exit (`tools/run_through_levels.py`). See
-  `docs/reference/level-1-1.md`.
+- **Levels**: World 1's three levels are extracted from the cartridge and are
+  what `run` and `play` load by default when they have been generated
+  (`sml extract-level 1-1|1-2|1-3`). The demo level, the example level and the
+  demo campaign remain as test fixtures and as the fallback on a checkout
+  without the ROM. Shipping invented levels is not a goal (see the end-goal
+  note in CLAUDE.md).
+- **World 1 geometry**: canonical. All 300 columns of 1-1 and all 280 of 1-2
+  match the running cartridge exactly; 1-3's first 27 do so far.
+- **Level-end trigger placement**: **stand-in.** The extractor puts the end
+  trigger two columns from the right edge, which lands correctly in 1-1 but
+  not in 1-2 or 1-3, where a walker runs off the end of the geometry instead
+  of finishing. The cartridge's own exit is on a specific screen (`0x67BB` for
+  1-1 and 1-2) and has not been located tile by tile.
+
 - **Tile solidity**: **faithful, measured from the cartridge.** The shipped
   rule is `tile >= 0x60`, with `0xF4` carved out as passable.
 

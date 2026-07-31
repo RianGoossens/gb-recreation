@@ -203,11 +203,9 @@ fn resolve_horizontal(mario: &mut Mario, solids: &Solids) {
 fn resolve_vertical(mario: &mut Mario, solids: &Solids, was_above: i32) {
     let (_w, h) = mario.size();
     let (left, top, right, bottom) = edges(mario);
-    if mario.vy > 0 && solids.rect_hits_solid(left, bottom, right, bottom) {
-        let floor_top = bottom.div_euclid(TILE) * TILE;
-        mario.y = pixels(floor_top - h);
-        mario.vy = 0;
-    } else if mario.vy > 0 && landed_on_platform(solids, left, right, bottom, was_above) {
+    let landed = solids.rect_hits_solid(left, bottom, right, bottom)
+        || landed_on_platform(solids, left, right, bottom, was_above);
+    if mario.vy > 0 && landed {
         let floor_top = bottom.div_euclid(TILE) * TILE;
         mario.y = pixels(floor_top - h);
         mario.vy = 0;

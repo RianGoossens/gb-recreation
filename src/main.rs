@@ -483,7 +483,7 @@ fn play(args: &[String]) -> ExitCode {
 fn run_game(args: &[String]) -> ExitCode {
     use minifb::{Key, Window, WindowOptions};
     use sml::core::level::Level;
-    use sml::session::campaign_levels;
+    use sml::session::default_levels;
     use sml::input::mapping::{buttons_from_held, Key as GbKey};
     use sml::session::Session;
     use sml::tuning::Tuning;
@@ -531,7 +531,7 @@ fn run_game(args: &[String]) -> ExitCode {
                 return ExitCode::FAILURE;
             }
         },
-        None => Session::with_tuning(faithful(campaign_levels()), tuning),
+        None => Session::with_tuning(faithful(default_levels()), tuning),
     };
 
     let (win_w, win_h) = sml::frontend::scaled_size(SCALE);

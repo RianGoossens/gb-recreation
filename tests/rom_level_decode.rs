@@ -159,3 +159,31 @@ fn the_decode_matches_every_column_the_real_game_draws() {
         "columns decoded from the ROM differ from the running game at {mismatches:?}"
     );
 }
+
+/// Coins live in the background tilemap, not the object table, so they come
+/// straight out of the geometry decode. Tile 0xF4 is the coin: the probe found
+/// it passes through with no support, and playing until the coin counter moved
+/// showed it turning into background on that frame.
+#[test]
+fn world_1_1_has_its_eighteen_coins() {
+    let Some(columns) = level_1_1() else { return };
+    let coins: Vec<(usize, usize)> = columns
+        .iter()
+        .enumerate()
+        .flat_map(|(c, col)| {
+            col.iter()
+                .enumerate()
+                .filter(|(_, &t)| level::is_coin(t))
+                .map(move |(r, _)| (c, r))
+        })
+        .collect();
+    assert_eq!(coins.len(), 18);
+
+    // Seven of them stack in one column, which is what a coin tower looks like
+    // and what an earlier reading of this tile called floating decoration.
+    let tower: Vec<usize> = coins.iter().filter(|(c, _)| *c == 87).map(|(_, r)| *r).collect();
+    assert_eq!(tower, vec![3, 4, 5, 6, 7, 8, 9]);
+
+    let text = level::to_level_text(&columns);
+    assert_eq!(text.matches('C').count(), 18);
+}

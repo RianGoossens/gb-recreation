@@ -72,10 +72,18 @@ fn rom_offset(pointer: u16) -> Option<usize> {
 /// solid apart from the ids below.
 pub const SOLID_FROM: u8 = 0x60;
 
-/// The one id at or above [`SOLID_FROM`] the game lets Mario through. In World
-/// 1-1 it is decoration: isolated single cells, and a seven-tall bar floating
-/// in open sky with nothing beneath it.
-pub const PASSABLE: [u8; 1] = [0xF4];
+/// The one id at or above [`SOLID_FROM`] the game lets Mario through, because
+/// it is a coin. Coins live in the background tilemap rather than in the
+/// object table, which is why a column re-read after Mario has walked through
+/// it is missing the ones he took. Found by playing until the coin counter
+/// moved and looking at which tilemap cell changed on that frame
+/// (`tools/find_coin_tile.py`). World 1-1 has 18 of them.
+pub const COIN: u8 = 0xF4;
+pub const PASSABLE: [u8; 1] = [COIN];
+
+pub fn is_coin(tile: u8) -> bool {
+    tile == COIN
+}
 
 /// Ids that hold Mario up from above but do not block him sideways. The
 /// second screen list in the ROM (the candidate World 1-2) lays `0x68`,
@@ -181,8 +189,8 @@ const SPAWN_COLUMN: usize = 6;
 const GROUND_ROW: usize = 14;
 
 /// Render decoded columns as our plain-text level format, which
-/// `Level::from_file` loads: `#` solid, `^` a one-way platform, `.` empty,
-/// `M` spawn, `E` end trigger.
+/// `Level::from_file` loads: `#` solid, `^` a one-way platform, `C` a coin,
+/// `.` empty, `M` spawn, `E` end trigger.
 pub fn to_level_text(columns: &[Column]) -> String {
     let width = columns.len();
     let mut rows: Vec<Vec<u8>> = (0..ROWS)
@@ -192,6 +200,7 @@ pub fn to_level_text(columns: &[Column]) -> String {
                 .map(|c| match c[r] {
                     t if is_solid(t) => b'#',
                     t if is_platform(t) => b'^',
+                    t if is_coin(t) => b'C',
                     _ => b'.',
                 })
                 .collect()
@@ -324,7 +333,8 @@ mod tests {
         assert!(is_solid(0x60), "tile 96 is the ground");
         assert!(is_solid(0xE8), "tile 232 is the raised platform fill");
         assert!(is_solid(0xFF));
-        assert!(!is_solid(0xF4), "0xF4 is decoration the game lets Mario through");
+        assert!(!is_solid(COIN), "a coin does not block Mario");
+        assert!(is_coin(0xF4));
         for tile in SEMI_SOLID {
             assert!(is_platform(tile), "these hold Mario up from above only");
             assert!(!is_solid(tile), "and do not block him sideways");

@@ -80,8 +80,9 @@ playing it faithfully.
   the cartridge's geometry (ROM/emulator). Shipping invented
   levels is not a goal (see the end-goal note in CLAUDE.md).
 - **World 1-1 geometry**: canonical. All 300 columns decode from the ROM and
-  match the running game on every column there is ground truth for (88 of
-  them). See `docs/reference/level-1-1.md`.
+  all 300 match the running game exactly, captured by driving the real
+  cartridge to the level's exit (`tools/run_through_levels.py`). See
+  `docs/reference/level-1-1.md`.
 - **Tile solidity**: **faithful, measured from the cartridge.** The shipped
   rule is `tile >= 0x60`, with `0xF4` carved out as passable.
 
@@ -92,7 +93,8 @@ playing it faithfully.
 
   | ids | verdict |
   |-----|---------|
-  | `0x00`-`0x5F`, `0xF4` | pass through, no support |
+  | `0x00`-`0x5F` | pass through, no support |
+  | `0xF4` | passes through: it is a coin |
   | `0x68`, `0x69`, `0x6A`, `0x7C` | support from above, no sideways block |
   | everything else `>= 0x60` | solid |
 
@@ -106,6 +108,14 @@ playing it faithfully.
   like, and it agrees with what the probe measured. It is still untested
   against the running game in a real level, because 1-2 has not been reached
   in the emulator yet.
+
+  `0xF4` is a coin, not decoration. Coins are drawn in the background tilemap
+  rather than spawned from the object table, so they come straight out of the
+  geometry decode: `tools/find_coin_tile.py` plays until the coin counter
+  moves and reads which tilemap cell changed on that frame. World 1-1 has 18,
+  including a tower of seven in one column, which an earlier note here called
+  a bar of decoration floating in open sky. They are extracted as `C` markers
+  and the level now has its real coins.
 
   Two earlier readings of this were wrong and shipped. The first was an
   allow-list of `{96}` plus two invented structural rules, which Rian caught

@@ -1178,3 +1178,27 @@ through 1-1 and captures the "WORLD 1-2" title card, then stops producing
 columns: Mario's pinned Y is chosen for 1-1, and 1-2 is built on floating
 platforms over open sky (only 40% of its columns have anything solid on the
 bottom two rows, against 92% for 1-1).
+
+
+## 0xF4 is a coin
+
+Called decoration in two places before this, on the strength of its shape:
+18 cells in World 1-1, isolated singles on alternating rows near the end and
+a seven-tall bar floating in open sky with nothing beneath it. Those are
+coins. The seven-tall bar is a coin tower.
+
+Coins are drawn into the background tilemap rather than spawned from the
+object table, which is the same fact that made `capture_columns.py` record
+each column the first time it appeared: a column re-read after Mario walked
+through it is missing the ones he took. `tools/find_coin_tile.py` uses that
+directly. It flies Mario through the level at a sweep of heights, removing
+only the solid tiles from his path so the coins survive, and records which
+tilemap cell changed on any frame the coin counter moved. One answer, 13
+times over: `244 -> 44`.
+
+The evidence was already sitting in the solidity probe's output and went
+unread. Probing tile 244 as a wall printed its four cells afterwards as
+`[244, 244, 244, 44]`: Mario had collected one on his way past.
+
+So the level's coins need no object table. They are in the geometry, and
+`sml extract-level` writes them as `C`.

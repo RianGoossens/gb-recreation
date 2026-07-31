@@ -9,7 +9,7 @@
     "title": "Asking the cartridge which tiles are solid",
     "date": "2026-07-30",
     "slug": "2026-07-30-asking-the-cartridge-which-tiles-are-solid",
-    "summary": "The solidity rule Rian caught being wrong was fitted to 7 of World 1-1's 43 tile ids. Super Mario Land tests collision against the background tilemap in video RAM, which can be written to, so the game itself classified all 256 ids."
+    "summary": "The solidity rule Rian caught being wrong was fitted to 7 of World 1-1's 43 tile ids. Super Mario Land tests collision against the background tilemap in video RAM, which can be written to, so the game itself classified all 256 ids. Carries a correction: the one tile it called decoration is a coin."
   },
   {
     "title": "The cartridge does not say what is solid",

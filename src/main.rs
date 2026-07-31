@@ -235,7 +235,12 @@ fn extract_level(args: &[String]) -> ExitCode {
         .count();
     println!("extracted World 1-1 from ROM (no emulator):");
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
-    println!("  {solid} solid cells");
+    let coins = columns
+        .iter()
+        .flatten()
+        .filter(|&&t| level::is_coin(t))
+        .count();
+    println!("  {solid} solid cells, {coins} coins");
     println!("  columns you can fall through: {:?}", level::pits(&columns));
     ExitCode::SUCCESS
 }

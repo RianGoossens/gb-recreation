@@ -86,6 +86,15 @@ playing it faithfully.
   the speed that reproduces that traced arc against the engine's `JUMP_CUT`;
   the raw `2d/t` reading (333) only reached 7px when simulated. See
   `docs/reference/physics.md`.
+- **World 1-3's end trigger**: **stand-in**, and now at least a reachable one.
+  1-3 has no exit door, since it ends the world rather than leading anywhere,
+  so its trigger is placed by rule. The old rule (two columns from the right
+  edge at the ground row) put it at column 298 row 13, a one-tile pocket walled
+  in on all four sides, so the level could not be finished. It now goes on the
+  rightmost cell with two free rows, solid underneath, and the same true of the
+  column to its left, which is column 296. A flood fill from the spawn to the
+  trigger is a test for all three levels. Where the cartridge actually ends 1-3
+  is still unmeasured.
 - **Levels**: World 1's three levels are extracted from the cartridge and are
   what `run` and `play` load by default when they have been generated
   (`sml extract-level 1-1|1-2|1-3`). The demo level, the example level and the

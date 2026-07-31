@@ -275,3 +275,53 @@ fn mario_fits_through_the_real_level_at_his_measured_size() {
         game.mario.pixel_x() / 8
     );
 }
+
+
+/// The end trigger has to be somewhere Mario could get to.
+///
+/// World 1-3 has no exit door, so its trigger is placed by rule, and the rule
+/// used to be "two columns from the right edge at the ground row". In 1-3 that
+/// lands at column 298 row 13, a one-tile pocket with solid tiles above,
+/// below and either side. The level could not be finished. A flood fill over
+/// open cells from the spawn catches that, where checking the cell itself
+/// does not.
+#[test]
+fn every_world_1_end_trigger_is_reachable_from_the_spawn() {
+    for (i, path) in ["1_1", "1_2", "1_3"].iter().enumerate() {
+        let file = format!("assets/extracted/level_{path}.txt");
+        if !std::path::Path::new(&file).exists() {
+            continue;
+        }
+        let level = Level::from_file(&file).expect("extracted level parses");
+        let end = level.end.expect("every level needs an end trigger");
+        let (w, h) = (level.solids.width as i32, level.solids.height as i32);
+
+        let mut seen = vec![false; (w * h) as usize];
+        let start = (level.spawn.0 / 8, level.spawn.1 / 8);
+        let mut queue = vec![start];
+        seen[(start.1 * w + start.0) as usize] = true;
+        while let Some((x, y)) = queue.pop() {
+            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let (nx, ny) = (x + dx, y + dy);
+                if nx < 0 || ny < 0 || nx >= w || ny >= h {
+                    continue;
+                }
+                let at = (ny * w + nx) as usize;
+                if seen[at] || level.solids.is_solid(nx, ny) {
+                    continue;
+                }
+                seen[at] = true;
+                queue.push((nx, ny));
+            }
+        }
+
+        let cell = (end.0 / 8, end.1 / 8);
+        assert!(
+            seen[(cell.1 * w + cell.0) as usize],
+            "World 1-{} walls its end trigger in at column {}, row {}",
+            i + 1,
+            cell.0,
+            cell.1
+        );
+    }
+}

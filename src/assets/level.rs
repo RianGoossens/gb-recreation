@@ -227,6 +227,27 @@ const GROUND_ROW: usize = 14;
 /// the next level.
 pub const EXIT_DOOR: u8 = 0x13;
 
+/// Where to put the end trigger in a level with no exit door: the rightmost
+/// cell Mario could actually stand on and reach.
+///
+/// A stand-in either way, but the previous one (two columns from the right
+/// edge, at the ground row) put World 1-3's trigger at column 298 row 13,
+/// a one-tile pocket with solid tiles above, below and either side. The level
+/// could not be finished at all. Mario is 12 px tall, so standing takes two
+/// free rows, and he has to arrive from somewhere: without the check on the
+/// column to the left, the rightmost floor in 1-3 is another sealed shaft.
+pub fn far_end(columns: &[Column]) -> Option<(usize, usize)> {
+    let standing = |c: usize, r: usize| {
+        !is_solid(columns[c][r]) && !is_solid(columns[c][r - 1]) && is_solid(columns[c][r + 1])
+    };
+    (1..columns.len()).rev().find_map(|c| {
+        (1..ROWS - 1)
+            .rev()
+            .find(|&r| standing(c, r) && standing(c - 1, r))
+            .map(|r| (c, r))
+    })
+}
+
 /// The exit door's top-left cell, if the level has one.
 pub fn exit_door(columns: &[Column]) -> Option<(usize, usize)> {
     columns
@@ -281,11 +302,11 @@ pub fn to_level_text_with_objects(columns: &[Column], objects: &[(usize, usize, 
     }
     if width >= 2 {
         rows[GROUND_ROW - 1][SPAWN_COLUMN.min(width - 1)] = b'M';
-        // The door when the level has one, the far end otherwise. Placing it
-        // two columns from the right edge happens to land on the door in both
-        // 1-1 and 1-2, which is a coincidence worth not relying on.
-        let (column, row) = exit_door(columns).unwrap_or((width - 2, GROUND_ROW - 1));
-        rows[row][column] = b'E';
+        // The door when the level has one, the far end otherwise.
+        let end = exit_door(columns)
+            .or_else(|| far_end(columns))
+            .unwrap_or((width - 2, GROUND_ROW - 1));
+        rows[end.1][end.0] = b'E';
     }
     let mut out = String::with_capacity((width + 1) * ROWS);
     for row in rows {
@@ -488,7 +509,9 @@ mod tests {
         assert_eq!(lines.len(), ROWS);
         assert_eq!(lines[14], "##########");
         assert_eq!(lines[13].chars().nth(SPAWN_COLUMN), Some('M'));
-        assert_eq!(lines[13].chars().nth(8), Some('E'));
+        // No exit door here, so the trigger goes on the rightmost cell Mario
+        // could stand on, which on a flat floor is the last column.
+        assert_eq!(lines[13].chars().nth(9), Some('E'));
     }
 
     #[test]

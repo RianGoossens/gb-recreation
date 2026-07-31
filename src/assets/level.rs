@@ -51,9 +51,21 @@ pub const LEVEL_1_1_LIST: usize = 0x0A198;
 /// list points at.
 ///
 /// Each list in the ROM opens with three pointers that are not part of the
-/// level: 1-1's verified start sits six bytes into its run, and 1-2's does
-/// too. What those three are for is not known yet.
+/// level: all three known starts sit six bytes into their run. What those
+/// three are for is not known yet.
 pub const LEVEL_1_2_LIST: usize = 0x0A1BD;
+
+/// World 1-3's screen list, reached the same way: the walkthrough plays
+/// through 1-1 and 1-2 and 1-3 opens on `0x6E2F`, which only this list points
+/// at, with the columns the game then draws matching the decode.
+pub const LEVEL_1_3_LIST: usize = 0x0A1E0;
+
+/// The three levels of World 1, in order.
+pub const WORLD_1: [(&str, usize); 3] = [
+    ("1-1", LEVEL_1_1_LIST),
+    ("1-2", LEVEL_1_2_LIST),
+    ("1-3", LEVEL_1_3_LIST),
+];
 
 /// Level data lives in ROM bank 2, which the CPU sees at `0x4000`, so a
 /// pointer of `0x62BE` is ROM file offset `0xA2BE`.

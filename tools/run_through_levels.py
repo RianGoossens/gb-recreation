@@ -13,7 +13,9 @@ RAM (see `probe_solidity.py`), so the terrain can be flattened out from
 under the problem: every column Mario has not reached yet becomes open sky
 over solid ground. That handles pits, pipes and walls, but not the enemies,
 which still take all three lives inside a thousand frames. Pinning Mario's
-Y position every frame holds him in the air above them. Only Y: pinning the
+Y position every frame holds him in the air above them. The height matters:
+sweeping it from a snapshot at World 1-2's opening, 60 loses four lives in
+2500 frames and 32 loses none. Only Y: pinning the
 rise/fall phase byte as well freezes him at the spawn of any level he did
 not start in, at screen x 50, and the flattened ground is not solid so he
 cannot simply be left to walk.
@@ -76,7 +78,8 @@ PHASE = 0xC207
 SPAWN_X = 55
 
 MARIO_Y = 0xC201
-FLY_Y = 60
+LIVES = 0xDA15
+FLY_Y = 32
 
 FRAMES = 20000
 
@@ -168,6 +171,12 @@ def main():
                 pb.memory[PHASE] = 0
         pb.tick()
 
+        # Running out of lives sends the game to the title screen and its
+        # attract demo, which draws real level columns but not in level order.
+        if pb.memory[LIVES] == 0:
+            print(f"  frame {frame}: out of lives, stopping")
+            break
+
         if playing:
             if capture.step(pb, frame):
                 quiet = 0
@@ -199,8 +208,9 @@ def main():
         if not hit:
             blank += SAMPLE_EVERY
         elif blank >= BONUS_FRAMES:
+            opening = sorted({p for _, p in hit})
             print(f"  frame {frame}: level {len(levels)} opens on "
-                  + ", ".join(f"0x{p:04X}" for _, p in sorted(set(hit))))
+                  + ", ".join(f"0x{p:04X}" for p in opening))
             # Right has to be let go of and pressed again for the new level,
             # and one frame of release is not enough for the game to see the
             # edge. Holding it across the transition looks the same from here

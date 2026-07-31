@@ -1280,14 +1280,51 @@ paused out of the way, a snapshot at World 1-2's opening settled it directly:
 frames without a column write, which 1-2 trips repeatedly mid-level. The gap
 between levels is thousands of frames, so 400 is safe and 90 was not.
 
+### The flying height matters
+
+At screen y 60 Mario died at World 1-2's column 69 every single time, six runs
+in a row. Rather than work out what was killing him, the height was swept from
+a snapshot at 1-2's opening, 2500 frames each:
+
+| pinned y | columns | lives lost |
+|----------|---------|------------|
+| 32 | 253 | 0 |
+| 40 | 253 | 0 |
+| 48 | 298 | 2 |
+| 60 | 286 | 4 |
+| 72 | 288 | 4 |
+| 100 | 281 | 4 |
+
+At 32 nothing touches him. The tool flies him there now.
+
 ### What it gets
 
-World 1-2's first 69 columns, matching the ROM exactly. Mario dies at world
-column 69 every time, and the level restarts; the run this was measured from
-died there six times and re-captured the same 69 columns each time, all
-matching. After the sixth the lives run out and the game returns to 1-1.
+All of World 1-1 (300 of 300 columns) and all of World 1-2 (280 of 280), each
+matching the ROM decode exactly, and the first 27 columns of World 1-3 before
+Mario runs into whatever ends the run there.
 
-So 1-2 is verified for the first quarter of its 280 columns rather than all of
-them. What kills him is not identified; he is pinned at screen y 60, which is
-rows 7 to 9, and the level has platform runs at rows 7, 9 and 11 through that
-stretch.
+Running out of lives sends the game to the title screen and its attract demo,
+which draws real level columns but not in level order: a block captured from
+it matched World 1-1 for 93 columns and then diverged into something else.
+The run stops at game over now.
+
+World 1-3 also restarts from a checkpoint rather than from the start, so some
+of its blocks open on a mid-level screen (`0x7253`). The test skips blocks
+that do not begin at a level's first column.
+
+## World 1-3's list, and all three pinned
+
+`0x0A1E0`, reached by playing through 1-1 and 1-2. It opens on `0x6E2F`, which
+only the third list points at, and the columns the game then draws match the
+decode.
+
+| level | list | screens | columns | solid | platforms | coins |
+|-------|------|---------|---------|-------|-----------|-------|
+| 1-1 | 0x0A198 | 15 | 300 | 922 | 0 | 18 |
+| 1-2 | 0x0A1BD | 14 | 280 | 151 | 183 | 26 |
+| 1-3 | 0x0A1E0 | 15 | 300 | 1767 | 0 | 72 |
+
+The six-byte shape held for all three: each list starts six bytes into its
+run, after three pointers that are not part of the level. 1-1 and 1-2 end on
+the same exit screen `0x67BB`; 1-3 ends the world and has its own, `0x75C6`.
+

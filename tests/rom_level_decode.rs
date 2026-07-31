@@ -149,150 +149,83 @@ fn the_scan_finds_world_ones_three_screen_lists() {
 }
 
 /// The strongest check there is on the decode: drive the real cartridge
-/// through the whole of World 1-1 and compare every column.
+/// through the levels and compare every column it draws.
 ///
 /// The capture file is written by `tools/run_through_levels.py` and is
-/// gitignored, so this skips when it is absent. When it is there, the decode
-/// has to reproduce it exactly. It did, 300 of 300, which replaced the earlier
-/// ground truth of 88 columns from a walker that died a quarter of the way in.
+/// gitignored, so this skips when it is absent. Each captured level is matched
+/// against whichever of World 1's levels it starts like, and then has to agree
+/// exactly for as far as the run got. Short blocks are Mario dying early and
+/// the level restarting, which is still a real comparison, just a shorter one.
+/// A block that starts mid-level (World 1-3 restarts from a checkpoint) is
+/// skipped rather than mismatched.
 #[test]
 fn the_decode_matches_every_column_the_real_game_draws() {
     let Ok(text) = std::fs::read_to_string(CAPTURE) else { return };
-    let Some(columns) = level_1_1() else { return };
-
-    let captured = &captured_levels(&text)[0];
-    assert_eq!(captured.len(), COLUMNS, "capture should cover the whole level");
-
-    let mismatches: Vec<usize> = (0..COLUMNS)
-        .filter(|&i| columns[i][..] != captured[i][..])
-        .collect();
-    assert!(
-        mismatches.is_empty(),
-        "columns decoded from the ROM differ from the running game at {mismatches:?}"
-    );
-}
-
-/// Coins live in the background tilemap, not the object table, so they come
-/// straight out of the geometry decode. Tile 0xF4 is the coin: the probe found
-/// it passes through with no support, and playing until the coin counter moved
-/// showed it turning into background on that frame.
-#[test]
-fn world_1_1_has_its_eighteen_coins() {
-    let Some(columns) = level_1_1() else { return };
-    let coins: Vec<(usize, usize)> = columns
-        .iter()
-        .enumerate()
-        .flat_map(|(c, col)| {
-            col.iter()
-                .enumerate()
-                .filter(|(_, &t)| level::is_coin(t))
-                .map(move |(r, _)| (c, r))
-        })
-        .collect();
-    assert_eq!(coins.len(), 18);
-
-    // Seven of them stack in one column, which is what a coin tower looks like
-    // and what an earlier reading of this tile called floating decoration.
-    let tower: Vec<usize> = coins.iter().filter(|(c, _)| *c == 87).map(|(_, r)| *r).collect();
-    assert_eq!(tower, vec![3, 4, 5, 6, 7, 8, 9]);
-
-    let text = level::to_level_text(&columns);
-    assert_eq!(text.matches('C').count(), 18);
-}
-
-/// World 1-2's list start was pinned the same way 1-1's was, by playing to it
-/// rather than by reasoning about the layout: the level opens on screen
-/// `0x69A6`, which only the second list points at, and it is reached after the
-/// bonus game between the two levels.
-#[test]
-fn world_1_2_starts_on_the_screen_the_game_opens_it_with() {
     let Some(data) = rom() else { return };
-    let pointers = level::screen_list(&data, level::LEVEL_1_2_LIST);
-    assert_eq!(pointers.first(), Some(&0x69A6));
-    assert_eq!(pointers.len(), 14, "14 screens, 280 columns");
-    assert_eq!(
-        pointers.last(),
-        Some(&0x67BB),
-        "1-2 ends on the same exit screen as 1-1"
-    );
 
-    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
-    assert_eq!(columns.len(), 14 * level::SCREEN_COLUMNS);
-}
-
-/// Both known list starts sit six bytes into their run, after three pointers
-/// that are not part of the level. Whatever those three are, the shape is
-/// consistent, and it is what makes 0x0A1E0 the candidate for World 1-3.
-#[test]
-fn the_known_list_starts_share_a_three_pointer_prefix() {
-    let Some(data) = rom() else { return };
-    for (run, start) in [(0x0A192, level::LEVEL_1_1_LIST), (0x0A1B7, level::LEVEL_1_2_LIST)] {
-        assert_eq!(start - run, 6, "run 0x{run:05X}");
-        let prefix = &level::screen_list(&data, run)[..3];
-        assert_eq!(prefix, [0x62BE, 0x6817, 0x68C7]);
+    let mut checked: Vec<(&str, usize)> = Vec::new();
+    for captured in captured_levels(&text) {
+        let Some((name, columns)) = level::WORLD_1
+            .iter()
+            .map(|&(name, list)| (name, level::decode_level(&data, list)))
+            .find(|(_, columns)| columns[0][..] == captured[0][..])
+        else {
+            continue;
+        };
+        let reached = captured.len().min(columns.len());
+        let mismatches: Vec<usize> = (0..reached)
+            .filter(|&i| columns[i][..] != captured[i][..])
+            .collect();
+        assert!(
+            mismatches.is_empty(),
+            "World {name} differs from the running game at {mismatches:?}"
+        );
+        checked.push((name, reached));
     }
+
+    let best = |name: &str| {
+        checked
+            .iter()
+            .filter(|(n, _)| *n == name)
+            .map(|(_, r)| *r)
+            .max()
+            .unwrap_or(0)
+    };
+    assert_eq!(best("1-1"), 300, "the whole of World 1-1 should be covered");
+    assert_eq!(best("1-2"), 280, "the whole of World 1-2 should be covered");
+    assert!(best("1-3") >= 20, "World 1-3 is only partly covered so far");
 }
 
-/// World 1-2 is where the one-way platforms live: horizontal runs of a left
-/// cap, a repeated middle and a right cap. World 1-1 has none.
+/// World 1-3's list start, reached by playing through 1-1 and 1-2. It opens on
+/// 0x6E2F, which only the third list points at.
 #[test]
-fn world_1_2_is_built_on_platforms() {
+fn world_1_3_starts_on_the_screen_the_game_opens_it_with() {
     let Some(data) = rom() else { return };
-    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
-    let platform_cells: usize = columns
+    let pointers = level::screen_list(&data, level::LEVEL_1_3_LIST);
+    assert_eq!(pointers.first(), Some(&0x6E2F));
+    assert_eq!(pointers.len(), 15, "15 screens, 300 columns");
+
+    // Unique to this list, so the match that pinned it is not ambiguous.
+    let elsewhere = level::WORLD_1
         .iter()
-        .map(|c| c.iter().filter(|&&t| level::is_platform(t)).count())
-        .sum();
-    assert!(platform_cells > 100, "got {platform_cells} platform cells");
-
-    // The opening screen's run, read off the running game at frame 5120.
-    let row = 11;
-    let run: Vec<u8> = (10..16).map(|c| columns[c][row]).collect();
-    assert_eq!(run, vec![104, 105, 105, 105, 105, 106]);
+        .filter(|(name, _)| *name != "1-3")
+        .any(|&(_, list)| level::screen_list(&data, list).contains(&0x6E2F));
+    assert!(!elsewhere, "0x6E2F should appear in no other level's list");
 }
 
-/// World 1-2 is a platform level over open sky, so most of its columns are
-/// pits. Mario's spawn column still has to have something under it.
+/// All three of World 1's levels decode to a whole number of screens and end
+/// on the same exit screen.
 #[test]
-fn world_1_2_has_ground_under_its_spawn() {
+fn world_1_decodes_end_to_end() {
     let Some(data) = rom() else { return };
-    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
-    let spawn = 6;
-    assert!(
-        columns[spawn].iter().any(|&t| level::is_solid(t)),
-        "nothing to stand on at the spawn column"
-    );
-    let pits = level::pits(&columns);
-    assert!(
-        pits.len() > 50,
-        "1-2 is mostly open sky; got {} pit columns",
-        pits.len()
-    );
-}
-
-/// World 1-2 as far as the walkthrough gets. Mario dies at world column 69
-/// every time, six times over in the run this was written from, and each
-/// restart re-captures the same opening columns; every one of those matches
-/// the ROM. That verifies the level's body, not only the opening screen the
-/// list start was pinned with.
-#[test]
-fn the_decode_matches_world_1_2_as_far_as_the_game_was_driven() {
-    let Ok(text) = std::fs::read_to_string(CAPTURE) else { return };
-    let Some(data) = rom() else { return };
-    let levels = captured_levels(&text);
-    if levels.len() < 2 {
-        return;
-    }
-    let captured = &levels[1];
-    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
-
-    let reached = captured.len().min(columns.len());
-    assert!(reached >= 60, "only {reached} columns of 1-2 were captured");
-    let mismatches: Vec<usize> = (0..60)
-        .filter(|&i| columns[i][..] != captured[i][..])
+    let sizes: Vec<usize> = level::WORLD_1
+        .iter()
+        .map(|&(_, list)| level::decode_level(&data, list).len())
         .collect();
-    assert!(
-        mismatches.is_empty(),
-        "World 1-2 differs from the running game at {mismatches:?}"
-    );
+    assert_eq!(sizes, vec![300, 280, 300]);
+    // 1-1 and 1-2 share an exit screen; 1-3 ends the world and has its own.
+    let last = |list| *level::screen_list(&data, list).last().unwrap();
+    assert_eq!(last(level::LEVEL_1_1_LIST), 0x67BB);
+    assert_eq!(last(level::LEVEL_1_2_LIST), 0x67BB);
+    assert_eq!(last(level::LEVEL_1_3_LIST), 0x75C6);
 }

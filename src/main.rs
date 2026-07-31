@@ -3,7 +3,7 @@
 //! Subcommands grow with the milestones. Available now:
 //!   verify-rom [path]                       check the ROM is SML (World) v1.0
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
-//!   extract-level [1-1|1-2] [out]           decode a level into a level file
+//!   extract-level [1-1|1-2|1-3] [out]       decode a level into a level file
 //!   scan-levels                             list every screen list in the ROM
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
@@ -194,7 +194,7 @@ fn extract_title_screen(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `extract-level [1-1|1-2] [out]` decodes a level's geometry straight out of
+/// `extract-level [1-1|1-2|1-3] [out]` decodes a level's geometry straight out of
 /// the verified ROM and writes it in our plain-text level format, which
 /// `Level::from_file` loads. No emulator involved.
 ///
@@ -204,13 +204,10 @@ fn extract_level(args: &[String]) -> ExitCode {
     use sml::assets::level;
 
     let name = args.first().map(String::as_str).unwrap_or("1-1");
-    let list = match name {
-        "1-1" => level::LEVEL_1_1_LIST,
-        "1-2" => level::LEVEL_1_2_LIST,
-        other => {
-            eprintln!("unknown level {other}; known levels are 1-1 and 1-2");
-            return ExitCode::FAILURE;
-        }
+    let Some(&(_, list)) = level::WORLD_1.iter().find(|(n, _)| *n == name) else {
+        let known: Vec<&str> = level::WORLD_1.iter().map(|(n, _)| *n).collect();
+        eprintln!("unknown level {name}; known levels are {}", known.join(", "));
+        return ExitCode::FAILURE;
     };
     let default_out = format!("assets/extracted/level_{}.txt", name.replace('-', "_"));
     let out = args.get(1).map(String::as_str).unwrap_or(&default_out);

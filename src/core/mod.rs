@@ -13,6 +13,7 @@ pub mod animation;
 pub mod block;
 pub mod enemy;
 pub mod entity;
+pub mod lift;
 pub mod level;
 pub mod physics;
 pub mod powerup;

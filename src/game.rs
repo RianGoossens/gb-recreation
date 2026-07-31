@@ -12,6 +12,7 @@ use crate::core::block::{Block, BlockKind};
 use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
 use crate::core::entity::{pixels, Mario, Power};
 use crate::core::level::{Level, TILE};
+use crate::core::lift::{ride_lifts, Lift};
 use crate::core::physics::step_motion;
 use crate::core::powerup::{update_item, Item, ItemKind, ITEM_SIZE};
 use crate::core::superball::{update_superball, Superball};
@@ -59,6 +60,8 @@ pub struct Game {
     pub items: Vec<Item>,
     /// Superballs currently in flight.
     pub superballs: Vec<Superball>,
+    /// Moving platforms. They carry Mario and never despawn.
+    pub lifts: Vec<Lift>,
     /// Tracks the throw button so a held press throws only once.
     throw_latched: bool,
     /// Uncollected coins, top-left pixel.
@@ -224,6 +227,11 @@ impl Game {
         let coins = level.coins.clone();
         let blocks = spawn_blocks(&level);
         let items = spawn_items(&level);
+        let lifts = level
+            .lifts
+            .iter()
+            .map(|&(x, y, axis)| Lift::new(x, y, axis))
+            .collect();
         let tuning = Tuning::default();
         Self {
             level,
@@ -232,6 +240,7 @@ impl Game {
             blocks,
             items,
             superballs: Vec::new(),
+            lifts,
             throw_latched: false,
             coins,
             coins_collected: 0,
@@ -323,7 +332,12 @@ impl Game {
         }
         let rising = self.mario.vy < 0;
         let was_grounded = self.mario.on_ground;
+        // Where his feet were before the frame, so a lift can tell a landing
+        // from a jump up through it.
+        let was_bottom = self.mario.pixel_y() + self.mario.size().1 - 1;
+        let lift_moves: Vec<(i32, i32)> = self.lifts.iter_mut().map(Lift::step).collect();
         step_motion(&mut self.mario, buttons, &self.level.solids, &self.tuning);
+        ride_lifts(&mut self.mario, &self.lifts, &lift_moves, was_bottom);
         if was_grounded && !self.mario.on_ground && self.mario.vy < 0 {
             self.sounds.push(SoundEvent::Jump);
         }

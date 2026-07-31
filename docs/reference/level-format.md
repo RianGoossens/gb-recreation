@@ -21,6 +21,8 @@ code with `Level::from_file` / `Level::from_text`.
 | `?` | question block, gives a coin when bumped (solid) |
 | `P` | power block, gives a mushroom when bumped (solid) |
 | `B` | brick block (solid) |
+| `V` | a lift that runs up and down, 60 px each way |
+| `H` | a lift that runs side to side, 53 px each way |
 | `E` | the level-end trigger (walk into it to finish; not solid) |
 
 Any other character is treated as empty. The block markers (`?`, `P`, `B`) are

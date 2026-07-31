@@ -6,6 +6,7 @@
 
 use crate::core::block::BlockKind;
 use crate::core::enemy::EnemyKind;
+use crate::core::lift::LiftAxis;
 use crate::core::powerup::ItemKind;
 
 /// Tile size in pixels.
@@ -138,13 +139,16 @@ pub struct Level {
     pub end: Option<(i32, i32)>,
     /// Free-standing item spawns: top-left pixel and kind.
     pub items: Vec<(i32, i32, ItemKind)>,
+    /// Moving platforms: top-left pixel and the axis they run on.
+    pub lifts: Vec<(i32, i32, LiftAxis)>,
 }
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `^` a one-way
     /// platform, `M` marks Mario's spawn, `G` a Goomba, `F` a Fly, `C` a coin,
     /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
-    /// `E` the level-end trigger.
+    /// `E` the level-end trigger, `V` and `H` a lift running up and down or
+    /// side to side.
     /// The block markers are also solid; `E`, `S`, and coins are not. Anything
     /// else is empty. Rows must be equal length. This is the human-editable
     /// format levels are authored in.
@@ -156,6 +160,7 @@ impl Level {
         let mut blocks = Vec::new();
         let mut end = None;
         let mut items = Vec::new();
+        let mut lifts = Vec::new();
         for (ty, row) in rows.iter().enumerate() {
             for (tx, ch) in row.chars().enumerate() {
                 let (px, py) = (tx as i32 * TILE, ty as i32 * TILE);
@@ -170,6 +175,8 @@ impl Level {
                     'S' => items.push((px, py, ItemKind::Star)),
                     'W' => items.push((px, py, ItemKind::Flower)),
                     'E' => end = Some((px, py)),
+                    'V' => lifts.push((px, py, LiftAxis::Vertical)),
+                    'H' => lifts.push((px, py, LiftAxis::Horizontal)),
                     _ => {}
                 }
             }
@@ -182,6 +189,7 @@ impl Level {
             blocks,
             end,
             items,
+            lifts,
         }
     }
 

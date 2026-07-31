@@ -35,7 +35,7 @@ playing it faithfully.
 
 | Enemy | Label | Notes |
 |-------|-------|-------|
-| Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls and ledges). Its walk speed is now measured: object kind `0x00`, the one World 1-1's list uses nine times, moves one pixel left every three frames without exception over 143 steps (`tools/measure_enemy_walk.py`). Whether it turns at a ledge or walks off one is still unverified, as is the mapping of kind `0x00` to this entity. |
+| Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls and ledges). Its movement is now measured, on object kind `0x00`, the one World 1-1's list uses nine times: one pixel left every three frames without exception over 143 steps (`tools/measure_enemy_walk.py`), and it walks off a ledge rather than turning, falling straight down at a flat pixel per frame with its X frozen (`tools/probe_enemy_ledge.py`). The ledge-turn our engine used to do was carried over from another game and is gone. Still unverified: the mapping of kind `0x00` to this entity, and its sprite. |
 | Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Gated the same way as the star. Still worth replacing with a real SML enemy rather than only hiding it. |
 
 ## Items, blocks, scoring

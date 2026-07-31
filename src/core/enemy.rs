@@ -2,12 +2,12 @@
 //!
 //! An enemy walks, falls under gravity, and collides with the world much like
 //! Mario, but with simpler behavior. This module owns the shared parts: the
-//! entity, one physics step (walk plus gravity plus collision), and despawning
-//! enemies that have scrolled off screen. Per-type quirks (like a Goomba not
-//! walking off ledges) build on top of this.
+//! entity, one physics step (walk plus falling plus collision), and despawning
+//! enemies that have scrolled off screen. Per-type quirks (like a Fly's hop)
+//! build on top of this.
 
 use crate::core::level::{Solids, TILE};
-use crate::core::physics::{GRAVITY, MAX_FALL_SPEED};
+use crate::core::physics::GRAVITY;
 use crate::SCREEN_WIDTH;
 
 /// Enemies are one tile square.
@@ -26,6 +26,14 @@ pub const ENEMY_SIZE: i32 = 8;
 /// as close as this representation gets: 0.4% slow, about a pixel behind the
 /// cartridge every 750 frames.
 pub const ENEMY_WALK_SPEED: i32 = 85;
+/// Downward speed of a falling enemy, in subpixels per frame.
+///
+/// Cutting the ground out from under the cartridge's walker (collision reads
+/// the tilemap in video RAM, so a pit can be made where there was none) drops
+/// it one pixel per frame, flat, for the whole fall. There is no acceleration
+/// to measure: leave a floor 8 pixels down and it takes exactly 8 frames to
+/// reach it (`tools/probe_enemy_ledge.py`).
+pub const ENEMY_FALL_SPEED: i32 = crate::core::entity::SUBPIXEL;
 /// How far past the screen edges an enemy may be before it despawns.
 pub const DESPAWN_MARGIN: i32 = 32;
 /// Upward speed a Fly gets on each hop. Provisional.
@@ -35,7 +43,7 @@ pub const HOP_INTERVAL: u32 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
-    /// Walks along the ground and turns at walls and ledges.
+    /// Walks along the ground, turns at walls, and walks off ledges.
     Goomba,
     /// Walks but hops on a timer, so it does not respect ledges.
     Fly,
@@ -104,17 +112,12 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
         return;
     }
 
-    // A Goomba turns at a ledge instead of walking off. When grounded, probe the
-    // ground just past its leading foot; if nothing is there, reverse first.
-    if enemy.on_ground && enemy.kind == EnemyKind::Goomba && enemy.vx != 0 {
-        let (l, _t, r, b) = enemy.edges();
-        let ahead = if enemy.vx > 0 { r + 1 } else { l - 1 };
-        if !solids.rect_hits_solid(ahead, b + 1, ahead, b + 1) {
-            enemy.vx = -enemy.vx;
-        }
+    // Walking stops while airborne. Measured: the walker's screen X does not
+    // change by a single pixel through a fall, and picks up again the frame it
+    // lands (`tools/probe_enemy_ledge.py`).
+    if enemy.on_ground {
+        enemy.x += enemy.vx;
     }
-
-    enemy.x += enemy.vx;
     let (l, t, r, b) = enemy.edges();
     if enemy.vx > 0 && solids.rect_hits_solid(r, t, r, b) {
         let wall_left = r.div_euclid(TILE) * TILE;
@@ -137,10 +140,15 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
         }
     }
 
-    // Gravity only builds up while airborne, so a resting enemy sits still
-    // instead of creeping into the floor (same rule as Mario).
+    // An enemy falls at a flat rate rather than accelerating. Cutting the
+    // ground from under the cartridge's own walker drops it one pixel per
+    // frame, every frame, with no build up at all.
     if !enemy.on_ground {
-        enemy.vy = (enemy.vy + GRAVITY).min(MAX_FALL_SPEED);
+        enemy.vy = if enemy.vy < 0 {
+            (enemy.vy + GRAVITY).min(ENEMY_FALL_SPEED)
+        } else {
+            ENEMY_FALL_SPEED
+        };
     }
     enemy.y += enemy.vy;
     let (l, _t, r, b) = enemy.edges();
@@ -216,7 +224,7 @@ mod tests {
         // every time. Over 300 frames that is 100 pixels, and ours lands on
         // the same pixel.
         let solids = floor();
-        let mut e = Enemy::goomba(160, 16, true);
+        let mut e = Enemy::goomba(120, 16, true);
         let start = e.pixel_x();
         for _ in 0..300 {
             update_enemy(&mut e, &solids);
@@ -253,9 +261,9 @@ mod tests {
     }
 
     #[test]
-    fn goomba_turns_at_a_ledge_instead_of_walking_off() {
-        // A short platform (tiles 5..9 on the floor row) with empty space beyond.
-        // Rows are 20 wide, 4 tall; the platform is on the bottom row.
+    fn a_walker_leaves_a_ledge_instead_of_turning() {
+        // A short platform (tiles 5..9 on the floor row) with empty space
+        // beyond. Rows are 20 wide, 4 tall; the platform is on the bottom row.
         let mut floor_row = ".".repeat(20);
         floor_row.replace_range(5..10, "#####");
         let solids = Solids::from_rows(&[
@@ -265,15 +273,39 @@ mod tests {
             &floor_row,
         ]);
 
-        // Goomba standing on the platform (tile 6, pixel x 48, y 16), walking right.
+        // Walker standing on the platform (tile 6, pixel x 48, y 16), going right.
         let mut e = Enemy::goomba(48, 16, false);
         e.on_ground = true;
+        let edge_x = 10 * 8; // right edge of the platform
         for _ in 0..300 {
             update_enemy(&mut e, &solids);
         }
-        // It never leaves the platform: its feet stay over solid tiles 5..9.
-        let (l, _t, r, b) = e.edges();
-        assert!(solids.rect_hits_solid(l, b + 1, r, b + 1), "should still be on the platform");
+        assert!(e.pixel_x() >= edge_x, "should have walked off the end");
+        assert!(!e.on_ground, "and be falling");
+    }
+
+    #[test]
+    fn a_falling_walker_drops_straight_down_at_one_pixel_a_frame() {
+        // Ground under the left half only, so the walker runs out of floor.
+        let mut floor_row = "#".repeat(10);
+        floor_row.push_str(&".".repeat(10));
+        let solids = Solids::from_rows(&[
+            &".".repeat(20),
+            &".".repeat(20),
+            &".".repeat(20),
+            &floor_row,
+        ]);
+        let mut e = Enemy::goomba(48, 16, false);
+        e.on_ground = true;
+        while e.on_ground {
+            update_enemy(&mut e, &solids);
+        }
+        let (x, y) = (e.pixel_x(), e.pixel_y());
+        for step in 1..=8 {
+            update_enemy(&mut e, &solids);
+            assert_eq!(e.pixel_x(), x, "no horizontal movement while falling");
+            assert_eq!(e.pixel_y(), y + step, "one pixel down per frame");
+        }
     }
 
     #[test]

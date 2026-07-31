@@ -229,3 +229,42 @@ fn world_1_decodes_end_to_end() {
     assert_eq!(last(level::LEVEL_1_2_LIST), 0x67BB);
     assert_eq!(last(level::LEVEL_1_3_LIST), 0x75C6);
 }
+
+/// The cartridge's exit door, rather than a guess at where the exit should be.
+/// It is a 2x2 block whose top-left tile is 0x13, and it appears exactly twice
+/// in 1-1 and twice in 1-2, in the same column each time: a raised one leading
+/// to the bonus route and one at ground level.
+#[test]
+fn the_exit_door_is_where_the_cartridge_puts_it() {
+    let Some(data) = rom() else { return };
+    for (name, list, column) in [("1-1", level::LEVEL_1_1_LIST, 298), ("1-2", level::LEVEL_1_2_LIST, 278)] {
+        let columns = level::decode_level(&data, list);
+        let doors: Vec<(usize, usize)> = columns
+            .iter()
+            .enumerate()
+            .flat_map(|(c, col)| {
+                col.iter()
+                    .enumerate()
+                    .filter(|(_, &t)| t == level::EXIT_DOOR)
+                    .map(move |(r, _)| (c, r))
+            })
+            .collect();
+        assert_eq!(doors, vec![(column, 0), (column, 13)], "World {name}");
+        assert_eq!(level::exit_door(&columns), Some((column, 13)), "World {name}");
+
+        // The full 2x2 block, so the tile is a door and not a lone id.
+        assert_eq!(columns[column][13], 0x13);
+        assert_eq!(columns[column + 1][13], 0x21);
+        assert_eq!(columns[column][14], 0x24);
+        assert_eq!(columns[column + 1][14], 0x39);
+    }
+}
+
+/// World 1-3 ends the world rather than leading to another level, and has no
+/// exit door at all. Its trigger is placed at the far end as a stand-in.
+#[test]
+fn world_1_3_has_no_exit_door() {
+    let Some(data) = rom() else { return };
+    let columns = level::decode_level(&data, level::LEVEL_1_3_LIST);
+    assert_eq!(level::exit_door(&columns), None);
+}

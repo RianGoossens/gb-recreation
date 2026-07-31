@@ -1328,3 +1328,20 @@ The six-byte shape held for all three: each list starts six bytes into its
 run, after three pointers that are not part of the level. 1-1 and 1-2 end on
 the same exit screen `0x67BB`; 1-3 ends the world and has its own, `0x75C6`.
 
+
+
+## The exit door
+
+The level-end trigger used to go two columns from the right edge. That lands
+exactly on the cartridge's own exit in both World 1-1 and World 1-2, which is
+a coincidence and not a reason to keep it.
+
+The exit is a 2x2 door: tiles `0x13 0x21` over `0x24 0x39`. It appears exactly
+twice in each of 1-1 and 1-2, both times in the same column, at row 0 and row
+13. The upper one is the raised door that leads to the bonus route; the lower
+one is the exit. Both levels put it two columns from the right, which is why
+the old rule worked.
+
+World 1-3 contains none of those tiles. It ends World 1 rather than leading to
+another level, and its final screen (`0x75C6`) is a room rather than a gate.
+Its trigger is still placed at the far end, and that is a stand-in.

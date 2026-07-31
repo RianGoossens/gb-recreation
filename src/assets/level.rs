@@ -211,6 +211,30 @@ pub fn extract_level(rom_path: impl AsRef<Path>, start: usize) -> Result<Vec<Col
 const SPAWN_COLUMN: usize = 6;
 const GROUND_ROW: usize = 14;
 
+/// Top-left tile of the cartridge's level-exit door, a 2x2 block of
+/// `0x13 0x21` over `0x24 0x39`. It appears exactly twice in World 1-1 and
+/// twice in World 1-2, both times in the same column: once at row 0, the
+/// raised door that leads to the bonus route, and once at row 13, the one at
+/// ground level. The lower one is the level's exit.
+///
+/// World 1-3 has neither, because it ends the world rather than leading to
+/// the next level.
+pub const EXIT_DOOR: u8 = 0x13;
+
+/// The exit door's top-left cell, if the level has one.
+pub fn exit_door(columns: &[Column]) -> Option<(usize, usize)> {
+    columns
+        .iter()
+        .enumerate()
+        .flat_map(|(c, col)| {
+            col.iter()
+                .enumerate()
+                .filter(|(_, &t)| t == EXIT_DOOR)
+                .map(move |(r, _)| (c, r))
+        })
+        .max_by_key(|&(_, r)| r)
+}
+
 /// Render decoded columns as our plain-text level format, which
 /// `Level::from_file` loads: `#` solid, `^` a one-way platform, `C` a coin,
 /// `.` empty, `M` spawn, `E` end trigger.
@@ -231,7 +255,11 @@ pub fn to_level_text(columns: &[Column]) -> String {
         .collect();
     if width >= 2 {
         rows[GROUND_ROW - 1][SPAWN_COLUMN.min(width - 1)] = b'M';
-        rows[GROUND_ROW - 1][width - 2] = b'E';
+        // The door when the level has one, the far end otherwise. Placing it
+        // two columns from the right edge happens to land on the door in both
+        // 1-1 and 1-2, which is a coincidence worth not relying on.
+        let (column, row) = exit_door(columns).unwrap_or((width - 2, GROUND_ROW - 1));
+        rows[row][column] = b'E';
     }
     let mut out = String::with_capacity((width + 1) * ROWS);
     for row in rows {

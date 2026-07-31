@@ -83,11 +83,14 @@ playing it faithfully.
   note in CLAUDE.md).
 - **World 1 geometry**: canonical. All 300 columns of 1-1 and all 280 of 1-2
   match the running cartridge exactly; 1-3's first 27 do so far.
-- **Level-end trigger placement**: **stand-in.** The extractor puts the end
-  trigger two columns from the right edge, which lands correctly in 1-1 but
-  not in 1-2 or 1-3, where a walker runs off the end of the geometry instead
-  of finishing. The cartridge's own exit is on a specific screen (`0x67BB` for
-  1-1 and 1-2) and has not been located tile by tile.
+- **Level-end trigger placement**: canonical for 1-1 and 1-2, **stand-in** for
+  1-3. The exit is a 2x2 door, `0x13 0x21` over `0x24 0x39`, and it appears
+  exactly twice per level in the same column: a raised one leading to the
+  bonus route and one at ground level. The extractor puts the trigger on the
+  lower one. The rule it replaces (two columns from the right edge) landed on
+  the door in both 1-1 and 1-2 by coincidence. World 1-3 has no door, because
+  it ends the world instead of leading to another level, so its trigger still
+  goes at the far end.
 
 - **Tile solidity**: **faithful, measured from the cartridge.** The shipped
   rule is `tile >= 0x60`, with `0xF4` carved out as passable.

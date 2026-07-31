@@ -15,7 +15,7 @@ pub const ENEMY_SIZE: i32 = 8;
 /// Horizontal walk speed in subpixels per frame.
 ///
 /// Measured from the cartridge with `tools/measure_enemy_walk.py`, on the
-/// object kind World 1-1's list uses nine times. The camera in Super Mario
+/// object kind World 1-1's list uses ten times. The camera in Super Mario
 /// Land only moves while Mario does, so letting go of right freezes it and
 /// leaves the object's slot X moving under its own power alone: it stepped one
 /// pixel left 143 times, and every one of the 142 gaps between steps was

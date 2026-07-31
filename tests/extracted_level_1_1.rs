@@ -30,6 +30,40 @@ fn extracted_level_has_the_shape_the_rom_decodes_to() {
     assert!(level.end.is_some(), "the level needs its end trigger");
 }
 
+#[test]
+fn the_extracted_level_carries_the_cartridge_s_walkers() {
+    let Some(level) = extracted() else { return };
+    // The ten kind 0x00 records in World 1-1's object list. Only that kind is
+    // written out, since it is the only one whose movement has been measured.
+    let mut placed: Vec<(i32, i32)> =
+        level.enemy_spawns.iter().map(|&(x, y, _)| (x, y)).collect();
+    placed.sort_unstable();
+    // Every kind 0x00 record in World 1-1's list, at 16 * x across and
+    // 8 * (row) down. Six stand on the ground at row 13, four are higher up.
+    assert_eq!(
+        placed,
+        vec![
+            (192, 104),
+            (528, 80),
+            (640, 16),
+            (656, 16),
+            (1264, 104),
+            (1360, 104),
+            (1488, 80),
+            (1568, 80),
+            (1600, 104),
+            (1680, 104),
+        ]
+    );
+    for &(x, y, _) in &level.enemy_spawns {
+        let (column, row) = (x / 8, y / 8);
+        assert!(
+            !level.solids.is_solid(column, row),
+            "a walker was placed inside a solid tile at {column},{row}"
+        );
+    }
+}
+
 /// Walks the level: hold right, jump when blocked, and jump when the ground
 /// ahead runs out. Mario has to reach the end trigger, which fails if the
 /// solidity rule seals a wall shut or opens a pit that is not there.

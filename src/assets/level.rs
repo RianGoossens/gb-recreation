@@ -245,6 +245,16 @@ pub fn exit_door(columns: &[Column]) -> Option<(usize, usize)> {
 /// `Level::from_file` loads: `#` solid, `^` a one-way platform, `C` a coin,
 /// `.` empty, `M` spawn, `E` end trigger.
 pub fn to_level_text(columns: &[Column]) -> String {
+    to_level_text_with_enemies(columns, &[])
+}
+
+/// The same, with enemy spawns stamped in as `G`.
+///
+/// Only the kind whose behaviour has actually been measured is passed in here
+/// (see [`super::object`]); the rest of a level's objects are left out rather
+/// than guessed at, so a level file is short of enemies rather than wrong
+/// about them.
+pub fn to_level_text_with_enemies(columns: &[Column], enemies: &[(usize, usize)]) -> String {
     let width = columns.len();
     let mut rows: Vec<Vec<u8>> = (0..ROWS)
         .map(|r| {
@@ -259,6 +269,15 @@ pub fn to_level_text(columns: &[Column]) -> String {
                 .collect()
         })
         .collect();
+    for &(column, row) in enemies {
+        // The cell has to be free. A record that would land on a coin or on
+        // Mario's spawn is dropped rather than allowed to replace it.
+        if let Some(cell) = rows.get_mut(row).and_then(|r| r.get_mut(column)) {
+            if *cell == b'.' {
+                *cell = b'G';
+            }
+        }
+    }
     if width >= 2 {
         rows[GROUND_ROW - 1][SPAWN_COLUMN.min(width - 1)] = b'M';
         // The door when the level has one, the far end otherwise. Placing it

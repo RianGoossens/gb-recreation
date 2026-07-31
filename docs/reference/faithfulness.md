@@ -35,7 +35,7 @@ playing it faithfully.
 
 | Enemy | Label | Notes |
 |-------|-------|-------|
-| Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls and ledges). Its movement is now measured, on object kind `0x00`, the one World 1-1's list uses nine times: one pixel left every three frames without exception over 143 steps (`tools/measure_enemy_walk.py`), and it walks off a ledge rather than turning, falling straight down at a flat pixel per frame with its X frozen (`tools/probe_enemy_ledge.py`). The ledge-turn our engine used to do was carried over from another game and is gone. Still unverified: the mapping of kind `0x00` to this entity, and its sprite. |
+| Goomba (walker) | stand-in | SML's ground walker is the Chibibo. Ours behaves like it (walk, turn at walls). Its movement is now measured, on object kind `0x00`, the one World 1-1's list uses ten times: one pixel left every three frames without exception over 143 steps (`tools/measure_enemy_walk.py`), and it walks off a ledge rather than turning, falling straight down at a flat pixel per frame with its X frozen (`tools/probe_enemy_ledge.py`). The ledge-turn our engine used to do was carried over from another game and is gone. Still unverified: the mapping of kind `0x00` to this entity, and its sprite. |
 | Fly (hopper) | **invented / stand-in** | A generic hopping enemy, not a specific SML enemy. SML World 1 (Birabuto) has the Nokobon (a walking bomb). Gated the same way as the star. Still worth replacing with a real SML enemy rather than only hiding it. |
 
 ## Items, blocks, scoring
@@ -83,6 +83,14 @@ playing it faithfully.
   note in CLAUDE.md).
 - **World 1 geometry**: canonical, and verified end to end. Every column of
   all three levels (300, 280, 300) matches the running cartridge exactly.
+- **World 1 enemies**: canonical in placement, **incomplete**. The object
+  lists decode (`docs/reference/objects.md`) and `sml extract-level` writes out
+  the kind whose movement has been measured, the ground walker: 10 in 1-1, 4 in
+  1-2, none in 1-3. The other kinds spawn in the cartridge and are left out of
+  our levels, because nothing about how they move has been measured yet. So a
+  level is short of enemies rather than carrying invented ones. Which kind byte
+  is which named SML enemy is also open; `tools/capture_object_sprites.py`
+  draws each one, which tells them apart without naming them.
 - **Level-end trigger placement**: canonical for 1-1 and 1-2, **stand-in** for
   1-3. The exit is a 2x2 door, `0x13 0x21` over `0x24 0x39`, and it appears
   exactly twice per level in the same column: a raised one leading to the

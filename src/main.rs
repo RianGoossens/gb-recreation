@@ -205,7 +205,7 @@ fn extract_title_screen(args: &[String]) -> ExitCode {
 /// Output defaults to `assets/extracted/level_<name>.txt`, gitignored and
 /// regenerated on demand.
 fn extract_level(args: &[String]) -> ExitCode {
-    use sml::assets::level;
+    use sml::assets::{level, object};
 
     let name = args.first().map(String::as_str).unwrap_or("1-1");
     let Some(&(_, list)) = level::WORLD_1.iter().find(|(n, _)| *n == name) else {
@@ -231,7 +231,22 @@ fn extract_level(args: &[String]) -> ExitCode {
         }
     };
 
-    if let Err(e) = std::fs::write(path, level::to_level_text(&columns)) {
+    let objects = object::WORLD_1_OBJECTS
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|&(_, start)| object::extract_objects(DEFAULT_ROM, start))
+        .transpose();
+    let records = match objects {
+        Ok(records) => records.unwrap_or_default(),
+        Err(e) => {
+            eprintln!("object extraction failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let walkers = object::walker_spawns(&records);
+
+    let text = level::to_level_text_with_enemies(&columns, &walkers);
+    if let Err(e) = std::fs::write(path, text) {
         eprintln!("could not write {out}: {e}");
         return ExitCode::FAILURE;
     }
@@ -254,6 +269,12 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("extracted World {name} from ROM (no emulator):");
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
+    println!(
+        "  {} ground walkers, from {} object records ({} of them spawn)",
+        walkers.len(),
+        records.len(),
+        object::spawning(&records).len(),
+    );
     println!("  columns you can fall through: {:?}", level::pits(&columns));
     ExitCode::SUCCESS
 }

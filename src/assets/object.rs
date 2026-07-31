@@ -133,6 +133,25 @@ pub fn spawning(records: &[ObjectRecord]) -> Vec<ObjectRecord> {
     records.iter().copied().filter(|r| !r.skipped()).collect()
 }
 
+/// The ground walker, the one kind whose movement has been measured off the
+/// cartridge: one pixel every three frames, off a ledge rather than turning at
+/// it, straight down at a pixel a frame (`docs/reference/faithfulness.md`).
+/// World 1-1's list uses it ten times, World 1-2 four, World 1-3 not at all.
+pub const WALKER: u8 = 0x00;
+
+/// Where a level puts its ground walkers, as (column, row).
+///
+/// Deliberately only this kind. The other kinds spawn and move, but nothing
+/// about how they move has been measured, so a level file is short of enemies
+/// rather than carrying invented ones.
+pub fn walker_spawns(records: &[ObjectRecord]) -> Vec<(usize, usize)> {
+    spawning(records)
+        .iter()
+        .filter(|r| r.kind == WALKER)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// Verify the ROM, then read a level's object list out of it.
 pub fn extract_objects(
     rom_path: impl AsRef<Path>,

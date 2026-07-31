@@ -408,15 +408,20 @@ fn scan_levels() -> ExitCode {
     };
     for (start, pointers) in level::find_screen_lists(&rom) {
         let unique: std::collections::BTreeSet<u16> = pointers.iter().copied().collect();
-        let mark = if start <= level::LEVEL_1_1_LIST
-            && level::LEVEL_1_1_LIST < start + 2 * pointers.len()
-        {
-            "  <- contains World 1-1's list"
-        } else {
-            ""
+        let end = start + 2 * pointers.len();
+        let pinned = level::KNOWN_LEVELS
+            .iter()
+            .find(|&&(_, at)| (start..end).contains(&at));
+        let mark = match pinned {
+            Some(&(name, at)) => {
+                let skipped = (at - start) / 2;
+                format!("  <- World {name}, starting {skipped} pointers in")
+            }
+            None => "  <- not yet tied to a level".to_string(),
         };
         println!(
-            "0x{start:05X}  {:2} screens ({} unique), {} columns{mark}",
+            "0x{start:05X}  bank 0x{:05X}  {:2} screens ({} unique), {} columns{mark}",
+            level::bank_of(start),
             pointers.len(),
             unique.len(),
             pointers.len() * level::SCREEN_COLUMNS

@@ -103,6 +103,69 @@ fn the_ground_level_records_have_ground_under_them() {
 }
 
 #[test]
+fn all_three_world_1_levels_have_a_list() {
+    let Some(data) = rom() else { return };
+    let counts: Vec<usize> = object::WORLD_1_OBJECTS
+        .iter()
+        .map(|&(_, start)| object::object_list(&data, start).len())
+        .collect();
+    assert_eq!(counts, vec![37, 46, 48]);
+}
+
+#[test]
+fn the_lists_sit_back_to_back_in_the_rom() {
+    let Some(data) = rom() else { return };
+    // Each list is a run of three-byte records ending on 0xFF, and the next
+    // level's start was read off the game's pointer rather than computed, so
+    // this checks the two agree. World 1-1's list is followed by a second
+    // 0xFF, which is why 1-2 starts two bytes on rather than one.
+    let ends: Vec<usize> = object::WORLD_1_OBJECTS
+        .iter()
+        .map(|&(_, start)| start + 3 * object::object_list(&data, start).len())
+        .collect();
+    assert_eq!(data[ends[0]], 0xFF);
+    assert_eq!(data[ends[0] + 1], 0xFF);
+    assert_eq!(object::LEVEL_1_2_OBJECTS, ends[0] + 2);
+    assert_eq!(data[ends[1]], 0xFF);
+    assert_eq!(object::LEVEL_1_3_OBJECTS, ends[1] + 1);
+    assert_eq!(data[ends[2]], 0xFF);
+}
+
+#[test]
+fn world_1_2_places_every_record_the_same_way_1_1_does() {
+    let Some(data) = rom() else { return };
+    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
+    for r in object::object_list(&data, object::LEVEL_1_2_OBJECTS) {
+        assert!(
+            !level::is_solid(columns[r.column()][r.row()]),
+            "record {:02X} {:02X} {:02X} lands inside a solid tile",
+            r.x,
+            r.y,
+            r.kind,
+        );
+    }
+}
+
+#[test]
+fn world_1_3_has_records_the_position_mapping_does_not_explain() {
+    let Some(data) = rom() else { return };
+    let columns = level::decode_level(&data, level::LEVEL_1_3_LIST);
+    let records = object::object_list(&data, object::LEVEL_1_3_OBJECTS);
+    let missed: Vec<&ObjectRecord> = records
+        .iter()
+        .filter(|r| r.row() >= 16 || level::is_solid(columns[r.column()][r.row()]))
+        .collect();
+    // Pinning the gap rather than hiding it. Every miss is a kind 1-3
+    // introduces, so the mapping is incomplete for those and not wrong for the
+    // rest; this fails loudly if a later change moves the boundary either way.
+    assert_eq!(missed.len(), 17);
+    let mut kinds: Vec<u8> = missed.iter().map(|r| r.kind_id()).collect();
+    kinds.sort_unstable();
+    kinds.dedup();
+    assert_eq!(kinds, vec![0x02, 0x0C, 0x36]);
+}
+
+#[test]
 fn the_kinds_that_spawn_are_the_ones_the_trace_saw() {
     let Some(records) = records() else { return };
     let mut kinds: Vec<u8> = object::spawning(&records).iter().map(|r| r.kind).collect();

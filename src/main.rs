@@ -5,7 +5,7 @@
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
 //!   extract-level [1-1|1-2|1-3] [out]       decode a level into a level file
 //!   scan-levels                             list every screen list in the ROM
-//!   list-objects [1-1]                      print a level's object list
+//!   list-objects [1-1|1-2|1-3]              print a level's object list
 //!   render-level <level> <col> <out.png>    draw a level screen with its real tiles
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
@@ -303,18 +303,19 @@ fn list_objects(args: &[String]) -> ExitCode {
     use sml::assets::object;
 
     let name = args.first().map(String::as_str).unwrap_or("1-1");
-    if name != "1-1" {
-        eprintln!("only World 1-1's object list is pinned so far");
+    let Some(&(_, start)) = object::WORLD_1_OBJECTS.iter().find(|(n, _)| *n == name) else {
+        let known: Vec<&str> = object::WORLD_1_OBJECTS.iter().map(|(n, _)| *n).collect();
+        eprintln!("unknown level {name}; known levels are {}", known.join(", "));
         return ExitCode::FAILURE;
-    }
-    let records = match object::extract_objects(DEFAULT_ROM, object::LEVEL_1_1_OBJECTS) {
+    };
+    let records = match object::extract_objects(DEFAULT_ROM, start) {
         Ok(records) => records,
         Err(e) => {
             eprintln!("object extraction failed: {e}");
             return ExitCode::FAILURE;
         }
     };
-    println!("World {name}: {} records at 0x{:05X}", records.len(), object::LEVEL_1_1_OBJECTS);
+    println!("World {name}: {} records at 0x{start:05X}", records.len());
     println!(" bytes     column  row  kind  spawns");
     for r in &records {
         println!(

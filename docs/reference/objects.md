@@ -129,6 +129,38 @@ address that did not hold it the frame before, and counts that over all 37
 records. Field 2 goes to `0xD100` eleven times and `0xD110` four times, and a
 stride of 16 falls out.
 
+## All three of World 1's lists
+
+`tools/find_object_lists.py` drives the walkthrough across the level
+boundaries and reads `0xD010` each time a level opens, which is the same
+measurement 1-1 got for free:
+
+| level | list | records | first bytes |
+|---|---|---|---|
+| 1-1 | `0x0A002` | 37 | `0C 0F 00` |
+| 1-2 | `0x0A073` | 46 | `0E 0C 84` |
+| 1-3 | `0x0A0FE` | 48 | `0D 4D 02` |
+
+They sit back to back. 1-3 begins one byte past 1-2's terminator. 1-2 begins
+two bytes past 1-1's, because there are two `0xFF` bytes at the end of 1-1's
+list where every other list has one.
+
+### World 1-3 does not fit yet
+
+The position mapping places every record of 1-1 and 1-2 on a cell that is not
+solid. It misses on 17 of 1-3's 48.
+
+Every miss is a kind 1-3 introduces: nine of kind `0x02`, seven of `0x0C`, one
+of `0x36`. The nine `0x02` records also carry a `y` byte with a high nibble of
+4 or C, which no record in either of the other two levels uses, and reading
+only the low nibble as the row does not rescue them either: it moves the
+failures around rather than removing them (15 land inside solid instead of 8).
+
+So the mapping is incomplete for those kinds rather than wrong for the rest.
+`tests/rom_object_decode.rs` pins the count at 17 so the boundary cannot move
+in either direction unnoticed. Working out what those kinds read is the next
+thing to trace, with the same tools pointed at 1-3.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine
@@ -136,8 +168,6 @@ stride of 16 falls out.
   appear only in the last two records of the level, at columns 284 and 292.
 - The top bit of the `y` byte. Seven records carry it, five of which also carry
   the skip bit, so it is independent of that.
-- Where World 1-2's and 1-3's lists start. The same technique applies: read
-  `0xD010` the moment each level opens.
 - The rest of a slot's 16 bytes.
 
 ## Tools
@@ -150,3 +180,4 @@ stride of 16 falls out.
 | `tools/watch_object_slot.py` | one slot through a plain walk, terrain intact |
 | `tools/measure_spawn_column.py` | column count against camera scroll |
 | `tools/probe_object_type_flag.py` | what the kind byte's top bit does |
+| `tools/find_object_lists.py` | where each World 1 level's list starts |

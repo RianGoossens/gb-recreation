@@ -255,7 +255,7 @@ fn coast_to_zero(v: i32, amount: i32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::entity::Facing;
+    use crate::core::entity::{Facing, SMALL_HEIGHT, SMALL_WIDTH};
 
     fn held(button: Button) -> Buttons {
         let mut b = Buttons::default();
@@ -361,12 +361,12 @@ mod tests {
     #[test]
     fn mario_falls_and_lands_on_the_floor() {
         let solids = floor_level();
-        let mut m = Mario::new(8, 0); // small (8x8), above the floor
+        let mut m = Mario::new(8, 0); // above the floor
         for _ in 0..200 {
             step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
         }
-        // Floor top is y=24, Mario is 8 tall, so he rests at y=16.
-        assert_eq!(m.pixel_y(), 16);
+        // Floor top is y=24 and Mario is 12 tall, so he rests at y=12.
+        assert_eq!(m.pixel_y(), 24 - SMALL_HEIGHT);
         assert_eq!(m.vy, 0);
         assert!(m.on_ground);
     }
@@ -384,12 +384,12 @@ mod tests {
         for _ in 0..200 {
             step_motion(&mut m, held(Button::Right), &solids, &Tuning::default());
         }
-        // Wall's left edge is x=56, Mario is 8 wide, so he stops at x=48 and
-        // cannot pass it no matter how long he pushes.
-        assert_eq!(m.pixel_x(), 48);
+        // Wall's left edge is x=56 and Mario is 11 wide, so he stops at x=45
+        // and cannot pass it no matter how long he pushes.
+        assert_eq!(m.pixel_x(), 56 - SMALL_WIDTH);
         for _ in 0..10 {
             step_motion(&mut m, held(Button::Right), &solids, &Tuning::default());
-            assert_eq!(m.pixel_x(), 48);
+            assert_eq!(m.pixel_x(), 56 - SMALL_WIDTH);
         }
     }
 
@@ -555,23 +555,39 @@ mod tests {
     }
 
     #[test]
-    fn mario_settles_into_a_one_tile_wide_pit() {
-        // Walls on columns 2 and 4 make a one-tile-wide slot at column 3, with a
-        // floor underneath. Mario dropped in should rest on the floor.
+    fn mario_settles_into_a_two_tile_wide_slot() {
+        // Mario is 11 px wide, so a one-tile slot no longer admits him. Walls
+        // on columns 1 and 4 leave a 16 px slot, which is the narrowest gap
+        // that fits him at all.
+        let solids = Solids::from_rows(&[
+            ".#..#...",
+            ".#..#...",
+            ".#..#...",
+            "########",
+        ]);
+        let mut m = Mario::new(18, 0);
+        for _ in 0..200 {
+            step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
+        }
+        assert_eq!(m.pixel_x(), 18);
+        assert_eq!(m.pixel_y(), 24 - SMALL_HEIGHT);
+        assert!(m.on_ground);
+    }
+
+    #[test]
+    fn a_one_tile_slot_is_too_narrow_for_him() {
         let solids = Solids::from_rows(&[
             "..#.#...",
             "..#.#...",
             "..#.#...",
             "########",
         ]);
-        let mut m = Mario::new(24, 0); // column 3, in the slot
+        let mut m = Mario::new(24, 0);
         for _ in 0..200 {
             step_motion(&mut m, Buttons::default(), &solids, &Tuning::default());
         }
-        // Pit floor top is row 3 (y=24); small Mario rests at y=16.
-        assert_eq!(m.pixel_x(), 24);
-        assert_eq!(m.pixel_y(), 16);
-        assert!(m.on_ground);
+        // He never reaches the floor of the slot, which is at y = 24.
+        assert!(m.pixel_y() + SMALL_HEIGHT < 24);
     }
 
     #[test]

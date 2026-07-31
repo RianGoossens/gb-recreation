@@ -760,10 +760,14 @@ impl Game {
             let (_mw, mh) = self.mario.size();
             let mx = self.mario.pixel_x() - self.camera.x;
             let my = self.mario.pixel_y() - self.camera.y;
-            let mut ty = 0;
-            while ty < mh {
-                fb.draw_tile(&self.mario_tile, mx, my + ty, &self.palette);
-                ty += TILE;
+            // The collision box is not a whole number of tiles (small Mario is
+            // 12 px tall), so the placeholder tiles are anchored to his feet
+            // and the leftover sits above his head, where the cartridge's own
+            // sprite overhangs the box too.
+            let tiles = mh / TILE;
+            let top = my + mh - tiles * TILE;
+            for i in 0..tiles {
+                fb.draw_tile(&self.mario_tile, mx, top + i * TILE, &self.palette);
             }
         }
         self.draw_hud(&mut fb);

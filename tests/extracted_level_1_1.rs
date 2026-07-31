@@ -232,3 +232,37 @@ fn mario_can_stand_and_move_at_every_world_1_spawn() {
         // level, not a fault in the extraction.
     }
 }
+
+
+/// The cartridge's own numbers, checked against the cartridge's own level.
+///
+/// The corridor measurement was taken on World 1-1's opening screen, so the
+/// extracted level is where it has to hold: an 11 px Mario standing on the
+/// ground has to fit between the scenery there, and a 12 px Mario has to fit
+/// under everything the level expects him to walk under.
+#[test]
+fn mario_fits_through_the_real_level_at_his_measured_size() {
+    let Some(level) = extracted() else { return };
+    let mut game = Game::new(level);
+    assert_eq!(game.mario.size(), (11, 12));
+
+    let mut right = Buttons::default();
+    right.set(Button::Right, true);
+    // A couple of frames to settle onto the ground from the spawn position.
+    for _ in 0..4 {
+        game.step(Buttons::default());
+    }
+    let start = game.mario.pixel_x();
+    let ground = game.mario.pixel_y();
+    for _ in 0..100 {
+        game.step(right);
+        assert_eq!(game.mario.pixel_y(), ground, "he should stay on the ground");
+    }
+    // Past the two columns of scenery the level opens with, and clear of the
+    // first walker, which is what stops a plain hold-right run.
+    assert!(
+        game.mario.pixel_x() > start + 80,
+        "wedged at column {}",
+        game.mario.pixel_x() / 8
+    );
+}

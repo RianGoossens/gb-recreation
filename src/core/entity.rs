@@ -14,6 +14,22 @@ pub const fn pixels(n: i32) -> i32 {
     n * SUBPIXEL
 }
 
+/// Small Mario's collision width, measured off the cartridge by walling him
+/// into corridors of seven different widths and taking the room he had minus
+/// the room he used (`tools/measure_mario_box.py`). All seven agree on 11. The
+/// cartridge draws him 16 px across, from two sprites, so the box is well
+/// inside what is on screen.
+pub const SMALL_WIDTH: i32 = 11;
+
+/// Small Mario's collision height, from the same subtraction with a ceiling
+/// over him instead of walls beside him. Three headrooms agree on 12.
+pub const SMALL_HEIGHT: i32 = 12;
+
+/// Big Mario's collision height. Unmeasured: no run has reached a mushroom on
+/// the cartridge yet, so this stays at twice the small sprite's tile height.
+/// Labelled as a stand-in in `docs/reference/faithfulness.md`.
+pub const BIG_HEIGHT: i32 = 16;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Facing {
     Left,
@@ -95,11 +111,13 @@ impl Mario {
         self.y.div_euclid(SUBPIXEL)
     }
 
-    /// Sprite size in pixels. Small Mario is one tile, big Mario is two tall.
+    /// Collision box in pixels, which is smaller than what gets drawn: the
+    /// cartridge draws Mario from two 8x16 sprites and collides a narrower box
+    /// inside them.
     pub fn size(&self) -> (i32, i32) {
         match self.power {
-            Power::Small => (8, 8),
-            Power::Big | Power::Fire => (8, 16),
+            Power::Small => (SMALL_WIDTH, SMALL_HEIGHT),
+            Power::Big | Power::Fire => (SMALL_WIDTH, BIG_HEIGHT),
         }
     }
 
@@ -150,9 +168,17 @@ mod tests {
     #[test]
     fn big_mario_is_taller() {
         let mut m = Mario::new(0, 0);
-        assert_eq!(m.size(), (8, 8));
+        assert_eq!(m.size(), (SMALL_WIDTH, SMALL_HEIGHT));
         m.power = Power::Big;
-        assert_eq!(m.size(), (8, 16));
+        assert_eq!(m.size(), (SMALL_WIDTH, BIG_HEIGHT));
+        const { assert!(BIG_HEIGHT > SMALL_HEIGHT) };
+    }
+
+    #[test]
+    fn the_collision_box_is_narrower_than_the_sprite() {
+        // The cartridge draws Mario 16 px across, from two sprites, and
+        // collides 11 (`tools/measure_mario_box.py`).
+        assert_eq!(Mario::new(0, 0).size(), (11, 12));
     }
 
     #[test]

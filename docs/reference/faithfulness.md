@@ -43,7 +43,8 @@ playing it faithfully.
 
 | Piece | Notes |
 |-------|-------|
-| Small Mario's collision width | Ours is 8 px. Dropping him onto World 1-1's lift holds him across a 29 px window of his own X, and the lift is 16 px wide (two 8-px sprites), which puts the cartridge's small Mario nearer 14 px. Not yet chased: changing Mario's box touches every collision case, so it wants its own measurement rather than being inferred from one experiment. |
+| The lift's own width | Small Mario measures 11 px wide, and a 16 px lift under an 11 px Mario should hold him across 26 px of his X. The measured support window is 29. The 3 px belongs to the lift, either because its surface is wider than its two sprites or because support has a pixel of slack each side. `src/core/lift.rs` still uses 16. |
+| Big Mario's box | 11 x 16, of which only the width is measured. No run has reached a mushroom on the cartridge, so the height is still twice the small sprite's tile height rather than a number off the game. |
 
 ## Items, blocks, scoring
 
@@ -88,6 +89,11 @@ playing it faithfully.
   demo campaign remain as test fixtures and as the fallback on a checkout
   without the ROM. Shipping invented levels is not a goal (see the end-goal
   note in CLAUDE.md).
+- **Mario's collision box**: canonical for small Mario, 11 x 12, measured by
+  walling him into corridors of seven widths and putting a ceiling over him at
+  three heights (`tools/measure_mario_box.py`). Every trial agrees. The
+  cartridge draws him 16 px across from two sprites, so the box sits inside
+  what is on screen. This replaced an 8 x 8 box that was never measured.
 - **World 1 geometry**: canonical, and verified end to end. Every column of
   all three levels (300, 280, 300) matches the running cartridge exactly.
 - **Lifts**: canonical, measured. World 1-1's kinds `0x0A` and `0x0B` carry

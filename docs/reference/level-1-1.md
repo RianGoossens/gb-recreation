@@ -1246,3 +1246,48 @@ World 1-2 is 14 screens, 280 columns, 151 solid cells, 183 platform cells and
 columns are open sky.
 
 World 1-3's list is still a guess at `0x0A1E0`, on the same six-byte shape.
+
+
+## Driving the walkthrough into the next level
+
+`run_through_levels.py` crosses level boundaries now. Three things had to be
+right, and two of them were wrong for a long time in ways that all looked the
+same from outside (Mario frozen at the spawn, x 50, no columns ever written).
+
+**Start pauses the game.** The bonus game between levels needs input, and the
+first version tapped Start and A. A Start tap landing just as the next level
+opened left it paused. Everything downstream looked like a movement bug: the
+map was flat, Mario was alive, right was held, and he did not move. Tapping
+only A fixed it. Before finding that, three other explanations were tested and
+ruled out: that the right button needed re-pressing across the transition
+(one frame of release, then thirty, made no difference), that pinning the
+rise/fall phase byte at a spawn froze him (it does, separately, so the tool
+pins Y only), and that the flattening deadlocked (it did, separately: it only
+started after the first captured column, which needs Mario to move, which
+needs the terrain gone).
+
+**Pinning Y is enough, and pinning the phase byte is not free.** With the game
+paused out of the way, a snapshot at World 1-2's opening settled it directly:
+
+| poked | result |
+|-------|--------|
+| Y and phase | x 50 -> 50, stuck at the spawn |
+| Y only | x 50 -> 81, walking |
+| phase only | x 50 -> 67, then dead in a pit |
+| neither, solid flat ground | x 50 -> 81, walking |
+
+**A level going quiet is not a level ending.** The end-of-level test was 90
+frames without a column write, which 1-2 trips repeatedly mid-level. The gap
+between levels is thousands of frames, so 400 is safe and 90 was not.
+
+### What it gets
+
+World 1-2's first 69 columns, matching the ROM exactly. Mario dies at world
+column 69 every time, and the level restarts; the run this was measured from
+died there six times and re-captured the same 69 columns each time, all
+matching. After the sixth the lives run out and the game returns to 1-1.
+
+So 1-2 is verified for the first quarter of its 280 columns rather than all of
+them. What kills him is not identified; he is pinned at screen y 60, which is
+rows 7 to 9, and the level has platform runs at rows 7, 9 and 11 through that
+stretch.

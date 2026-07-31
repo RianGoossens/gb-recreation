@@ -31,12 +31,11 @@ import sys
 sys.path.insert(0, "tools")
 
 from sml_boot import boot_to_gameplay
+from sml_level import ROWS, VISIBLE_COLUMNS, known_screens
 
 MAP_BASE = 0x9800
 MAP_WIDTH = 32
 FIRST_ROW = 2
-ROWS = 16
-VISIBLE_COLUMNS = 20
 
 SKY_ROWS = 2
 FLAT_FILL = 0x00
@@ -50,64 +49,6 @@ SAMPLE_EVERY = 10
 BONUS_FRAMES = 800
 SETTLE_FRAMES = 12000
 FRAMES = 20000
-
-ROM_PATH = "super_mario_land.gb"
-FILLER = 44
-REPEAT = 0xFD
-COLUMN_END = 0xFE
-LIST_END = 0xFF
-BANK_BASE = 0x8000
-BANK_WINDOW = 0x4000
-LIST_STARTS = (0x0A190, 0x0A1B7, 0x0A1DA)
-
-
-def decode_column(rom, i):
-    column = [FILLER] * ROWS
-    while i < len(rom):
-        header = rom[i]
-        if header == COLUMN_END:
-            return column, i + 1
-        row, count = header >> 4, (header & 0x0F) or ROWS
-        i += 1
-        if row + count > ROWS or i >= len(rom):
-            return None, i
-        if rom[i] == REPEAT:
-            tile = rom[i + 1]
-            i += 2
-            for n in range(count):
-                column[row + n] = tile
-        else:
-            for n in range(count):
-                column[row + n] = rom[i]
-                i += 1
-    return None, i
-
-
-def decode_screen(rom, pointer):
-    columns = []
-    i = pointer - BANK_WINDOW + BANK_BASE
-    for _ in range(VISIBLE_COLUMNS):
-        column, i = decode_column(rom, i)
-        if column is None:
-            return None
-        columns.append(column)
-    return columns
-
-
-def known_screens():
-    """Every screen every candidate list points at, keyed by its columns."""
-    rom = open(ROM_PATH, "rb").read()
-    screens = {}
-    for start in LIST_STARTS:
-        i = start
-        while rom[i] != LIST_END:
-            pointer = rom[i] | (rom[i + 1] << 8)
-            i += 2
-            columns = decode_screen(rom, pointer)
-            if columns is not None:
-                screens.setdefault(repr(columns), []).append((start, pointer))
-    return screens
-
 
 def read_column(pb, ring):
     return [pb.memory[MAP_BASE + (FIRST_ROW + r) * MAP_WIDTH + ring] for r in range(ROWS)]

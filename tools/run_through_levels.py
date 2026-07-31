@@ -13,8 +13,10 @@ RAM (see `probe_solidity.py`), so the terrain can be flattened out from
 under the problem: every column Mario has not reached yet becomes open sky
 over solid ground. That handles pits, pipes and walls, but not the enemies,
 which still take all three lives inside a thousand frames. Pinning Mario's
-Y position holds him in the air above them, and pinning the vertical phase
-byte stops the game pulling him back down.
+Y position every frame holds him in the air above them. Only Y: pinning the
+rise/fall phase byte as well freezes him at the spawn of any level he did
+not start in, at screen x 50, and the flattened ground is not solid so he
+cannot simply be left to walk.
 
 Nothing needs to track the camera. The game writes a column into the
 tilemap once, when it scrolls in at the right edge, roughly every eight
@@ -22,6 +24,12 @@ frames, and the ring column it writes to advances by one each time. Any
 ring column that changes is fresh level data, in world order. It is
 captured and flattened `FLATTEN_DELAY` frames later, long before Mario
 arrives.
+
+Crossing into the next level needs the poking to stop the moment a level
+ends, and a way to tell when the next one has started. Both are the same
+lesson: a level's tail stays on display for a few hundred frames and matches
+its own screen list, while the bonus game between levels matches nothing the
+ROM points at for thousands. The length of that gap is the marker.
 
 Two things this got wrong before logging the ring index caught them. The
 top two playfield rows are a skyline the game keeps redrawing, so
@@ -37,6 +45,7 @@ import sys
 sys.path.insert(0, "tools")
 
 from sml_boot import boot_to_gameplay
+from sml_level import VISIBLE_COLUMNS, known_screens
 
 MAP_BASE = 0x9800
 MAP_WIDTH = 32
@@ -54,10 +63,19 @@ SKY_ROWS = 2
 FLAT_FILL = 0x00
 
 FLATTEN_DELAY = 24
-LEVEL_GAP_FRAMES = 90
+LEVEL_GAP_FRAMES = 400
+# A level can go quiet for a couple of hundred frames without being over, so
+# the end-of-level threshold is generous. The bonus game between levels
+# matches no screen the ROM points at, for thousands of frames. A level's own tail matches its own list within a few
+# hundred, which is why a plain "matched nothing" test does not separate them.
+BONUS_FRAMES = 800
+SAMPLE_EVERY = 10
+RELEASE_FRAMES = 30
+SCREEN_X = 0xC202
+PHASE = 0xC207
+SPAWN_X = 55
 
 MARIO_Y = 0xC201
-PHASE = 0xC207
 FLY_Y = 60
 
 FRAMES = 20000
@@ -79,25 +97,28 @@ def is_flat(column):
 class Capture:
     """Columns of one level, in world order."""
 
-    def __init__(self, pb):
+    def __init__(self, pb, frame):
         self.start_map = {ring: read_column(pb, ring) for ring in range(MAP_WIDTH)}
         self.known = dict(self.start_map)
-        self.pending = {}
         self.columns = []
         self.last_ring = None
+        # Flatten from the outset rather than after the first column is
+        # captured. Waiting deadlocks at a level that starts Mario in front of
+        # something solid: he cannot move until the terrain goes, and the
+        # terrain does not go until he moves.
+        self.pending = {ring: frame + FLATTEN_DELAY for ring in range(MAP_WIDTH)}
 
-    def seed(self, first_ring, frame):
+    def seed(self, first_ring):
         """The columns already drawn when the level started, in world order.
 
-        Every ring is queued for flattening here, not just the ones that get
-        captured. A seeded ring keeps its opening-screen content otherwise,
-        and when the game later writes a column into it that happens to be
-        identical, nothing changes and the column is missed. That cost
-        exactly two columns of World 1-1, at world columns 58 and 59.
+        Read from the snapshot taken at construction, not from the live map,
+        which has been flattened by now. Every ring is flattened, not just the
+        ones that get captured: a seeded ring keeps its opening-screen content
+        otherwise, and when the game later writes an identical column into it
+        nothing changes and the column is missed. That cost exactly two
+        columns of World 1-1, at world columns 58 and 59.
         """
         self.columns = [self.start_map[r] for r in range(first_ring)]
-        for ring in range(MAP_WIDTH):
-            self.pending.setdefault(ring, frame + FLATTEN_DELAY)
 
     def step(self, pb, frame):
         found = False
@@ -107,7 +128,7 @@ class Capture:
                 continue
             self.known[ring] = column
             if not self.columns:
-                self.seed(ring, frame)
+                self.seed(ring)
             # The game fills a column over several frames. Waiting for it to
             # settle drops columns instead: rewrite the last one in place.
             if ring == self.last_ring:
@@ -129,27 +150,70 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "assets/extracted/captured_columns.txt"
     frames = int(sys.argv[2]) if len(sys.argv) > 2 else FRAMES
 
+    screens = known_screens()
     pb = boot_to_gameplay()
     levels = []
-    capture = Capture(pb)
-    last_seen = 0
+    capture = Capture(pb, 0)
+    playing = True
+    quiet = 0
+    blank = 0
 
     pb.button_press("right")
     for frame in range(frames):
-        pb.memory[MARIO_Y] = FLY_Y
-        pb.memory[PHASE] = 0
+        if playing:
+            pb.memory[MARIO_Y] = FLY_Y
+            # Leave the rise/fall phase alone until Mario is under way.
+            # Pinning it at a level's spawn freezes him there.
+            if pb.memory[SCREEN_X] > SPAWN_X:
+                pb.memory[PHASE] = 0
         pb.tick()
 
-        # No column is written while one level ends and the next loads, so a
-        # long quiet stretch is the boundary between two levels.
-        if capture.columns and frame - last_seen > LEVEL_GAP_FRAMES:
-            print(f"  frame {frame}: level {len(levels)} ended, {len(capture.columns)} columns")
-            levels.append(capture.columns)
-            capture = Capture(pb)
-            last_seen = frame
+        if playing:
+            if capture.step(pb, frame):
+                quiet = 0
+            else:
+                quiet += 1
+            # The end-of-level sequence needs the game left alone. Poking
+            # through it freezes Mario at the exit gate forever.
+            if capture.columns and quiet > LEVEL_GAP_FRAMES:
+                print(f"  frame {frame}: level {len(levels)} ended, "
+                      f"{len(capture.columns)} columns")
+                levels.append(capture.columns)
+                playing = False
+                blank = 0
+            continue
 
-        if capture.step(pb, frame):
-            last_seen = frame
+        # A bonus game sits between levels and waits for input. Only A: Start
+        # pauses Super Mario Land, and a tap landing just as the next level
+        # opens leaves it paused, with Mario frozen at the spawn and no
+        # columns ever written.
+        if frame % 40 == 0:
+            pb.button_press("a")
+        elif frame % 40 == 12:
+            pb.button_release("a")
+
+        if frame % SAMPLE_EVERY:
+            continue
+        visible = [read_column(pb, ring) for ring in range(VISIBLE_COLUMNS)]
+        hit = screens.get(repr(visible))
+        if not hit:
+            blank += SAMPLE_EVERY
+        elif blank >= BONUS_FRAMES:
+            print(f"  frame {frame}: level {len(levels)} opens on "
+                  + ", ".join(f"0x{p:04X}" for _, p in sorted(set(hit))))
+            # Right has to be let go of and pressed again for the new level,
+            # and one frame of release is not enough for the game to see the
+            # edge. Holding it across the transition looks the same from here
+            # and does nothing: Mario stands at the spawn and never moves.
+            pb.button_release("right")
+            for _ in range(RELEASE_FRAMES):
+                pb.tick()
+            pb.button_press("right")
+            capture = Capture(pb, frame)
+            playing = True
+            quiet = 0
+        else:
+            blank = 0
 
     pb.button_release("right")
     if capture.columns:

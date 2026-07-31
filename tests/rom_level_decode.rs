@@ -15,6 +15,23 @@ fn rom() -> Option<Vec<u8>> {
     std::fs::read(ROM).ok()
 }
 
+const CAPTURE: &str = "assets/extracted/captured_columns.txt";
+
+/// The capture file is one column per line, 16 tile ids, a blank line between
+/// levels. Written by `tools/run_through_levels.py` and gitignored.
+fn captured_levels(text: &str) -> Vec<Vec<Vec<u8>>> {
+    text.split("\n\n")
+        .filter(|block| !block.trim().is_empty())
+        .map(|block| {
+            block
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .map(|line| line.split_whitespace().map(|t| t.parse().unwrap()).collect())
+                .collect()
+        })
+        .collect()
+}
+
 fn level_1_1() -> Option<Vec<Column>> {
     rom().map(|data| level::decode_level(&data, level::LEVEL_1_1_LIST))
 }
@@ -140,15 +157,10 @@ fn the_scan_finds_world_ones_three_screen_lists() {
 /// ground truth of 88 columns from a walker that died a quarter of the way in.
 #[test]
 fn the_decode_matches_every_column_the_real_game_draws() {
-    const CAPTURE: &str = "assets/extracted/captured_columns.txt";
     let Ok(text) = std::fs::read_to_string(CAPTURE) else { return };
     let Some(columns) = level_1_1() else { return };
 
-    let captured: Vec<Vec<u8>> = text
-        .lines()
-        .take_while(|line| !line.trim().is_empty())
-        .map(|line| line.split_whitespace().map(|t| t.parse().unwrap()).collect())
-        .collect();
+    let captured = &captured_levels(&text)[0];
     assert_eq!(captured.len(), COLUMNS, "capture should cover the whole level");
 
     let mismatches: Vec<usize> = (0..COLUMNS)
@@ -255,5 +267,32 @@ fn world_1_2_has_ground_under_its_spawn() {
         pits.len() > 50,
         "1-2 is mostly open sky; got {} pit columns",
         pits.len()
+    );
+}
+
+/// World 1-2 as far as the walkthrough gets. Mario dies at world column 69
+/// every time, six times over in the run this was written from, and each
+/// restart re-captures the same opening columns; every one of those matches
+/// the ROM. That verifies the level's body, not only the opening screen the
+/// list start was pinned with.
+#[test]
+fn the_decode_matches_world_1_2_as_far_as_the_game_was_driven() {
+    let Ok(text) = std::fs::read_to_string(CAPTURE) else { return };
+    let Some(data) = rom() else { return };
+    let levels = captured_levels(&text);
+    if levels.len() < 2 {
+        return;
+    }
+    let captured = &levels[1];
+    let columns = level::decode_level(&data, level::LEVEL_1_2_LIST);
+
+    let reached = captured.len().min(columns.len());
+    assert!(reached >= 60, "only {reached} columns of 1-2 were captured");
+    let mismatches: Vec<usize> = (0..60)
+        .filter(|&i| columns[i][..] != captured[i][..])
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "World 1-2 differs from the running game at {mismatches:?}"
     );
 }

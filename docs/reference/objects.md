@@ -209,6 +209,51 @@ They sit back to back. 1-3 begins one byte past 1-2's terminator. 1-2 begins
 two bytes past 1-1's, because there are two `0xFF` bytes at the end of 1-1's
 list where every other list has one.
 
+### The pointer does not carry its bank
+
+`0xD010` is a bank-window address. `0x6002` is ROM `0x0A002` in bank 2 and
+`0x0E002` in bank 3, and the pointer says nothing about which. That did not
+matter while every level was in bank 2; World 2's are in bank 1.
+
+Reading the bank off the mapped window at the moment a level opens gives the
+wrong answer. It says bank 3 for World 1-1, whose list is pinned at `0x0A002`,
+because the bank switched in at that instant is whatever the game last
+touched, not the one the object list is read from.
+
+`tools/find_object_bank.py` asks the spawns instead. It plays to the level,
+pairs each step of the read pointer with the slot that fills on the same
+frame, and checks the record's kind byte against all three candidate banks.
+Only frames where exactly one record was consumed and exactly one slot filled
+are scored: a slot can fill for reasons the list knows nothing about (World 2
+gives Mario a torpedo, which takes a slot), and the pointer steps past
+expert-only records without creating anything.
+
+| level | pointer | bank 1 | bank 2 | bank 3 |
+|---|---|---|---|---|
+| 1-1 (control) | `0x6002` | 0/8 | **16/16** | 0/12 |
+| 2-1 | `0x5179` | **37/37** | 2/37 | 0/30 |
+| 2-2 | `0x5222` | **29/29** | 1/22 | 1/6 |
+
+So World 2-1's list is at `0x05179` and 2-2's at `0x05222`, in bank 1
+alongside World 2's terrain. 2-3's pointer reads `0x529B` when the level
+opens; its bank is not measured, because three attempts at the run killed the
+machine before it started. Bank 1 is where its two siblings are and the only
+bank where `0x529B` decodes to a sorted list, which is a structural fit rather
+than a measurement.
+
+### World 2 puts objects on rows its records do not give
+
+The kind byte matched on every one of those spawns. The row did not. 23 of
+2-1's 37 spawns land somewhere its record's `y` byte does not predict: a `y`
+of `0x13` reads as row 1 and the slot holds a Y of 166, the bottom of the
+screen. 2-2 has 2 such spawns, and every one of World 1's agreed exactly.
+
+That is not a bank question, so it did not change the reading above, but it
+does mean World 2's object lists stay out of `sml extract-level`. The affected
+records include kinds the engine already implements, so writing them into a
+level file would put a known enemy in the wrong place, which is worse than
+leaving the level short of enemies.
+
 ## What World 1-3's own kinds do
 
 1-3 is the one level of World 1 whose extracted file carries no enemies at
@@ -473,8 +518,9 @@ the back door, so the ids stay as ids.
 | `tools/probe_lift.py` | whether an object holds Mario up |
 | `tools/measure_lift.py` | a lift's surface: how wide, and how high Mario rests |
 | `tools/probe_walker_turn.py` | whether a walker turns at a wall or a ledge |
-| `tools/find_object_lists.py` | where each World 1 level's list starts |
-| `tools/trace_level_objects.py` | the same trace in any World 1 level |
+| `tools/find_object_lists.py` | where each level's list starts |
+| `tools/trace_level_objects.py` | the same trace in any pinned level |
+| `tools/find_object_bank.py` | which ROM bank a level's object list is in |
 | `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
 | `tools/measure_level_kind.py` | how a kind moves, in 1-2 and 1-3 as well as 1-1 |
 | `tools/probe_object_contact.py` | whether touching a kind costs Mario a life |

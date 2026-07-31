@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyboy"]
 # ///
-"""Read every World 1 level's object list start, by playing to each level.
+"""Read every level's object list start, by playing to each level.
 
 World 1-1's list start needed no searching: 0xD010 already holds it when the
 level opens. The other two levels are the same question with a longer walk,
@@ -36,10 +36,10 @@ from run_through_levels import (
 )
 from sml_boot import boot_to_gameplay
 from sml_level import VISIBLE_COLUMNS, known_screens
-from trace_object_spawns import pointer, rom_offset
+from trace_object_spawns import current_bank, pointer, rom_offset
 
-FRAMES = 12000
-NAMES = ["1-1", "1-2", "1-3"]
+FRAMES = 30000
+NAMES = ["1-1", "1-2", "1-3", "2-1", "2-2", "2-3"]
 
 
 def main():
@@ -54,10 +54,18 @@ def main():
 
     def record_start(index):
         value = pointer(pb)
-        at = rom_offset(value)
+        # The bank comes from what the CPU is actually seeing, not from a
+        # constant: World 1's object lists are in bank 2 and World 2's are
+        # not.
+        bank = current_bank(pb, rom)
         name = NAMES[index] if index < len(NAMES) else f"level {index}"
+        if bank is None:
+            print(f"World {name}: 0xD010 = 0x{value:04X}, bank not identified")
+            return
+        at = rom_offset(value, bank)
         head = " ".join(f"{b:02X}" for b in rom[at : at + 12])
-        print(f"World {name}: 0xD010 = 0x{value:04X}, rom 0x{at:05X}")
+        print(f"World {name}: 0xD010 = 0x{value:04X}, bank {bank:#07X}, "
+              f"rom 0x{at:05X}")
         print(f"  first bytes: {head}")
         found.append((name, at))
 

@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyboy"]
 # ///
-"""Trace object spawns in any World 1 level, not just the first one.
+"""Trace object spawns in any pinned level, not just the first one.
 
 World 1-3 introduces kinds the position mapping does not place: nine records
 of kind 0x02 whose `y` byte has a high nibble of 4 or C, seven of kind 0x0C,
@@ -15,7 +15,7 @@ Once the requested level is up, the flattening keeps going (Mario still has to
 cross the level for the pointer to advance) and every slot fill is reported
 with the record that caused it.
 
-Usage: uv run tools/trace_level_objects.py [1-1|1-2|1-3]
+Usage: uv run tools/trace_level_objects.py [level]
 """
 
 import sys
@@ -41,12 +41,12 @@ from sml_boot import boot_to_gameplay
 from sml_level import VISIBLE_COLUMNS, known_screens
 from trace_object_spawns import pointer, rom_offset
 
-NAMES = ["1-1", "1-2", "1-3"]
-FRAMES = 16000
+NAMES = ["1-1", "1-2", "1-3", "2-1", "2-2", "2-3"]
+FRAMES = 30000
 
 
 def reach_level(target, on_open=None):
-    """Play from a cold boot until World 1's `target` level is open.
+    """Play from a cold boot until the `target` level is open.
 
     Returns (pb, capture) with right still held and the level's first columns
     already captured, or (None, None) if the run died on the way. Split out of

@@ -66,6 +66,35 @@ pub const WORLD_1_OBJECTS: [(&str, usize); 3] = [
     ("1-3", LEVEL_1_3_OBJECTS),
 ];
 
+/// World 2-1's and 2-2's object lists, in ROM bank 1 alongside World 2's
+/// terrain.
+///
+/// `0xD010` gives the pointer (`0x5179` and `0x5222`) but not the bank, and
+/// the bank cannot be read off the mapped window: doing that answers bank 3
+/// for World 1-1, whose list is pinned at `0x0A002` in bank 2, because the
+/// bank switched in at that instant is whatever the game last touched.
+///
+/// `tools/find_object_bank.py` asks the spawns instead. It plays to the level,
+/// pairs each step of the read pointer with the slot that fills on the same
+/// frame, and checks the kind byte against all three candidate banks. Bank 1
+/// predicts every one of 2-1's 37 spawns and every one of 2-2's 29; bank 2
+/// gets 2 and 1, bank 3 gets 0 and 1. World 1-1 is the control and comes back
+/// bank 2, 16 of 16.
+///
+/// These are not wired into `sml extract-level` yet. 23 of 2-1's 37 spawns
+/// land on a row its record's `y` byte does not give (a `y` of `0x13` reads as
+/// row 1 and the slot holds 166, the bottom of the screen), and that includes
+/// kinds the engine already implements, so writing them into a level file
+/// would place them wrongly. Settling that comes first.
+pub const LEVEL_2_1_OBJECTS: usize = 0x05179;
+pub const LEVEL_2_2_OBJECTS: usize = 0x05222;
+
+/// World 2-3's list start, `0xD010` reading `0x529B` the moment the level
+/// opens. The bank is untested: three attempts at the measurement killed the
+/// machine before it got going, and bank 1 is only where the other two are.
+/// Left out of the pinned constants until it is measured like they were.
+pub const LEVEL_2_3_OBJECT_POINTER: u16 = 0x529B;
+
 const RECORD: usize = 3;
 const LIST_END: u8 = 0xFF;
 

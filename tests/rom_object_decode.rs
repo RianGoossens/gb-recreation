@@ -228,3 +228,38 @@ fn the_kinds_that_spawn_are_the_ones_the_trace_saw() {
     kinds.dedup();
     assert_eq!(kinds, vec![0x00, 0x04, 0x0A, 0x0B, 0x0E]);
 }
+
+/// World 2-1's and 2-2's lists, pinned by playing to each level and checking
+/// the kind of every spawn against all three candidate banks
+/// (`tools/find_object_bank.py`). A list has to be sorted by `x`, since the
+/// game walks it with a single forward read pointer, and it has to terminate.
+#[test]
+fn world_2s_pinned_lists_are_sorted_and_terminated() {
+    let Some(data) = rom() else { return };
+    for (name, start, count) in [
+        ("2-1", object::LEVEL_2_1_OBJECTS, 56),
+        ("2-2", object::LEVEL_2_2_OBJECTS, 40),
+    ] {
+        let records = object::object_list(&data, start);
+        assert_eq!(records.len(), count, "World {name}");
+        assert!(
+            records.windows(2).all(|w| w[0].x <= w[1].x),
+            "World {name}'s records have to be sorted by x"
+        );
+    }
+}
+
+/// The same three bytes read in the wrong bank are a different list. Neither
+/// of the banks the probe ruled out gives World 2-1 a sorted one, which is the
+/// cheap structural check behind the measured answer.
+#[test]
+fn world_2_1s_list_only_sorts_in_the_bank_the_probe_found() {
+    let Some(data) = rom() else { return };
+    let sorted_at = |start: usize| {
+        let records = object::object_list(&data, start);
+        records.windows(2).all(|w| w[0].x <= w[1].x)
+    };
+    assert!(sorted_at(object::LEVEL_2_1_OBJECTS));
+    assert!(!sorted_at(object::LEVEL_2_1_OBJECTS + 0x4000));
+    assert!(!sorted_at(object::LEVEL_2_1_OBJECTS + 0x8000));
+}

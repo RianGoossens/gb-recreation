@@ -29,6 +29,10 @@ from sml_boot import boot_to_gameplay
 
 OBJECT_POINTER = 0xD010
 BANK_WINDOW = 0x4000
+# The switchable banks, as file offsets. World 1's data is in bank 2; World 2's
+# is in bank 1, so which bank a pointer resolves against has to be observed
+# rather than assumed.
+BANK_BASES = (0x4000, 0x8000, 0xC000)
 BANK_BASE = 0x8000
 
 FRAMES = 3000
@@ -38,8 +42,24 @@ def pointer(pb):
     return pb.memory[OBJECT_POINTER] | (pb.memory[OBJECT_POINTER + 1] << 8)
 
 
-def rom_offset(value):
-    return value - BANK_WINDOW + BANK_BASE
+def rom_offset(value, bank=BANK_BASE):
+    return value - BANK_WINDOW + bank
+
+
+def current_bank(pb, rom, at=BANK_WINDOW, length=64):
+    """Which ROM bank is switched in, by matching its bytes.
+
+    PyBoy exposes no bank register, and the bank cannot be read off the
+    pointer. Comparing what the CPU currently sees in the 0x4000 window
+    against the same span of each bank in the ROM file identifies it by
+    construction, the same technique `find_rom_offset.py` uses. Returns None
+    if more than one bank matches, so an ambiguous window is visible rather
+    than guessed at.
+    """
+    window = bytes(pb.memory[at : at + length])
+    hits = [b for b in BANK_BASES
+            if rom[at - BANK_WINDOW + b : at - BANK_WINDOW + b + length] == window]
+    return hits[0] if len(hits) == 1 else None
 
 
 def main():

@@ -1,5 +1,11 @@
 [
   {
+    "title": "Thirteen enemies deleted on frame one",
+    "date": "2026-07-31",
+    "slug": "2026-07-31-thirteen-enemies-deleted-on-frame-one",
+    "summary": "Every enemy past the first screen was being deleted before Mario moved. Fixing it needed the rule the cartridge already uses, and turned up a level whose exit was walled in."
+  },
+  {
     "title": "The half of the list you never see",
     "date": "2026-07-31",
     "slug": "2026-07-31-the-half-of-the-list-you-never-see",

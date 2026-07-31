@@ -423,3 +423,61 @@ fn mario_can_stand_at_every_world_2_spawn() {
         );
     }
 }
+
+/// How far the geometry walker gets through each of World 2's levels.
+///
+/// Not a pass/fail on the level. The walker only knows how to run right and
+/// jump gaps, and World 2's levels open into water: 2-1 and 2-2 both stop at
+/// column 69, because both lists point at screen `0x5D32` for world columns 60
+/// to 79 and it has no floor. Swimming is not implemented, so that is where a
+/// walker ends up, and the number is recorded rather than asserted away.
+///
+/// What this pins is the geometry. A decode that breaks these levels open or
+/// seals them shut moves the number.
+#[test]
+fn world_2s_geometry_is_walkable_as_far_as_it_is_recorded() {
+    for (name, expected) in [("2_1", 69), ("2_2", 69), ("2_3", 178)] {
+        let path = format!("assets/extracted/level_{name}.txt");
+        if !std::path::Path::new(&path).exists() {
+            continue;
+        }
+        let mut level = Level::from_file(&path).expect("extracted level parses");
+        level.enemy_spawns.clear();
+        let mut game = Game::new(level);
+        let ground_ahead = |game: &Game, x: i32, y: i32| {
+            let column = (x + 12) / 8;
+            (y / 8..ROWS).any(|row| game.level.solids.is_solid(column, row))
+        };
+
+        let mut stalled = 0;
+        let mut furthest = i32::MIN;
+        let mut hold_jump = 0;
+        let mut reached = 0;
+        for _ in 0..20_000 {
+            let x = game.mario.pixel_x();
+            if x <= furthest {
+                stalled += 1;
+            } else {
+                stalled = 0;
+                furthest = x;
+            }
+            reached = reached.max(furthest / 8);
+            let gap = !ground_ahead(&game, x, game.mario.pixel_y());
+            if (stalled > 6 || gap) && game.mario.on_ground {
+                hold_jump = 12;
+            }
+            let mut buttons = Buttons::default();
+            buttons.set(Button::Right, true);
+            if hold_jump > 0 {
+                buttons.set(Button::A, true);
+                hold_jump -= 1;
+            }
+            game.step(buttons);
+            if game.completed {
+                reached = game.level.solids.width as i32;
+                break;
+            }
+        }
+        assert_eq!(reached, expected, "World {name}: the walker reached a different column");
+    }
+}

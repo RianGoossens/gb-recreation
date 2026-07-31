@@ -432,6 +432,15 @@ impl Game {
             self.mario.alive = false;
         }
 
+        // So is falling out of the bottom of the level. Nothing checked this
+        // before, so Mario fell through a pit and kept drifting right for
+        // ever: World 2-1's walker was 6000 pixels below the level and still
+        // going. World 1's levels hid it, because the geometry walker jumps
+        // every gap in them.
+        if self.mario.pixel_y() > self.level_size().1 {
+            self.mario.alive = false;
+        }
+
         if !self.mario.alive {
             self.deaths += 1;
             self.sounds.push(SoundEvent::Death);

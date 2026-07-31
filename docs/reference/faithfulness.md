@@ -209,3 +209,20 @@ playing it faithfully.
    unchecked. Stomps and coins are pinned at 100 each.
 
 (Brick breaking and superball coin collection are already canonical, done.)
+
+## World 2 is decoded but not playable
+
+World 2's three levels decode from the cartridge and `sml extract-level 2-1`
+writes them, but they cannot be finished:
+
+- **No swimming.** 2-1 and 2-2 both open into water at world columns 60 to 79
+  (both lists point at screen `0x5D32`, which has no floor), and the engine has
+  no swimming, so a walker falls out of the level there. 2-3 is the same world's
+  third level and gets to column 178.
+- **No enemies.** World 2's object lists are pinned for 2-1 and 2-2 but stay out
+  of the level files, because 23 of 2-1's 37 spawns land on a row their record's
+  `y` byte does not give. Placing them would put known enemies in the wrong
+  place.
+
+So World 2 is geometry only. It is not wired into the default campaign, which
+stays World 1.

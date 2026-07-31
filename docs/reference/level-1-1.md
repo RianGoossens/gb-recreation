@@ -1111,3 +1111,70 @@ column 87 against its worked-example record, and the nine pits.
 
 The PyBoy tools stay Python. They observe a running emulator, which is not
 something the product does.
+
+## Every column, from the running game
+
+The decode was scored against 88 columns, because that is how far a reactive
+walker got before dying. It is now scored against all 300, and matches every
+one.
+
+Two pokes get the real cartridge through a whole level. Collision reads the
+background tilemap, so the terrain can be replaced: every column Mario has
+not reached yet becomes tile 0, which is below `0x60` and therefore not
+solid. That removes pits, pipes and walls in one go. It does not remove the
+enemies, which still take all three lives inside a thousand frames, so his Y
+position and the vertical phase byte are pinned each frame and he flies over
+them. He reaches the exit of World 1-1 at frame 2299.
+
+Capturing what scrolls past needs no camera tracking. The game writes a
+column into the tilemap once, when it scrolls in at the right edge, about
+every eight frames, and the ring column it writes to advances by one each
+time, so any ring column that changes is fresh level data in world order.
+`tools/run_through_levels.py` records it and flattens it 24 frames later.
+
+Three things went wrong before the numbers came out right, all of them
+found by logging the ring index rather than by reasoning about the code:
+
+* The top two playfield rows are a skyline the game keeps redrawing.
+  Flattening them made every column look freshly written on the next frame,
+  and the capture cycled with period 19 instead of advancing.
+* Flattening with the level's own background tile made plain columns of
+  background-over-ground read as already flat, so they were skipped.
+  Tile 0 never appears in level data and has no such ambiguity.
+* Rings holding the opening screen were seeded but never flattened, so when
+  the game later wrote an identical column into one, nothing changed and the
+  column was missed. That cost exactly two columns, at 58 and 59, and showed
+  up as a single alignment break with a perfect match either side of it.
+
+The last one is worth keeping in mind: the result before that fix was 102 of
+298 columns matching, which reads like a decode that is mostly wrong. It was
+two dropped columns and a shifted comparison.
+
+## The other levels
+
+Nothing in the ROM holds World 1-1's screen list address, so there is no
+table to follow to the other levels. `sml scan-levels` finds them by
+structure instead, and there are exactly three in the level data, matching
+World 1's three levels:
+
+```
+0x0A190  19 screens (11 unique)   <- contains World 1-1's list
+         5F15 62BE 6817 68C7 62BE 6200 62BE 6381 645F 62BE ...
+0x0A1B7  17 screens (11 unique)
+         62BE 6817 68C7 69A6 6A61 6B23 6A61 6BF5 6CAB 6B23 ...
+0x0A1DA  18 screens (13 unique)
+         62BE 76CA 779F 6E2F 6F21 6FF2 6FF2 70FD 6F21 6E2F ...
+```
+
+World 1-1's verified list starts at 0x0A198, which is six bytes into the
+first run, right after `62BE 6817 68C7`. The same three-pointer shape opens
+the other two lists, which suggests each level's playable screens start six
+bytes in, putting 1-2 at 0x0A1BD and 1-3 at 0x0A1E0. **That is a guess and
+is not shipped.** The one list whose start is known was pinned by capturing
+the running game, and the other two have not been.
+
+Reaching 1-2 in the emulator is the open piece. The walkthrough above gets
+through 1-1 and captures the "WORLD 1-2" title card, then stops producing
+columns: Mario's pinned Y is chosen for 1-1, and 1-2 is built on floating
+platforms over open sky (only 40% of its columns have anything solid on the
+bottom two rows, against 92% for 1-1).

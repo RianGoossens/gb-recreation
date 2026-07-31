@@ -4,6 +4,7 @@
 //!   verify-rom [path]                       check the ROM is SML (World) v1.0
 //!   extract-tiles <offset> <count> <out>    decode ROM tiles into an asset file
 //!   extract-level [out]                     decode World 1-1 into a level file
+//!   scan-levels                             list every screen list in the ROM
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
 use std::process::ExitCode;
@@ -25,6 +26,7 @@ fn main() -> ExitCode {
         Some("extract-tiles") => extract_tiles(&args[1..]),
         Some("extract-title") => extract_title_screen(&args[1..]),
         Some("extract-level") => extract_level(&args[1..]),
+        Some("scan-levels") => scan_levels(),
         Some("screenshot") => screenshot(&args[1..]),
         Some("render-title") => render_title(&args[1..]),
         Some("run") => run_game(&args[1..]),
@@ -235,6 +237,39 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells");
     println!("  columns you can fall through: {:?}", level::pits(&columns));
+    ExitCode::SUCCESS
+}
+
+/// `scan-levels` finds every screen list in the ROM by structure. Nothing in
+/// the ROM holds World 1-1's list address, so there is no table to follow.
+fn scan_levels() -> ExitCode {
+    use sml::assets::level;
+
+    let rom = match std::fs::read(DEFAULT_ROM) {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!("could not read {DEFAULT_ROM}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    for (start, pointers) in level::find_screen_lists(&rom) {
+        let unique: std::collections::BTreeSet<u16> = pointers.iter().copied().collect();
+        let mark = if start <= level::LEVEL_1_1_LIST
+            && level::LEVEL_1_1_LIST < start + 2 * pointers.len()
+        {
+            "  <- contains World 1-1's list"
+        } else {
+            ""
+        };
+        println!(
+            "0x{start:05X}  {:2} screens ({} unique), {} columns{mark}",
+            pointers.len(),
+            unique.len(),
+            pointers.len() * level::SCREEN_COLUMNS
+        );
+        let hex: Vec<String> = pointers.iter().map(|p| format!("{p:04X}")).collect();
+        println!("          {}", hex.join(" "));
+    }
     ExitCode::SUCCESS
 }
 

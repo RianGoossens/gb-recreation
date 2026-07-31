@@ -52,8 +52,15 @@ const BANK_WINDOW: usize = 0x4000;
 /// A decoded column: one tile id per playfield row, top to bottom.
 pub type Column = [u8; ROWS];
 
-fn rom_offset(pointer: u16) -> usize {
-    pointer as usize - BANK_WINDOW + BANK_BASE
+/// Resolve a screen pointer to a ROM file offset. `None` if it does not point
+/// into the bank window at all, which is how a scan tells a real screen list
+/// from a run of bytes that merely ends in `0xFF`.
+fn rom_offset(pointer: u16) -> Option<usize> {
+    let pointer = pointer as usize;
+    if !(BANK_WINDOW..BANK_WINDOW * 2).contains(&pointer) {
+        return None;
+    }
+    Some(pointer - BANK_WINDOW + BANK_BASE)
 }
 
 /// Solidity is not stored per column, so it comes from the tile id.
@@ -116,7 +123,7 @@ fn decode_column(rom: &[u8], mut i: usize) -> Option<(Column, usize)> {
 /// The 20 columns a single screen pointer draws.
 fn decode_screen(rom: &[u8], pointer: u16) -> Option<Vec<Column>> {
     let mut columns = Vec::with_capacity(SCREEN_COLUMNS);
-    let mut i = rom_offset(pointer);
+    let mut i = rom_offset(pointer)?;
     for _ in 0..SCREEN_COLUMNS {
         let (column, next) = decode_column(rom, i)?;
         columns.push(column);
@@ -197,6 +204,52 @@ pub fn pits(columns: &[Column]) -> Vec<usize> {
         .filter(|(_, c)| !c.iter().any(|&t| is_solid(t)))
         .map(|(i, _)| i)
         .collect()
+}
+
+/// Every screen list in the ROM, found by structure rather than by a pointer
+/// table: nothing in the ROM holds World 1-1's list address, so there is no
+/// table to read. A candidate is a run of 16-bit pointers into the bank
+/// window, terminated by `0xFF`, where every pointer decodes 20 valid column
+/// records and most of the resulting columns contain something solid.
+///
+/// Returns each list's ROM offset and its pointers, longest run first in each
+/// cluster: a real list also decodes from two bytes in, minus its first
+/// screen, so overlapping candidates are collapsed.
+pub fn find_screen_lists(rom: &[u8]) -> Vec<(usize, Vec<u16>)> {
+    const MIN_SCREENS: usize = 6;
+    // Deliberately not "has ground under it": World 1-2 is built on floating
+    // platforms over open sky and only 40% of its columns have anything solid
+    // on the bottom two rows, which a ground test throws away.
+    const MIN_SOLID: f32 = 0.7;
+
+    let mut found: Vec<(usize, Vec<u16>)> = Vec::new();
+    for start in BANK_BASE..rom.len() {
+        let pointers = screen_list(rom, start);
+        if pointers.len() < MIN_SCREENS {
+            continue;
+        }
+        let columns = decode_level(rom, start);
+        if columns.len() != pointers.len() * SCREEN_COLUMNS {
+            continue;
+        }
+        let solid = columns
+            .iter()
+            .filter(|c| c.iter().any(|&t| is_solid(t)))
+            .count();
+        if (solid as f32) < columns.len() as f32 * MIN_SOLID {
+            continue;
+        }
+        found.push((start, pointers));
+    }
+
+    let mut kept: Vec<(usize, Vec<u16>)> = Vec::new();
+    for entry in found {
+        match kept.last() {
+            Some((start, pointers)) if entry.0 < start + 2 * pointers.len() => {}
+            _ => kept.push(entry),
+        }
+    }
+    kept
 }
 
 #[cfg(test)]

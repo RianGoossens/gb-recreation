@@ -111,3 +111,51 @@ fn the_text_level_has_a_row_per_playfield_row() {
     assert!(lines[13].contains('M'), "spawn marker is on the row above the ground");
     assert!(lines[13].contains('E'), "end trigger is on the row above the ground");
 }
+
+/// There is no pointer table anywhere in the ROM holding World 1-1's list
+/// address, so the lists have to be found by their own structure. World 1 has
+/// three levels and the scan finds exactly three lists, one of them containing
+/// 1-1's verified start.
+#[test]
+fn the_scan_finds_world_ones_three_screen_lists() {
+    let Some(data) = rom() else { return };
+    let lists = level::find_screen_lists(&data);
+    let starts: Vec<usize> = lists.iter().map(|(start, _)| *start).collect();
+    assert_eq!(starts, vec![0x0A190, 0x0A1B7, 0x0A1DA]);
+
+    let (start, pointers) = &lists[0];
+    assert!(
+        *start <= level::LEVEL_1_1_LIST
+            && level::LEVEL_1_1_LIST < start + 2 * pointers.len(),
+        "the first list has to contain World 1-1's verified start"
+    );
+}
+
+/// The strongest check there is on the decode: drive the real cartridge
+/// through the whole of World 1-1 and compare every column.
+///
+/// The capture file is written by `tools/run_through_levels.py` and is
+/// gitignored, so this skips when it is absent. When it is there, the decode
+/// has to reproduce it exactly. It did, 300 of 300, which replaced the earlier
+/// ground truth of 88 columns from a walker that died a quarter of the way in.
+#[test]
+fn the_decode_matches_every_column_the_real_game_draws() {
+    const CAPTURE: &str = "assets/extracted/captured_columns.txt";
+    let Ok(text) = std::fs::read_to_string(CAPTURE) else { return };
+    let Some(columns) = level_1_1() else { return };
+
+    let captured: Vec<Vec<u8>> = text
+        .lines()
+        .take_while(|line| !line.trim().is_empty())
+        .map(|line| line.split_whitespace().map(|t| t.parse().unwrap()).collect())
+        .collect();
+    assert_eq!(captured.len(), COLUMNS, "capture should cover the whole level");
+
+    let mismatches: Vec<usize> = (0..COLUMNS)
+        .filter(|&i| columns[i][..] != captured[i][..])
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "columns decoded from the ROM differ from the running game at {mismatches:?}"
+    );
+}

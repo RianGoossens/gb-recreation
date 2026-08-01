@@ -673,3 +673,26 @@ fn the_animated_tile_is_world_2s_water_line() {
         assert!(wet[wet.len() - dry..].iter().all(|&w| !w), "World {name} ends wet");
     }
 }
+
+/// Every bonus room draws with its own world's tiles. The rooms are screen
+/// records like any other, so a coin in one is the same tile a coin in the
+/// level is, and every cell has to name a tile the world actually loaded.
+#[test]
+fn every_bonus_room_draws_with_its_worlds_tiles() {
+    let Some(data) = rom() else { return };
+    for (index, &name) in level::LEVEL_NAMES.iter().enumerate() {
+        let world = index / 3 + 1;
+        let sheet = level::world_tile_sheet(&data, world).expect("the world's tiles");
+        assert_eq!(sheet.len(), 256);
+        let list = level::level_list(&data, name).expect("header entry");
+        let rooms = level::bonus_rooms(&data, list).expect("a run before the list");
+        let bank = level::bank_of(list);
+        let mut coins = 0;
+        for pointer in rooms.iter().skip(1) {
+            let columns = level::screen(&data, *pointer, bank).expect("a room decodes");
+            assert_eq!(columns.len(), SCREEN_COLUMNS);
+            coins += columns.iter().flatten().filter(|&&t| level::is_coin(t)).count();
+        }
+        assert!(coins > 0, "World {name}'s bonus rooms hold no coins");
+    }
+}

@@ -792,6 +792,7 @@ fn bonus_rooms(args: &[String]) -> ExitCode {
     use sml::assets::level;
 
     let name = args.first().map(|s| s.as_str()).unwrap_or("1-1");
+    let prefix = args.get(1).map(|s| s.as_str());
     let Some((_rom, list)) = rom_and_list(name) else {
         return ExitCode::FAILURE;
     };
@@ -822,6 +823,38 @@ fn bonus_rooms(args: &[String]) -> ExitCode {
         println!("World {name}, screen 0x{pointer:04X} ({sealed}):");
         print!("{}", level::to_level_text(&columns));
         println!();
+        let Some(prefix) = prefix else { continue };
+        let out = format!("{prefix}-{pointer:04X}.png");
+        match render_screen(&rom, name, &columns, &out) {
+            Ok(()) => println!("wrote {out}"),
+            Err(e) => eprintln!("{e}"),
+        }
     }
     ExitCode::SUCCESS
+}
+
+/// Draw one 20-column screen with the world's own tiles, where the game would
+/// put it: in the 128 pixels below the status bar.
+fn render_screen(
+    rom: &[u8],
+    name: &str,
+    columns: &[sml::assets::level::Column],
+    out: &str,
+) -> Result<(), String> {
+    use sml::assets::level;
+    use sml::render::{render_background, Framebuffer, Palette, TileMap};
+
+    let world = level::level_index(name).ok_or("not a cartridge level")? / 3 + 1;
+    let tiles = level::world_tile_sheet(rom, world).map_err(|e| e.to_string())?;
+    let mut cells = Vec::with_capacity(level::SCREEN_COLUMNS * level::ROWS);
+    for row in 0..level::ROWS {
+        for column in columns.iter().take(level::SCREEN_COLUMNS) {
+            cells.push(column[row]);
+        }
+    }
+    let map = TileMap::new(level::SCREEN_COLUMNS, level::ROWS, cells);
+    let mut fb = Framebuffer::new();
+    render_background(&mut fb, &map, &tiles, 0, -sml::game::PLAYFIELD_TOP, &Palette::new(0xE4));
+    let png = sml::png::encode_gray(160, 144, &fb.to_gray());
+    std::fs::write(out, png).map_err(|e| format!("could not write {out}: {e}"))
 }

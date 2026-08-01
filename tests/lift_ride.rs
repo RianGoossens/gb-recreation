@@ -4,7 +4,7 @@
 //! check the whole thing running: gravity, collision, and the lift all in
 //! `Game::step`, which is where a wrong ordering between them shows up.
 
-use sml::core::lift::{HORIZONTAL_HALF_CYCLE, VERTICAL_HALF_CYCLE};
+use sml::core::lift::{DROP_DELAY, HORIZONTAL_HALF_CYCLE, VERTICAL_HALF_CYCLE};
 use sml::core::level::Level;
 use sml::game::Game;
 use sml::input::{Button, Buttons};
@@ -96,6 +96,57 @@ fn he_can_jump_up_through_a_lift_and_land_back_on_it() {
         }
     }
     assert!(back_on, "and he comes back down onto it");
+}
+
+/// The drop block through the whole loop. The shape to match is the traced
+/// one: he lands, nothing happens for nine frames, and then both of them go
+/// down together a pixel a frame.
+#[test]
+fn a_drop_block_gives_way_under_him_and_takes_him_down() {
+    let mut game = Game::new(over_a_lift('X'));
+    // The delay is counted from the touch, so the touch is what to find.
+    let mut touched = false;
+    for _ in 0..20 {
+        game.step(Buttons::default());
+        if game.mario.on_ground {
+            touched = true;
+            break;
+        }
+    }
+    assert!(touched, "he should have landed on the block");
+    let landed = game.mario.pixel_y();
+    let top = game.lifts[0].y;
+
+    for _ in 0..DROP_DELAY - 1 {
+        game.step(Buttons::default());
+    }
+    assert_eq!(game.lifts[0].y, top, "still put for the nine frames");
+    assert_eq!(game.mario.pixel_y(), landed);
+
+    for _ in 0..30 {
+        game.step(Buttons::default());
+    }
+    assert_eq!(game.lifts[0].y - top, 30, "a pixel a frame, no let up");
+    assert_eq!(
+        game.mario.pixel_y() - landed,
+        game.lifts[0].y - top,
+        "and he goes down with it"
+    );
+    assert!(game.mario.on_ground);
+}
+
+/// The other half: it is a surface, so it has to hold him before it gives way.
+/// Without the block he is in open air and falls to the floor far below.
+#[test]
+fn without_the_block_he_falls_straight_past() {
+    let mut game = Game::new(over_a_lift('.'));
+    for _ in 0..20 {
+        game.step(Buttons::default());
+    }
+    assert!(
+        !game.mario.on_ground,
+        "control: nothing there, so nothing catches him"
+    );
 }
 
 #[test]

@@ -26,6 +26,7 @@ code with `Level::from_file` / `Level::from_text`.
 | `B` | brick block (solid) |
 | `V` | a lift that runs up and down, 60 px each way |
 | `H` | a lift that runs side to side, 53 px each way |
+| `X` | a drop block: holds still, and nine frames after Mario stands on it, gives way and carries him down |
 | `E` | the level-end trigger (walk into it to finish; not solid) |
 
 Any other character is treated as empty. The block markers (`?`, `P`, `B`) are

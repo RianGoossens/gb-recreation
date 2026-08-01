@@ -86,7 +86,7 @@ fn the_extracted_level_carries_the_cartridge_s_walkers() {
 #[test]
 fn the_extracted_level_carries_the_cartridge_s_lifts() {
     let Some(level) = extracted() else { return };
-    use sml::core::lift::LiftAxis;
+    use sml::core::lift::{LiftAxis, Motion};
     // World 1-1's last two records, kinds 0x0A and 0x0B, either side of the
     // exit door. Both were confirmed to hold Mario up on the cartridge.
     assert_eq!(level.lifts.len(), 2);
@@ -96,18 +96,31 @@ fn the_extracted_level_carries_the_cartridge_s_lifts() {
     // 8, so both sit half a step right of their x byte, at pixels 2280 and
     // 2344. The text format is a tile grid, so each lands on the column that
     // contains it and the sub-tile offset is lost.
-    assert_eq!(placed[0], (285 * 8, 5 * 8, LiftAxis::Vertical));
-    assert_eq!(placed[1], (293 * 8, 2 * 8, LiftAxis::Horizontal));
+    assert_eq!(placed[0], (285 * 8, 5 * 8, Motion::Cycle(LiftAxis::Vertical)));
+    assert_eq!(placed[1], (293 * 8, 2 * 8, Motion::Cycle(LiftAxis::Horizontal)));
 }
 
 /// A lift Mario can ride has to survive the loader and the game's own set-up,
 /// not just the extractor.
 #[test]
 fn world_1_2_keeps_its_lifts_through_the_loader() {
+    use sml::core::lift::Motion;
     let Some(levels) = sml::session::world_1_levels() else { return };
-    assert_eq!(levels[1].lifts.len(), 7);
+    let cycling = |level: &Level| {
+        level
+            .lifts
+            .iter()
+            .filter(|&&(_, _, motion)| motion != Motion::Drop)
+            .count()
+    };
+    assert_eq!(cycling(&levels[1]), 7);
+    assert_eq!(levels[1].lifts.len(), 9, "and its two drop blocks");
     let game = sml::game::Game::new(levels[1].clone());
-    assert_eq!(game.lifts.len(), 7);
+    assert_eq!(game.lifts.len(), 9);
+    assert_eq!(
+        game.lifts.iter().filter(|l| l.motion == Motion::Drop).count(),
+        2
+    );
 }
 
 /// Walks the level: hold right, jump when blocked, and jump when the ground
@@ -459,7 +472,10 @@ fn mario_can_stand_at_every_spawn_outside_the_vehicle_stage() {
 fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     for (name, expected) in [
         ("2_1", 69), ("2_2", 69), ("2_3", 178),
-        ("3_1", 53), ("3_2", 34), ("3_3", 12),
+        // 3-1 was 53 until its drop blocks went in. One of them bridges the
+        // gap the walker used to stop at: he is across the eight pixels well
+        // inside the nine frames it stays up.
+        ("3_1", 98), ("3_2", 34), ("3_3", 12),
         ("4_1", 66), ("4_2", 106), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
@@ -1059,6 +1075,48 @@ fn a_lift_draws_three_tiles_wide() {
             }
         }
     }
+}
+
+/// The drop block draws as a single `0xEE`, the tile next to the lift's, which
+/// is the whole difference between the two on screen.
+#[test]
+fn a_drop_block_draws_one_tile_wide() {
+    use sml::assets::level as assets;
+    use sml::core::lift::Motion;
+    use sml::render::Palette;
+
+    let Ok(level) = assets::extracted_level("1-2") else { return };
+    let Some(graphics) = level.graphics.clone() else { return };
+
+    let mut game = Game::new(level);
+    let block = *game
+        .lifts
+        .iter()
+        .find(|l| l.motion == Motion::Drop)
+        .expect("1-2's list has drop blocks in it");
+    game.camera.x = (block.x - 60).max(0);
+    let drawn = game.render().to_gray();
+
+    let palette = Palette::new(sml::assets::DEFAULT_BGP);
+    let tile = &graphics.sprites[0xEE];
+    let left = block.x - game.camera.x;
+    let top = block.y - game.camera.y + sml::game::PLAYFIELD_TOP;
+    let mut ink = 0;
+    for (dy, row) in tile.pixels.iter().enumerate() {
+        for (dx, &index) in row.iter().enumerate() {
+            if index == 0 {
+                continue;
+            }
+            ink += 1;
+            let (x, y) = (left + dx as i32, top + dy as i32);
+            assert_eq!(
+                drawn[(y as usize) * 160 + x as usize],
+                palette.shade(index).to_gray(),
+                "drop block pixel {dx},{dy}"
+            );
+        }
+    }
+    assert!(ink > 0, "control: tile 0xEE has to draw something");
 }
 
 /// A hand-written level brings no cartridge graphics, so its enemies keep the

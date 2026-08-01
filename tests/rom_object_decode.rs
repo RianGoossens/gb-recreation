@@ -439,6 +439,7 @@ fn implemented_kinds_are_placed_in_open_space() {
         object::FALLER,
         object::LIFT_VERTICAL,
         object::LIFT_HORIZONTAL,
+        object::DROP_BLOCK,
     ];
     let mut checked = 0;
     for name in level::LEVEL_NAMES {
@@ -455,6 +456,13 @@ fn implemented_kinds_are_placed_in_open_space() {
             if name == "1-3" && r.kind_id() == object::FALLER {
                 continue;
             }
+            // And one of its five drop blocks, at column 235, the only one of
+            // the 48 in the cartridge that does. Same level, same story: the
+            // text grid cannot hold a block inside a solid cell, so the writer
+            // drops it and 1-3 gets four.
+            if name == "1-3" && r.kind_id() == object::DROP_BLOCK && r.column() == 235 {
+                continue;
+            }
             checked += 1;
             assert!(
                 !level::is_solid(columns[r.column()][row]),
@@ -468,7 +476,7 @@ fn implemented_kinds_are_placed_in_open_space() {
 }
 
 /// What each level gets when it is extracted, as (walkers, jumpers, fallers,
-/// lifts). Pinned so a change in the decode or in which kinds are implemented
+/// drop blocks, lifts). Pinned so a change in the decode or in which kinds are implemented
 /// is visible per level rather than only in a total. Worlds 3 and 4 have never
 /// been played here, so this is the record of what the ROM says they hold.
 #[test]
@@ -476,18 +484,18 @@ fn every_level_hands_over_the_same_objects_each_time() {
     let Some(data) = rom() else { return };
 
     let expected = [
-        ("1-1", (11, 3, 0, 2)),
-        ("1-2", (8, 0, 0, 7)),
-        ("1-3", (1, 0, 8, 0)),
-        ("2-1", (10, 0, 0, 4)),
-        ("2-2", (14, 0, 0, 5)),
-        ("2-3", (0, 0, 0, 0)),
-        ("3-1", (7, 0, 0, 3)),
-        ("3-2", (8, 5, 0, 1)),
-        ("3-3", (2, 0, 0, 3)),
-        ("4-1", (8, 0, 1, 5)),
-        ("4-2", (16, 0, 0, 4)),
-        ("4-3", (0, 0, 0, 0)),
+        ("1-1", (11, 3, 0, 0, 2)),
+        ("1-2", (8, 0, 0, 2, 7)),
+        ("1-3", (1, 0, 8, 5, 0)),
+        ("2-1", (10, 0, 0, 2, 4)),
+        ("2-2", (14, 0, 0, 3, 5)),
+        ("2-3", (0, 0, 0, 0, 0)),
+        ("3-1", (7, 0, 0, 8, 3)),
+        ("3-2", (8, 5, 0, 13, 1)),
+        ("3-3", (2, 0, 0, 4, 3)),
+        ("4-1", (8, 0, 1, 6, 5)),
+        ("4-2", (16, 0, 0, 5, 4)),
+        ("4-3", (0, 0, 0, 0, 0)),
     ];
     let mode = object::Mode::Normal;
     for (name, counts) in expected {
@@ -497,6 +505,7 @@ fn every_level_hands_over_the_same_objects_each_time() {
             object::walker_spawns(&records, mode).len(),
             object::fly_spawns(&records, mode).len(),
             object::faller_spawns(&records, mode).len(),
+            object::drop_block_spawns(&records, mode).len(),
             object::lift_spawns(&records, mode).len(),
         );
         assert_eq!(got, counts, "World {name}");
@@ -551,3 +560,4 @@ fn every_kind_the_levels_place_has_a_name_but_one() {
     }
     assert_eq!(unnamed, std::collections::BTreeSet::from([0x2F]));
 }
+

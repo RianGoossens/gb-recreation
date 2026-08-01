@@ -92,6 +92,7 @@ The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id directly.
 | `0x0E` | Fly | `0xA0` `0xA1` / `0xB0` `0xB1` | 16x16 |
 | `0x10` | Honen | `0xC1` over `0xD1` | 8x16 |
 | `0x24` | Yurarin Boo | `0xA6` `0xA7` / `0xB6` `0xB7` | 16x16 |
+| `0x36` | drop block | `0xEE` | 8x8 |
 
 The Fly's four ids are `n`, `n + 1`, `n + 16`, `n + 17`, the same 2x2 block
 Mario's frames are, which confirms the sheet's 16-tile width from the running
@@ -105,7 +106,7 @@ object's position is the bottom left corner of what it draws.
 ### Two kinds are drawn behind the background
 
 The OAM attribute byte came back as `0x80` for exactly two of the sixteen
-kinds measured, `0x02` and `0x10`, and clear for every other one. Bit 7 is the
+kinds measured, `0x02`, `0x10` and `0x36`, and clear for every other one. Bit 7 is the
 hardware's priority bit: a sprite with it set is covered by any background
 pixel that is not colour 0, so the object is hidden wherever the level's own
 tiles are drawn and visible only where they are empty.

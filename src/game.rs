@@ -319,7 +319,7 @@ impl Game {
         let lifts = level
             .lifts
             .iter()
-            .map(|&(x, y, axis)| Lift::new(x, y, axis))
+            .map(|&(x, y, motion)| Lift::with_motion_at(x, y, motion))
             .collect();
         let tuning = Tuning::default();
         Self {
@@ -431,7 +431,7 @@ impl Game {
         let was_bottom = self.mario.pixel_y() + self.mario.size().1 - 1;
         let lift_moves: Vec<(i32, i32)> = self.lifts.iter_mut().map(Lift::step).collect();
         step_motion(&mut self.mario, buttons, &self.level.solids, &self.tuning);
-        ride_lifts(&mut self.mario, &self.lifts, &lift_moves, was_bottom);
+        ride_lifts(&mut self.mario, &mut self.lifts, &lift_moves, was_bottom);
         if was_grounded && !self.mario.on_ground && self.mario.vy < 0 {
             self.sounds.push(SoundEvent::Jump);
         }
@@ -863,9 +863,13 @@ impl Game {
             );
         }
         for lift in &self.lifts {
+            let pieces = match lift.motion {
+                crate::core::lift::Motion::Cycle(_) => crate::assets::sprite::LIFT,
+                crate::core::lift::Motion::Drop => crate::assets::sprite::DROP_BLOCK,
+            };
             self.draw_object_sprite(
                 &mut fb,
-                crate::assets::sprite::LIFT,
+                pieces,
                 lift.x - self.camera.x,
                 lift.y + crate::core::lift::LIFT_HEIGHT - view_y,
             );

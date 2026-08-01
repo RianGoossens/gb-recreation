@@ -278,7 +278,7 @@ account for 171 of the 481 normal-play records.
 | `0x31` | 7 | 3-1 3-3 | Tokotoko |  |
 | `0x32` | 1 | 3-3 | Hiyoihoi |  |
 | `0x35` | 1 | 3-2 | falling spike |  |
-| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | drop block | still; harmless; goes away when stood on (see below) |
+| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | drop block | still until stood on, then gives way and carries him down (see below) |
 | `0x38` | 5 | 3-3 4-1 | diagonal platform, north east |  |
 | `0x39` | 4 | 3-3 4-1 | diagonal platform, north west |  |
 | `0x3A` | 6 | 3-1 3-2 3-3 4-2 | small vertical platform |  |
@@ -302,31 +302,57 @@ cartridge.
 
 ### The drop block, kind `0x36`
 
-The most-used kind nothing had watched: nine of the twelve levels place it, 50
-records in all. Three measurements, and it is still not implemented.
+The most-used kind in the game: nine of the twelve levels place it, 50 records
+in all.
 
-It never moves. Traced for 600 frames in World 1-2 with the camera frozen
-(`tools/measure_level_kind.py`), its slot x and y do not change by a pixel.
+It never moves on its own. Traced for 600 frames in World 1-2 with the camera
+frozen (`tools/measure_level_kind.py`), its slot x and y do not change by a
+pixel. It is not an enemy: the whole vertical overlap was swept with Mario
+written into the game's own position bytes (`tools/probe_object_contact.py`)
+and it never cost him a life, while the positive control lost one at five
+offsets out of six.
 
-It is not an enemy. The whole vertical overlap was swept with Mario written
-into the game's own position bytes (`tools/probe_object_contact.py`), and it
-never cost him a life at any of them, while the positive control (World 1-1's
-walker) lost one at five offsets out of six.
+What it does when stood on took a different instrument. Dropping Mario onto it
+puts the change on the frame his feet reach the surface, and he is falling
+three pixels a frame there, so a block that catches him for one frame and one
+with no surface at all look the same. `probe_drop_block_support.py` places him
+at rest height instead, says he is on the ground, and then writes nothing
+more, so what follows is the game's own collision:
 
-At exactly one offset, feet on top, the object goes away. Dropping Mario onto
-it and watching both of them frame by frame (`tools/probe_drop_block.py`) puts
-that on the frame his y reaches the slot's y minus 10, which is the height a
-lift rests him at, so it is the surface he reached rather than the overlap. The
-600 frame trace is the control that says it does not go away on its own, and
-the overlap sweep is the control that says no other contact removes it.
+- He stays there. Nine frames at a fixed gap of 10, the same height a lift
+  rests him at.
+- Then the block descends a pixel a frame and does not stop, slow down or come
+  back, with the gap fixed at 10 the whole way: it carries him.
+- The negative control is the same position with the slot's kind byte set to
+  `0xFF` first. With the object gone he falls at three pixels a frame from the
+  first frame, which is what says the nine frames are the block holding him.
 
-So it is a block that gives way the moment it is stood on, which is what its
-borrowed name says. What is not settled is what happens in that frame: whether
-it holds him for it, and whether the slot emptying means the block was removed
-or handed off to a falling object in another slot. He is falling at three
-pixels a frame throughout and never slows, but the object leaves on the same
-frame it would have caught him, so the trace cannot separate those. It stays
-out of the extracted levels until it can.
+The slot does not empty. Its kind byte becomes `0x37` on the frame he touches
+it and stays there, and every other slot is unchanged for the following
+frames, so the block is neither removed nor handed to a falling object
+somewhere else. `0x37` is the same object in its second state.
+
+Measured again in World 1-3 with the same numbers. That run adds one thing:
+partway down, the level's own ground catches Mario and the block carries on
+without him. Its negative control is not usable there, since 1-3's terrain
+holds him at that spot anyway, so the 1-2 run is the one the reading rests on.
+
+Its surface is 8 pixels, one tile. Sweeping Mario's x a pixel at a time holds
+him over 13, and 8 + 6 - 1 is 13 for the same 6 pixel foot the lift's 29 pixel
+window gave over a 24 pixel surface. Two different surface widths, one foot,
+two runs sharing no number.
+
+The sprite survey had skipped this kind, and the reason is in the data: the
+blocks are placed in rows, so there is always another one eight pixels away,
+inside the window that decides an object's sprites are its own. With Mario
+pinned far above and the neighbour identified in another slot, it draws as a
+single tile `0xEE`, next door to the lift's `0xEF`, with the OAM priority bit
+set so the background covers it. That makes it the third kind measured with
+that bit, after `0x02` and `0x10`.
+
+`X` in the level format. 48 of the 50 records go into the extracted levels;
+one of World 1-3's five starts inside a solid tile, which the text grid cannot
+represent, the same as two of that level's fallers.
 
 ### Where the names come from
 

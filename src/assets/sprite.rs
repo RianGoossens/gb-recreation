@@ -197,6 +197,15 @@ pub const LIFT: &[Piece] = &[
     piece(16, -8, 0xEF),
 ];
 
+/// A drop block (kind `0x36`), one tile, the id next door to the lift's.
+///
+/// The blocks are placed in rows, so the sprite survey always had a second
+/// one inside its window and skipped the kind; this came from a run with a
+/// single block isolated (`tools/probe_drop_block_support.py`). Its OAM
+/// attribute byte has bit 7 set, so the background covers it, which makes it
+/// the third kind measured with the priority bit after `0x02` and `0x10`.
+pub const DROP_BLOCK: &[Piece] = &[piece(0, -8, 0xEE)];
+
 #[cfg(test)]
 mod tests {
     use super::*;

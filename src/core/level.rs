@@ -6,7 +6,7 @@
 
 use crate::core::block::BlockKind;
 use crate::core::enemy::EnemyKind;
-use crate::core::lift::LiftAxis;
+use crate::core::lift::{LiftAxis, Motion};
 use crate::core::powerup::ItemKind;
 use crate::tiles::Tile;
 
@@ -140,8 +140,8 @@ pub struct Level {
     pub end: Option<(i32, i32)>,
     /// Free-standing item spawns: top-left pixel and kind.
     pub items: Vec<(i32, i32, ItemKind)>,
-    /// Moving platforms: top-left pixel and the axis they run on.
-    pub lifts: Vec<(i32, i32, LiftAxis)>,
+    /// Moving platforms and drop blocks: top-left pixel and how it moves.
+    pub lifts: Vec<(i32, i32, Motion)>,
     /// The cartridge's own background graphics, when the level came from the
     /// ROM. A hand-written level file has none and renders with placeholders.
     pub graphics: Option<Graphics>,
@@ -177,7 +177,7 @@ impl Level {
     /// `T` a walker that turns at ledges,
     /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
     /// `E` the level-end trigger, `V` and `H` a lift running up and down or
-    /// side to side.
+    /// side to side, `X` a drop block that gives way when stood on.
     /// The block markers are also solid; `E`, `S`, and coins are not. Anything
     /// else is empty. Rows must be equal length. This is the human-editable
     /// format levels are authored in.
@@ -207,8 +207,9 @@ impl Level {
                     'S' => items.push((px, py, ItemKind::Star)),
                     'W' => items.push((px, py, ItemKind::Flower)),
                     'E' => end = Some((px, py)),
-                    'V' => lifts.push((px, py, LiftAxis::Vertical)),
-                    'H' => lifts.push((px, py, LiftAxis::Horizontal)),
+                    'V' => lifts.push((px, py, Motion::Cycle(LiftAxis::Vertical))),
+                    'H' => lifts.push((px, py, Motion::Cycle(LiftAxis::Horizontal))),
+                    'X' => lifts.push((px, py, Motion::Drop)),
                     _ => {}
                 }
             }

@@ -235,6 +235,21 @@ pub fn lift_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize, b
         .collect()
 }
 
+/// The drop block: still until Mario stands on it, then it holds nine frames
+/// and descends a pixel a frame, carrying him, without ever coming back
+/// (`tools/probe_drop_block_support.py`). The most-used kind in the game, 50
+/// records across nine of the twelve levels.
+pub const DROP_BLOCK: u8 = 0x36;
+
+/// Where a level puts its drop blocks, as (column, row).
+pub fn drop_block_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == DROP_BLOCK)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// The faller. World 1-3 is the only level of World 1 that uses it. It holds
 /// position for 175 frames from spawn and then drops straight down at a pixel
 /// a frame (`tools/probe_faller_trigger.py`), and it hurts Mario from every

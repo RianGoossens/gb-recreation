@@ -127,12 +127,13 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
             .count()
     };
 
-    let tables: [(&str, &[Piece]); 5] = [
+    let tables: [(&str, &[Piece]); 6] = [
         ("Chibibo", sprite::CHIBIBO),
         ("Nokobon", sprite::NOKOBON),
         ("Fly", sprite::FLY),
         ("Falling Slab", sprite::FALLING_SLAB),
         ("lift", sprite::LIFT),
+        ("drop block", sprite::DROP_BLOCK),
     ];
     for (name, pieces) in tables {
         assert!(!pieces.is_empty(), "{name} has no tiles");

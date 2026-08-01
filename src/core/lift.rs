@@ -35,6 +35,29 @@ pub const VERTICAL_HALF_CYCLE: u32 = 120;
 /// Frames between reversals for the horizontal lift: 106, which is 53 pixels.
 pub const HORIZONTAL_HALF_CYCLE: u32 = 106;
 
+/// A drop block (kind `0x36`) is one tile across, drawn as a single `0xEE`.
+///
+/// Measured as a support window of 13 pixels of Mario's own x
+/// (`tools/probe_drop_block_support.py`), and 8 + FOOT_WIDTH - 1 is 13. That
+/// is the same foot the lift's 29 gave over a 24 pixel surface, from a
+/// different surface width, so the two agree without being fitted to each
+/// other. The blocks come in rows, which is why the sprite survey never
+/// caught this kind: its neighbour eight pixels right was always inside the
+/// window.
+pub const DROP_WIDTH: i32 = 8;
+/// Frames a drop block stays put after Mario stands on it, before it starts
+/// down. Nine in World 1-2 and nine again in World 1-3.
+pub const DROP_DELAY: u32 = 9;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Motion {
+    /// A lift, running back and forth on one axis forever.
+    Cycle(LiftAxis),
+    /// A drop block: still until stood on, then it falls a pixel a frame and
+    /// does not stop or come back.
+    Drop,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LiftAxis {
     Vertical,
@@ -55,24 +78,42 @@ pub struct Lift {
     /// Top-left in pixels. Lifts move in whole pixels, so no subpixel here.
     pub x: i32,
     pub y: i32,
-    pub axis: LiftAxis,
+    pub motion: Motion,
     /// +1 or -1 along the axis.
     pub direction: i32,
-    /// Frames since the last reversal.
+    /// Frames since the last reversal, or since a drop block was stood on.
     pub phase: u32,
     /// Frames since the last pixel of movement.
     pub tick: u32,
+    /// Set once Mario has stood on a drop block. It never clears.
+    pub triggered: bool,
 }
 
 impl Lift {
     pub fn new(x: i32, y: i32, axis: LiftAxis) -> Self {
+        Self::with_motion_at(x, y, Motion::Cycle(axis))
+    }
+
+    pub fn drop_block(x: i32, y: i32) -> Self {
+        Self::with_motion_at(x, y, Motion::Drop)
+    }
+
+    pub fn with_motion_at(x: i32, y: i32, motion: Motion) -> Self {
         Self {
             x,
             y,
-            axis,
+            motion,
             direction: 1,
             phase: 0,
             tick: 0,
+            triggered: false,
+        }
+    }
+
+    pub fn width(&self) -> i32 {
+        match self.motion {
+            Motion::Cycle(_) => LIFT_WIDTH,
+            Motion::Drop => DROP_WIDTH,
         }
     }
 
@@ -81,7 +122,7 @@ impl Lift {
         (
             self.x,
             self.y,
-            self.x + LIFT_WIDTH - 1,
+            self.x + self.width() - 1,
             self.y + LIFT_HEIGHT - 1,
         )
     }
@@ -89,6 +130,10 @@ impl Lift {
     /// Advance a frame. Returns how far it moved, as (dx, dy) in pixels, so a
     /// rider can be carried by exactly the same amount.
     pub fn step(&mut self) -> (i32, i32) {
+        let axis = match self.motion {
+            Motion::Cycle(axis) => axis,
+            Motion::Drop => return self.drop_step(),
+        };
         // The move comes before the reversal. Turning first spends the frame's
         // own pixel going back the way it came, and a half cycle then covers
         // 58 pixels instead of the 60 that was measured.
@@ -96,7 +141,7 @@ impl Lift {
         let mut step = (0, 0);
         if self.tick >= LIFT_STEP_FRAMES {
             self.tick = 0;
-            step = match self.axis {
+            step = match axis {
                 LiftAxis::Vertical => (0, self.direction),
                 LiftAxis::Horizontal => (self.direction, 0),
             };
@@ -104,11 +149,28 @@ impl Lift {
             self.y += step.1;
         }
         self.phase += 1;
-        if self.phase >= self.axis.half_cycle() {
+        if self.phase >= axis.half_cycle() {
             self.phase = 0;
             self.direction = -self.direction;
         }
         step
+    }
+
+    /// A drop block waits DROP_DELAY frames after being stood on, then
+    /// descends a pixel every frame for as long as it exists. Traced in World
+    /// 1-2 and again in 1-3: the slot's y is unchanged for nine frames and
+    /// then rises by exactly one per frame, with the rider's gap fixed at 10
+    /// the whole way down.
+    fn drop_step(&mut self) -> (i32, i32) {
+        if !self.triggered {
+            return (0, 0);
+        }
+        self.phase += 1;
+        if self.phase < DROP_DELAY {
+            return (0, 0);
+        }
+        self.y += 1;
+        (0, 1)
     }
 }
 
@@ -118,7 +180,7 @@ impl Lift {
 /// `was_bottom` is where his feet were before the frame's movement, which is
 /// what makes the support one-way: he lands only when he crosses the top edge
 /// from above, and jumps up through it otherwise.
-pub fn ride_lifts(mario: &mut Mario, lifts: &[Lift], moves: &[(i32, i32)], was_bottom: i32) {
+pub fn ride_lifts(mario: &mut Mario, lifts: &mut [Lift], moves: &[(i32, i32)], was_bottom: i32) {
     let (w, h) = mario.size();
     // The cartridge does not test his whole body against the surface. Sweeping
     // his position across a lift one pixel at a time holds him over a window
@@ -129,7 +191,7 @@ pub fn ride_lifts(mario: &mut Mario, lifts: &[Lift], moves: &[(i32, i32)], was_b
     let left = mario.pixel_x() + inset;
     let right = left + FOOT_WIDTH - 1;
 
-    for (lift, &(dx, dy)) in lifts.iter().zip(moves) {
+    for (lift, &(dx, dy)) in lifts.iter_mut().zip(moves) {
         let (ll, lt, lr, _lb) = lift.edges();
         if right < ll || left > lr {
             continue;
@@ -150,6 +212,7 @@ pub fn ride_lifts(mario: &mut Mario, lifts: &[Lift], moves: &[(i32, i32)], was_b
         mario.vy = 0;
         mario.on_ground = true;
         mario.x += dx * SUBPIXEL;
+        lift.triggered = true;
         return;
     }
 }
@@ -169,7 +232,7 @@ mod tests {
             .filter(|&x| {
                 let mut mario = Mario::new(x, 100 - 12);
                 mario.vy = 1;
-                ride_lifts(&mut mario, &[lift], &[(0, 0)], 100 - 1);
+                ride_lifts(&mut mario, &mut [lift], &[(0, 0)], 100 - 1);
                 mario.on_ground
             })
             .collect();
@@ -180,6 +243,75 @@ mod tests {
             held.first(),
             held.last()
         );
+    }
+
+    /// The other half of the same measurement. The drop block's surface is 8
+    /// wide against the lift's 24, and the window it holds Mario over is 13
+    /// against 29. Both are `surface + FOOT_WIDTH - 1` for the same foot, from
+    /// two runs that shared no number.
+    #[test]
+    fn a_drop_block_holds_him_across_the_thirteen_the_cartridge_holds_him() {
+        let held: Vec<i32> = (60..160)
+            .filter(|&x| {
+                let mut mario = Mario::new(x, 100 - 12);
+                mario.vy = 1;
+                let mut blocks = [Lift::drop_block(100, 100)];
+                ride_lifts(&mut mario, &mut blocks, &[(0, 0)], 100 - 1);
+                mario.on_ground
+            })
+            .collect();
+        assert_eq!(held.len(), 13, "held from {:?}", held.first());
+    }
+
+    #[test]
+    fn a_drop_block_stays_put_until_it_is_stood_on() {
+        let mut block = Lift::drop_block(0, 40);
+        for _ in 0..600 {
+            assert_eq!(block.step(), (0, 0));
+        }
+        assert_eq!(block.y, 40, "the 600 frame trace never saw it move");
+    }
+
+    /// The traced arc: nine frames of nothing, then a pixel every frame with
+    /// no let up. `tools/probe_drop_block_support.py`, twice.
+    #[test]
+    fn a_drop_block_waits_nine_frames_and_then_falls_a_pixel_a_frame() {
+        let mut mario = Mario::new(0, 40 - 12);
+        let mut blocks = [Lift::drop_block(0, 40)];
+        mario.vy = 1;
+        ride_lifts(&mut mario, &mut blocks, &[(0, 0)], 40 - 1);
+        assert!(mario.on_ground);
+        assert!(blocks[0].triggered);
+
+        for frame in 0..DROP_DELAY - 1 {
+            assert_eq!(blocks[0].step(), (0, 0), "frame {frame} after the touch");
+        }
+        assert_eq!(blocks[0].y, 40);
+        for frame in 0..50 {
+            assert_eq!(blocks[0].step(), (0, 1), "frame {frame} of the fall");
+        }
+        assert_eq!(blocks[0].y, 90);
+    }
+
+    /// It carries him down, the way the trace's fixed gap of 10 does.
+    #[test]
+    fn a_drop_block_takes_mario_with_it() {
+        let mut mario = Mario::new(0, 40 - 12);
+        let mut blocks = [Lift::drop_block(0, 40)];
+        mario.vy = 1;
+        ride_lifts(&mut mario, &mut blocks, &[(0, 0)], 40 - 1);
+        let (_w, h) = mario.size();
+        for _ in 0..DROP_DELAY + 20 {
+            let was_bottom = mario.pixel_y() + h - 1;
+            let moves = [blocks[0].step()];
+            ride_lifts(&mut mario, &mut blocks, &moves, was_bottom);
+        }
+        assert_eq!(
+            mario.pixel_y() + h,
+            blocks[0].y,
+            "his feet stay on its top edge all the way down"
+        );
+        assert_eq!(blocks[0].y, 40 + 20 + 1);
     }
 
     #[test]
@@ -222,7 +354,7 @@ mod tests {
         // Feet one pixel above the lift's top, coming down.
         mario.y = pixels(40 - h + 1);
         mario.vy = SUBPIXEL;
-        ride_lifts(&mut mario, &[lift], &[(1, 0)], 40 - 2);
+        ride_lifts(&mut mario, &mut [lift], &[(1, 0)], 40 - 2);
         assert_eq!(mario.pixel_y() + h, 40, "his feet rest on the top edge");
         assert!(mario.on_ground);
         assert_eq!(mario.vy, 0);
@@ -236,7 +368,7 @@ mod tests {
         let (_w, h) = mario.size();
         mario.y = pixels(40 - h + 1);
         mario.vy = -SUBPIXEL;
-        ride_lifts(&mut mario, &[lift], &[(0, 0)], 60);
+        ride_lifts(&mut mario, &mut [lift], &[(0, 0)], 60);
         assert!(!mario.on_ground, "a jump goes up through it");
         assert_eq!(mario.vy, -SUBPIXEL);
     }
@@ -248,7 +380,7 @@ mod tests {
         let (_w, h) = mario.size();
         mario.y = pixels(40 - h + 1);
         mario.vy = SUBPIXEL;
-        ride_lifts(&mut mario, &[lift], &[(0, 0)], 40 - 2);
+        ride_lifts(&mut mario, &mut [lift], &[(0, 0)], 40 - 2);
         assert!(!mario.on_ground);
     }
 

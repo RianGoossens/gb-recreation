@@ -96,6 +96,9 @@ pub struct Game {
     flower_tile: Tile,
     superball_tile: Tile,
     end_tile: Tile,
+    /// Whether to draw the level-end marker. A cartridge level has the exit
+    /// door in its own background already.
+    draw_end_marker: bool,
     palette: Palette,
 }
 
@@ -275,6 +278,12 @@ impl Game {
                 (cells, vec![solid_tile(0), solid_tile(2)], 0xE4)
             }
         };
+        // The cartridge draws its coins with one background tile, and its exit
+        // door is part of the level's own background, so a marker on top of it
+        // would be our drawing over theirs.
+        let cartridge_coin =
+            cartridge.and_then(|g| g.tiles.get(crate::assets::level::COIN as usize).copied());
+        let draw_end_marker = cartridge.is_none();
         let mario = Mario::new(level.spawn.0, level.spawn.1);
         let mut pending = pending_enemies(&level);
         let mut enemies = Vec::new();
@@ -318,7 +327,7 @@ impl Game {
             // Enemies render as a light-gray block so they stand out from both
             // the white background and the dark terrain.
             enemy_tile: solid_tile(1),
-            coin_tile: coin_tile(),
+            coin_tile: cartridge_coin.unwrap_or_else(coin_tile),
             question_tile: question_tile(),
             used_tile: solid_tile(2),
             brick_tile: brick_tile(),
@@ -327,6 +336,7 @@ impl Game {
             flower_tile: flower_tile(),
             superball_tile: superball_tile(),
             end_tile: end_tile(),
+            draw_end_marker,
             palette: Palette::new(bgp),
         }
     }
@@ -788,7 +798,7 @@ impl Game {
             self.camera.y,
             &self.palette,
         );
-        if let Some((ex, ey)) = self.level.end {
+        if let (true, Some((ex, ey))) = (self.draw_end_marker, self.level.end) {
             fb.draw_tile(&self.end_tile, ex - self.camera.x, ey - self.camera.y, &self.palette);
         }
         for block in &self.blocks {

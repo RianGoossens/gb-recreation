@@ -195,6 +195,7 @@ playing it faithfully.
 | Level background in the game loop | canonical | the game itself now draws every one of the twelve levels with the cartridge's own tiles, its world's overlay included. A level written by hand carries no graphics and keeps the placeholder blocks |
 | The animated background tile | canonical | tile `0x5D` alternates between two pictures every eight frames, the cadence the routine at `0x02416` runs on. In World 2 it is the water line |
 | Status bar | canonical | the cartridge's own font, ids and layout, read off the World 1-1 capture and checked pixel for pixel against it (`src/hud.rs`). A level with no cartridge graphics falls back to the invented 3x5 font in `src/font.rs` |
+| Coins and the exit door | canonical | a coin is the cartridge's tile `0xF4` from the world's own sheet; the door is part of the level's background and the engine draws no marker over it |
 | Mario, enemies, items, blocks | **stand-in** | still drawn as flat blocks. The sprite tiles are in the ROM (`0x08032` to VRAM `0x8000`, visibly Mario's frames and the enemy set), but which tile ids each entity uses and in what order has not been pinned |
 
 ## Sound

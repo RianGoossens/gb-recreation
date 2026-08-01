@@ -640,3 +640,77 @@ fn the_status_bar_matches_the_captured_one() {
     let rows = 16 * 160;
     assert_eq!(&a[..rows], &b[..rows], "the status bar does not match the capture");
 }
+
+/// A coin on screen is the cartridge's coin tile, drawn where the level says.
+/// The engine draws coins itself rather than leaving them in the background,
+/// so this checks the picture it draws is the cartridge's own.
+#[test]
+fn coins_draw_with_the_cartridges_coin_tile() {
+    use sml::assets::level as assets;
+    use sml::render::{Framebuffer, Palette};
+
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    let Some(graphics) = level.graphics.clone() else { return };
+    let coin = graphics.tiles[assets::COIN as usize];
+    // World 1-1's first coins hang high over world column 87, so the camera
+    // has to walk out to them. They are out of Mario's reach on the ground,
+    // so they are all still there when it arrives.
+    let &(cx, cy) = level.coins.iter().min().expect("World 1-1 has coins");
+
+    let mut expected = Framebuffer::new();
+    expected.draw_tile(&coin, 0, 0, &Palette::new(graphics.palette));
+    let expected = expected.to_gray();
+
+    // Put the camera on the coin rather than walking there: this is a check
+    // on what gets drawn, and holding right through 1-1 costs Mario his lives.
+    let mut game = Game::new(level);
+    game.camera.x = cx - 80;
+    assert!(game.coins.contains(&(cx, cy)), "the coin is still there");
+
+    let drawn = game.render().to_gray();
+    let (sx, sy) = ((cx - game.camera.x) as usize, (cy - game.camera.y) as usize);
+    for row in 0..8 {
+        let at = (sy + row) * 160 + sx;
+        assert_eq!(
+            &drawn[at..at + 8],
+            &expected[row * 160..row * 160 + 8],
+            "row {row} of the coin at ({cx}, {cy})"
+        );
+    }
+}
+
+/// The cartridge's exit door is drawn by the level's own background, so the
+/// engine's end marker stays off. Without the level's graphics it stays on,
+/// since a hand-written level has no door drawn for it.
+#[test]
+fn a_cartridge_level_does_not_draw_its_own_end_marker() {
+    use sml::assets::level as assets;
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    let Some((ex, ey)) = level.end else { panic!("1-1 has an end trigger") };
+    if level.graphics.is_none() {
+        return;
+    }
+
+    let mut plain = level.clone();
+    plain.graphics = None;
+
+    let at = |game: &Game| {
+        let pixels = game.render().to_gray();
+        (0..8)
+            .map(|row| {
+                let i = (ey - game.camera.y) as usize * 160 + (ex - game.camera.x) as usize + 3;
+                pixels[i + row * 160]
+            })
+            .collect::<Vec<u8>>()
+    };
+    let mut cartridge = Game::new(level);
+    cartridge.camera.x = ex - 80;
+    let mut blocks = Game::new(plain);
+    blocks.camera.x = ex - 80;
+
+    // The marker is a black pole down the middle of its tile, so without the
+    // cartridge's graphics that column is black top to bottom.
+    let marker = at(&blocks);
+    assert!(marker.iter().all(|&p| p == 0), "the placeholder marker is not a black pole");
+    assert!(at(&cartridge).iter().any(|&p| p != 0), "the marker is still drawn over the door");
+}

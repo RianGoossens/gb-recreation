@@ -761,8 +761,26 @@ pub fn level_graphics(rom: &[u8], name: &str) -> Option<Graphics> {
             cells[y * columns.len() + x] = if is_coin(id) { FILLER } else { id };
         }
     }
-    let tiles = world_tile_sheet(rom, index / 3 + 1).ok()?;
-    Some(Graphics { cells, tiles, palette: DEFAULT_BGP })
+    let world = index / 3 + 1;
+    let tiles = world_tile_sheet(rom, world).ok()?;
+    let animated = animated_tile_pair(rom, world).map(|(a, b)| (ANIMATED_TILE, a, b));
+    Some(Graphics { cells, tiles, palette: DEFAULT_BGP, animated })
+}
+
+/// [`ANIMATED_TILE`] as the two pictures it alternates between, the one the
+/// world loads with first. Only the high bitplane changes, so both keep the
+/// low bitplane the world loaded.
+pub fn animated_tile_pair(rom: &[u8], world: usize) -> Option<(Tile, Tile)> {
+    let (loaded, alternate) = animation_frames(rom, world)?;
+    let vram = tiles_for_world(rom, world).ok()?;
+    let at = tile_vram_addr(ANIMATED_TILE) - VRAM_TILE_BASE;
+    let mut bytes: [u8; 16] = vram.get(at..at + 16)?.try_into().ok()?;
+    let first = Tile::decode(&bytes);
+    for (row, &plane) in alternate.iter().enumerate() {
+        bytes[row * 2 + 1] = plane;
+    }
+    debug_assert_eq!(loaded[0], vram[at + 1]);
+    Some((first, Tile::decode(&bytes)))
 }
 
 /// Where `sml extract-level` writes the cartridge's levels.

@@ -11,7 +11,7 @@ use crate::core::animation::Animator;
 use crate::core::block::{Block, BlockKind};
 use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
 use crate::core::entity::{pixels, Mario, Power};
-use crate::core::level::{Level, TILE};
+use crate::core::level::{Level, ANIMATION_HOLD, TILE};
 use crate::core::lift::{ride_lifts, Lift};
 use crate::core::physics::step_motion;
 use crate::core::powerup::{update_item, Item, ItemKind, ITEM_SIZE};
@@ -83,6 +83,8 @@ pub struct Game {
     sounds: Vec<SoundEvent>,
     bg_map: TileMap,
     bg_tiles: Vec<Tile>,
+    /// Frames stepped, which drives the cartridge's background tile animation.
+    frames: u32,
     mario_tile: Tile,
     enemy_tile: Tile,
     coin_tile: Tile,
@@ -311,6 +313,7 @@ impl Game {
             game_over: false,
             bg_map: TileMap::new(w, h, cells),
             bg_tiles,
+            frames: 0,
             mario_tile: solid_tile(3),
             // Enemies render as a light-gray block so they stand out from both
             // the white background and the dark terrain.
@@ -379,6 +382,8 @@ impl Game {
     /// Advance one frame from the held buttons.
     pub fn step(&mut self, buttons: Buttons) {
         self.sounds.clear();
+        self.frames = self.frames.wrapping_add(1);
+        self.animate_background();
         // Once the level is complete or Mario is out of lives, the scene freezes.
         if self.completed || self.game_over {
             return;
@@ -759,6 +764,17 @@ impl Game {
         self.camera = Camera::new(); // the one-way view resets to the spawn
         self.timer = self.tuning.timer_start;
         self.timer_ticks = 0;
+    }
+
+    /// Swap the one background tile the cartridge animates. It holds each of
+    /// its two pictures for [`ANIMATION_HOLD`] frames.
+    fn animate_background(&mut self) {
+        let animated = self.level.graphics.as_ref().and_then(|g| g.animated);
+        let Some((id, first, second)) = animated else { return };
+        let tile = if (self.frames / ANIMATION_HOLD).is_multiple_of(2) { first } else { second };
+        if let Some(slot) = self.bg_tiles.get_mut(id as usize) {
+            *slot = tile;
+        }
     }
 
     /// Render the current frame.

@@ -575,3 +575,33 @@ fn the_cartridges_background_changes_what_is_drawn() {
     let blocks = Game::new(plain).render().to_gray();
     assert_ne!(drawn, blocks);
 }
+
+/// The cartridge animates one background tile. In World 2-1 it is the water
+/// line along the level's bottom row, so those eight pixel rows change every
+/// eight frames and come back on the sixteenth. The right half is read so no
+/// sprite is in the way.
+#[test]
+fn the_water_line_animates_on_the_cartridges_cadence() {
+    use sml::assets::level as assets;
+    let Ok(level) = assets::extracted_level("2-1") else { return };
+    if level.graphics.as_ref().and_then(|g| g.animated).is_none() {
+        return;
+    }
+    let mut game = Game::new(level);
+    let strip = |game: &Game| {
+        let pixels = game.render().to_gray();
+        (120..128)
+            .flat_map(|y| (80..160).map(move |x| (y, x)))
+            .map(|(y, x)| pixels[y * 160 + x])
+            .collect::<Vec<u8>>()
+    };
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        for _ in 0..sml::core::level::ANIMATION_HOLD {
+            game.step(Buttons::default());
+        }
+        seen.push(strip(&game));
+    }
+    assert_ne!(seen[0], seen[1], "the water never changed");
+    assert_eq!(seen[0], seen[2], "the water did not come back");
+}

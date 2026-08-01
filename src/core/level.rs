@@ -154,7 +154,16 @@ pub struct Graphics {
     pub cells: Vec<u8>,
     pub tiles: Vec<Tile>,
     pub palette: u8,
+    /// The one tile the cartridge animates: its id and its two pictures, in
+    /// the order the game shows them. Each is held for [`ANIMATION_HOLD`]
+    /// frames.
+    pub animated: Option<(u8, Tile, Tile)>,
 }
+
+/// How long the cartridge holds each frame of its animated background tile.
+/// The routine that swaps it runs every eight frames and alternates on bit 3
+/// of the same counter (`docs/reference/level-format.md`).
+pub const ANIMATION_HOLD: u32 = 8;
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `^` a one-way

@@ -177,6 +177,22 @@ fn load_level_arg(arg: &str) -> Result<sml::core::level::Level, String> {
     Level::from_file(arg).map_err(|e| format!("could not load level {arg}: {e}"))
 }
 
+/// The same argument, read as a campaign. A bare world number ("3") plays that
+/// world's three levels in order; anything else is the single level
+/// [`load_level_arg`] resolves.
+#[cfg(feature = "gui")]
+fn load_campaign_arg(arg: &str) -> Result<Vec<sml::core::level::Level>, String> {
+    if let Ok(world) = arg.parse::<usize>() {
+        return sml::session::world_levels(world).ok_or_else(|| {
+            format!(
+                "World {world} has not been extracted yet: run \
+                 `sml extract-level {world}-1` and its other two levels"
+            )
+        });
+    }
+    load_level_arg(arg).map(|level| vec![level])
+}
+
 fn parse_number(s: &str) -> Option<usize> {
     if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
         usize::from_str_radix(hex, 16).ok()
@@ -710,8 +726,8 @@ fn run_game(args: &[String]) -> ExitCode {
         }
     };
     let mut session = match level_path {
-        Some(arg) => match load_level_arg(arg) {
-            Ok(level) => Session::with_tuning(faithful(vec![level]), tuning),
+        Some(arg) => match load_campaign_arg(arg) {
+            Ok(levels) => Session::with_tuning(faithful(levels), tuning),
             Err(e) => {
                 eprintln!("{e}");
                 return ExitCode::FAILURE;
@@ -835,7 +851,8 @@ fn usage() {
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
     println!("  sml sprites <world> <out.png>             draw a world's object atlas");
-    println!("  sml run [level.txt] [tuning.txt]          play in a window (needs --features gui)");
+    println!("  sml run [level|world] [tuning.txt]       play in a window (needs --features gui)");
+    println!("       a level is a file, a name like 3-1, or a world number like 3");
     println!("  sml play <out.png> [frames] [keys] [lvl] [tuning]  run headlessly to a PNG");
     println!("\n  run and play accept --allow-non-canonical anywhere in the arguments,");
     println!("  which keeps content Super Mario Land does not have (the star, the Fly).");

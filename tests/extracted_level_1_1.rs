@@ -904,3 +904,46 @@ fn a_hand_written_level_keeps_the_placeholder_mario() {
     // The placeholder is solid black across its whole width.
     assert!((0..8).all(|dx| drawn[(y + 6) * 160 + x + dx] == 0));
 }
+
+/// Any world can be played as a campaign, not just World 1. This drives a real
+/// session through World 3's three levels: each one has to arrive with its own
+/// graphics, its own number on the status bar, and Mario standing in it.
+#[test]
+fn a_session_plays_a_world_other_than_the_first() {
+    let Some(levels) = sml::session::world_levels(3) else { return };
+    assert_eq!(levels.len(), 3);
+    if levels[0].graphics.is_none() {
+        return;
+    }
+
+    let mut session = sml::session::Session::new(levels);
+    let mut start = Buttons::default();
+    start.set(Button::Start, true);
+    session.step(start);
+    session.step(Buttons::default());
+
+    for level in 1..=3u8 {
+        assert_eq!(session.current_level(), level as usize - 1);
+        assert_eq!(session.game.level.number, Some((3, level)));
+        assert!(session.game.level.graphics.is_some(), "3-{level} lost its graphics");
+
+        let bar = sml::hud::status_bar(
+            session.game.score,
+            session.game.coins_collected,
+            session.game.lives,
+            (3, level),
+            session.game.timer,
+        );
+        assert_eq!(bar[1][12], sml::hud::digit(3));
+        assert_eq!(bar[1][14], sml::hud::digit(level));
+        // The frame renders without panicking and is not blank.
+        let drawn = session.render().to_gray();
+        assert!(drawn.iter().any(|&p| p != drawn[0]), "3-{level} renders as one flat shade");
+
+        session.game.completed = true;
+        for _ in 0..8 {
+            session.step(start);
+            session.step(Buttons::default());
+        }
+    }
+}

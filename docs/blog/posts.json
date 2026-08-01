@@ -1,5 +1,11 @@
 [
   {
+    "title": "The cartridge had a table all along",
+    "date": "2026-08-01",
+    "slug": "2026-08-01-the-cartridge-had-a-table-all-along",
+    "summary": "Six of the twelve levels had been pinned by playing to them. Fifty bytes at the start of each ROM bank name all twelve, and the routine that loads a world's graphics names them too, which is what finally made worlds 3 and 4 draw."
+  },
+  {
     "title": "World 2 decoded perfectly and drew nonsense",
     "date": "2026-08-01",
     "slug": "2026-08-01-world-2-decoded-perfectly-and-drew-nonsense",

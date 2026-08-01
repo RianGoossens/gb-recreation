@@ -94,4 +94,22 @@ header.site p { margin: 0; color: var(--muted); }
   .post .two-up { grid-template-columns: 1fr; }
 }
 
+
+/* Small data tables inside a post. Wide ones scroll rather than pushing the
+   page sideways. */
+.post table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: .9rem;
+}
+.post th, .post td {
+  border-bottom: 1px solid var(--border);
+  padding: .35rem .8rem .35rem 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.post th { color: var(--muted); font-weight: 600; }
+
 footer { color: var(--muted); font-size: .8rem; text-align: center; padding: 2rem 1rem; }

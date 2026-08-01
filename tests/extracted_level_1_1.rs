@@ -744,3 +744,64 @@ fn a_cartridge_level_does_not_draw_its_own_end_marker() {
     assert!(marker.iter().all(|&p| p == 0), "the placeholder marker is not a black pole");
     assert!(at(&cartridge).iter().any(|&p| p != 0), "the marker is still drawn over the door");
 }
+
+/// The status bar follows the session from level to level. A session rebuilds
+/// its game from a cloned level on every transition and restart, so the
+/// cartridge graphics and the level number have to survive the clone.
+#[test]
+fn the_status_bar_names_each_level_of_a_world() {
+    use sml::session::Session;
+    let Some(levels) = sml::session::world_levels(1) else { return };
+    if levels[0].graphics.is_none() {
+        return;
+    }
+    assert_eq!(
+        levels.iter().map(|l| l.number).collect::<Vec<_>>(),
+        vec![Some((1, 1)), Some((1, 2)), Some((1, 3))]
+    );
+
+    let mut session = Session::new(levels.clone());
+    let mut start = Buttons::default();
+    start.set(Button::Start, true);
+    for _ in 0..4 {
+        session.step(start);
+        session.step(Buttons::default());
+    }
+    for (index, level) in levels.iter().enumerate() {
+        assert_eq!(session.current_level(), index, "the session is on the wrong level");
+        let bar = sml::hud::status_bar(
+            session.game.score,
+            session.game.coins_collected,
+            session.game.lives,
+            level.number.expect("a cartridge level knows its number"),
+            session.game.timer,
+        );
+        assert_eq!(bar[1][12], sml::hud::digit(1), "world number on level {index}");
+        assert_eq!(bar[1][14], sml::hud::digit(index as u8 + 1));
+        assert!(session.game.level.graphics.is_some(), "level {index} lost its graphics");
+        // What the session actually renders has to be the same two rows.
+        let drawn = session.render().to_gray();
+        let mut expected = sml::render::Framebuffer::new();
+        let graphics = level.graphics.as_ref().unwrap();
+        for (row, cells) in bar.iter().enumerate() {
+            for (column, &id) in cells.iter().enumerate() {
+                expected.draw_tile(
+                    &graphics.tiles[id as usize],
+                    column as i32 * 8,
+                    row as i32 * 8,
+                    &sml::render::Palette::new(graphics.palette),
+                );
+            }
+        }
+        let expected = expected.to_gray();
+        assert_eq!(&drawn[..16 * 160], &expected[..16 * 160], "bar on level {index}");
+
+        // Finish the level the way the session does, so the next pass is
+        // checking a game the session built rather than one the test did.
+        session.game.completed = true;
+        for _ in 0..8 {
+            session.step(start);
+            session.step(Buttons::default());
+        }
+    }
+}

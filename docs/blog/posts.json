@@ -1,5 +1,11 @@
 [
   {
+    "title": "The game draws the cartridge",
+    "date": "2026-08-01",
+    "slug": "2026-08-01-the-game-draws-the-cartridge",
+    "summary": "A separate command had been rendering levels from the ROM at 99.60% since Milestone 2 while the game itself drew grey rectangles. Now the game draws the real tiles, the real status bar, and the one background tile the cartridge animates."
+  },
+  {
     "title": "The cartridge had a table all along",
     "date": "2026-08-01",
     "slug": "2026-08-01-the-cartridge-had-a-table-all-along",

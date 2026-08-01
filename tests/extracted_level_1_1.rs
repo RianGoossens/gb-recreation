@@ -461,10 +461,18 @@ fn mario_can_stand_at_every_spawn_outside_the_vehicle_stage() {
 /// Not a pass/fail on the levels. The walker only knows how to run right and
 /// jump when it stalls, so these numbers measure it as much as they measure
 /// the geometry, and none of the nine is a level finished. World 2's are
-/// understood: 2-1 and 2-2 both stop at column 69 because both lists point at
-/// screen `0x5D32` for world columns 60 to 79 and it has no floor, which is
-/// the water the cartridge expects Mario to swim. Worlds 3 and 4 stop earlier
-/// still and why is not looked into yet.
+/// understood in full now. 2-1 and 2-2 both stop at column 69 because both
+/// lists point at screen `0x5D32` for world columns 60 to 79 and it has no
+/// floor, and the crossing is a lift rather than the swimming that was
+/// assumed: the ledge ends at column 59 with a single solid tile at row 9,
+/// and the nearest lift's surface is 56 pixels further on and 16 pixels
+/// above, on a 53 pixel cycle. That is a timed running jump onto a moving
+/// platform, which this walker cannot do; it either runs off the edge or
+/// waits at it forever, and both were tried. So 69 is a fact about the bot at
+/// this gap, and what the cartridge does there is measured separately
+/// (`tools/probe_water.py`, and `world_2_1s_water_gap_is_crossed_by_lift` in
+/// tests/lift_ride.rs). Worlds 3 and 4 stop earlier still and why is not
+/// looked into yet.
 ///
 /// What this pins is the geometry. A decode that breaks these levels open or
 /// seals them shut moves the number.

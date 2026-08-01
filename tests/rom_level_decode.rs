@@ -773,29 +773,3 @@ fn the_thirteenth_entry_of_each_bank() {
     assert!(screen.iter().all(|c| (2..13).all(|r| !level::is_solid(c[r]))));
 }
 
-#[test]
-fn scratch_dump_water() {
-    let Some(data) = rom() else { return };
-    for name in ["2-1", "2-3"] {
-        let list = level::level_list(&data, name).expect("header entry");
-        let columns = level::decode_level(&data, list);
-        println!("--- {name}, {} columns", columns.len());
-        let mut counts = std::collections::BTreeMap::new();
-        for column in &columns {
-            for (row, &t) in column.iter().enumerate() {
-                *counts.entry((row, t)).or_insert(0) += 1;
-            }
-        }
-        for row in [0usize, 1, 14, 15] {
-            let mut top: Vec<_> = counts.iter().filter(|((r, _), _)| *r == row).collect();
-            top.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
-            let shown: Vec<String> = top.iter().take(4)
-                .map(|((_, t), n)| format!("0x{t:02X} x{n}")).collect();
-            println!("  row {row}: {}", shown.join(", "));
-        }
-        for c in [60usize, 65, 70, 75, 80] {
-            let ids: Vec<String> = columns[c].iter().map(|t| format!("{t:02X}")).collect();
-            println!("  column {c}: {}", ids.join(" "));
-        }
-    }
-}

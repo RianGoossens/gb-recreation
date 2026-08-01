@@ -217,6 +217,9 @@ fn coin_tile() -> Tile {
 /// pixels off the right edge and walks on.
 pub const SPAWN_AHEAD: i32 = 183;
 
+/// Where the playfield starts on screen: below the two rows of status bar.
+pub const PLAYFIELD_TOP: i32 = crate::SCREEN_HEIGHT as i32 - crate::camera::VIEW_HEIGHT;
+
 /// The spawns a level still has ahead of the camera, furthest first so the
 /// next one to fire is the last element.
 fn pending_enemies(level: &Level) -> Vec<(i32, i32, crate::core::enemy::EnemyKind)> {
@@ -790,16 +793,19 @@ impl Game {
     /// Render the current frame.
     pub fn render(&self) -> Framebuffer {
         let mut fb = Framebuffer::new();
+        // The status bar takes the top two rows of the screen and the playfield
+        // starts under it, so everything in the level is drawn that far down.
+        let view_y = self.camera.y - PLAYFIELD_TOP;
         render_background(
             &mut fb,
             &self.bg_map,
             &self.bg_tiles,
             self.camera.x,
-            self.camera.y,
+            view_y,
             &self.palette,
         );
         if let (true, Some((ex, ey))) = (self.draw_end_marker, self.level.end) {
-            fb.draw_tile(&self.end_tile, ex - self.camera.x, ey - self.camera.y, &self.palette);
+            fb.draw_tile(&self.end_tile, ex - self.camera.x, ey - view_y, &self.palette);
         }
         for block in &self.blocks {
             let tile = match (block.kind, block.used) {
@@ -807,10 +813,10 @@ impl Game {
                 (BlockKind::Question | BlockKind::PowerUp, false) => &self.question_tile,
                 (BlockKind::Brick, false) => &self.brick_tile,
             };
-            fb.draw_tile(tile, block.x - self.camera.x, block.y - self.camera.y, &self.palette);
+            fb.draw_tile(tile, block.x - self.camera.x, block.y - view_y, &self.palette);
         }
         for &(cx, cy) in &self.coins {
-            fb.draw_tile(&self.coin_tile, cx - self.camera.x, cy - self.camera.y, &self.palette);
+            fb.draw_tile(&self.coin_tile, cx - self.camera.x, cy - view_y, &self.palette);
         }
         for item in &self.items {
             let tile = match item.kind {
@@ -821,7 +827,7 @@ impl Game {
             fb.draw_tile(
                 tile,
                 item.pixel_x() - self.camera.x,
-                item.pixel_y() - self.camera.y,
+                item.pixel_y() - view_y,
                 &self.palette,
             );
         }
@@ -829,7 +835,7 @@ impl Game {
             fb.draw_tile(
                 &self.superball_tile,
                 ball.pixel_x() - self.camera.x,
-                ball.pixel_y() - self.camera.y,
+                ball.pixel_y() - view_y,
                 &self.palette,
             );
         }
@@ -838,7 +844,7 @@ impl Game {
                 fb.draw_tile(
                     &self.enemy_tile,
                     enemy.pixel_x() - self.camera.x,
-                    enemy.pixel_y() - self.camera.y,
+                    enemy.pixel_y() - view_y,
                     &self.palette,
                 );
             }
@@ -849,7 +855,7 @@ impl Game {
         if visible {
             let (_mw, mh) = self.mario.size();
             let mx = self.mario.pixel_x() - self.camera.x;
-            let my = self.mario.pixel_y() - self.camera.y;
+            let my = self.mario.pixel_y() - view_y;
             // The collision box is not a whole number of tiles (small Mario is
             // 12 px tall), so the placeholder tiles are anchored to his feet
             // and the leftover sits above his head, where the cartridge's own

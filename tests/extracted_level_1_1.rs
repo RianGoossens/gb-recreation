@@ -577,9 +577,9 @@ fn the_cartridges_background_changes_what_is_drawn() {
 }
 
 /// The cartridge animates one background tile. In World 2-1 it is the water
-/// line along the level's bottom row, so those eight pixel rows change every
-/// eight frames and come back on the sixteenth. The right half is read so no
-/// sprite is in the way.
+/// line along the level's bottom row, which is the last eight pixel rows of
+/// the screen: they change every eight frames and come back on the sixteenth.
+/// The right half is read so no sprite is in the way.
 #[test]
 fn the_water_line_animates_on_the_cartridges_cadence() {
     use sml::assets::level as assets;
@@ -590,7 +590,7 @@ fn the_water_line_animates_on_the_cartridges_cadence() {
     let mut game = Game::new(level);
     let strip = |game: &Game| {
         let pixels = game.render().to_gray();
-        (120..128)
+        (136..144)
             .flat_map(|y| (80..160).map(move |x| (y, x)))
             .map(|(y, x)| pixels[y * 160 + x])
             .collect::<Vec<u8>>()
@@ -606,12 +606,14 @@ fn the_water_line_animates_on_the_cartridges_cadence() {
     assert_eq!(seen[0], seen[2], "the water did not come back");
 }
 
-/// The status bar, against the emulator capture it was read off. The capture
-/// is a tilemap plus its own sheet, so this compares pixels drawn through our
-/// renderer with pixels the real game put on screen: same font, same layout,
-/// same two rows.
+/// World 1-1's opening frame against the emulator capture of the same frame.
+/// The capture is a tilemap plus its own sheet, so this is our whole screen
+/// against the real game's: status bar, background, and where they sit.
+///
+/// Every 8x8 cell has to match except the ones Mario stands in. He is drawn as
+/// a placeholder block, and the cartridge draws his sprite there.
 #[test]
-fn the_status_bar_matches_the_captured_one() {
+fn the_opening_frame_matches_the_emulator_capture() {
     use sml::assets::level as assets;
     use sml::render::{render_background, Framebuffer, Palette};
 
@@ -634,11 +636,34 @@ fn the_status_bar_matches_the_captured_one() {
     let mut game = Game::new(level);
     game.lives = 2;
     game.timer = 393;
-    let ours = game.render();
 
-    let (a, b) = (ours.to_gray(), captured.to_gray());
-    let rows = 16 * 160;
-    assert_eq!(&a[..rows], &b[..rows], "the status bar does not match the capture");
+    let (mw, mh) = game.mario.size();
+    let mario = (
+        game.mario.pixel_x() - game.camera.x,
+        game.mario.pixel_y() - game.camera.y + sml::game::PLAYFIELD_TOP,
+        mw,
+        mh,
+    );
+
+    let (ours, theirs) = (game.render().to_gray(), captured.to_gray());
+    let mut wrong = Vec::new();
+    for ty in 0..18 {
+        for tx in 0..20 {
+            let (x, y) = (tx as i32 * 8, ty as i32 * 8);
+            let over_mario = x < mario.0 + mario.2 && x + 8 > mario.0 && y < mario.1 + mario.3 && y + 8 > mario.1;
+            if over_mario {
+                continue;
+            }
+            let same = (0..8).all(|r| {
+                let at = (ty * 8 + r) * 160 + tx * 8;
+                ours[at..at + 8] == theirs[at..at + 8]
+            });
+            if !same {
+                wrong.push((tx, ty));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "cells that do not match the capture: {wrong:?}");
 }
 
 /// A coin on screen is the cartridge's coin tile, drawn where the level says.
@@ -668,7 +693,10 @@ fn coins_draw_with_the_cartridges_coin_tile() {
     assert!(game.coins.contains(&(cx, cy)), "the coin is still there");
 
     let drawn = game.render().to_gray();
-    let (sx, sy) = ((cx - game.camera.x) as usize, (cy - game.camera.y) as usize);
+    let (sx, sy) = (
+        (cx - game.camera.x) as usize,
+        (cy - game.camera.y + sml::game::PLAYFIELD_TOP) as usize,
+    );
     for row in 0..8 {
         let at = (sy + row) * 160 + sx;
         assert_eq!(
@@ -698,7 +726,9 @@ fn a_cartridge_level_does_not_draw_its_own_end_marker() {
         let pixels = game.render().to_gray();
         (0..8)
             .map(|row| {
-                let i = (ey - game.camera.y) as usize * 160 + (ex - game.camera.x) as usize + 3;
+                let i = (ey - game.camera.y + sml::game::PLAYFIELD_TOP) as usize * 160
+                    + (ex - game.camera.x) as usize
+                    + 3;
                 pixels[i + row * 160]
             })
             .collect::<Vec<u8>>()

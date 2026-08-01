@@ -1,10 +1,18 @@
 //! A camera that follows Mario and stays inside the level.
 //!
-//! The camera is the top-left pixel of the visible 160x144 window over a larger
-//! level. It keeps its focus (usually Mario) centered, but clamps at the level
-//! edges so we never scroll past the world into blank space.
+//! The camera is the top-left pixel of the visible window over a larger level.
+//! It keeps its focus (usually Mario) centered, but clamps at the level edges
+//! so we never scroll past the world into blank space.
+//!
+//! The window is 160 wide and 128 tall, not 144: the status bar owns the top
+//! two rows of the screen and the level is only ever drawn below it. The
+//! cartridge's levels are exactly 128 pixels tall and so never scroll
+//! vertically at all.
 
-use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::SCREEN_WIDTH;
+
+/// The height of the level's window on screen, the screen minus the status bar.
+pub const VIEW_HEIGHT: i32 = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Camera {
@@ -28,7 +36,7 @@ impl Camera {
         let desired = center_clamped(focus_x, SCREEN_WIDTH as i32, level_w);
         self.x = desired.max(self.frontier);
         self.frontier = self.x;
-        self.y = center_clamped(focus_y, SCREEN_HEIGHT as i32, level_h);
+        self.y = center_clamped(focus_y, VIEW_HEIGHT, level_h);
     }
 }
 
@@ -43,7 +51,7 @@ mod tests {
     use super::*;
 
     const W: i32 = SCREEN_WIDTH as i32; // 160
-    const H: i32 = SCREEN_HEIGHT as i32; // 144
+    const H: i32 = VIEW_HEIGHT; // 128
 
     #[test]
     fn centers_on_focus_in_open_space() {

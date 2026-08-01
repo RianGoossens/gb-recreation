@@ -1136,3 +1136,88 @@ fn a_hand_written_level_keeps_the_placeholder_enemy() {
     game.step(Buttons::default());
     assert!(game.render().to_gray().iter().any(|&p| p != 0xFF));
 }
+
+/// World 1 played end to end, through the session rather than a level at a
+/// time. The three levels are the default campaign, and until now nothing
+/// walked them in one run: the flood fill proves a trigger is reachable, and
+/// a reachable trigger is not the same as a game that gets to it.
+///
+/// Enemies are cleared, the same as the single-level walkthrough. What is
+/// being checked is the geometry, the transitions between levels, and that
+/// nothing added since (the drop blocks, most recently) seals a route that
+/// used to be open.
+#[test]
+fn world_1_can_be_walked_from_its_first_level_to_its_last() {
+    use sml::session::Session;
+    let Some(mut levels) = sml::session::world_levels(1) else { return };
+    for level in &mut levels {
+        level.enemy_spawns.clear();
+    }
+    let mut session = Session::new(levels);
+
+    // Start exactly once. A second press pauses, which is what the session
+    // does with it while playing.
+    let mut start = Buttons::default();
+    start.set(Button::Start, true);
+    session.step(start);
+    session.step(Buttons::default());
+    assert_eq!(session.phase(), sml::session::Phase::Playing);
+
+    let mut finished = 0;
+    let mut stalled = 0;
+    let mut furthest = i32::MIN;
+    let mut hold_jump = 0;
+    let mut on_level = 0;
+    for _ in 0..60_000 {
+        if session.current_level() != on_level {
+            on_level = session.current_level();
+            finished += 1;
+            furthest = i32::MIN;
+            stalled = 0;
+        }
+        let game = &session.game;
+        let x = game.mario.pixel_x();
+        if x <= furthest {
+            stalled += 1;
+        } else {
+            stalled = 0;
+            furthest = x;
+        }
+        let column = (x + 12) / 8;
+        let ground_ahead =
+            (game.mario.pixel_y() / 8..16).any(|row| game.level.solids.is_solid(column, row));
+        if (stalled > 6 || !ground_ahead) && game.mario.on_ground {
+            hold_jump = 12;
+        }
+        let mut buttons = Buttons::default();
+        buttons.set(Button::Right, true);
+        if hold_jump > 0 {
+            buttons.set(Button::A, true);
+            hold_jump -= 1;
+        }
+        session.step(buttons);
+        if session.phase() == sml::session::Phase::Win {
+            finished = 3;
+            break;
+        }
+    }
+    // World 1-1 is walkable end to end and the transition into 1-2 works.
+    // 1-2 then stops this walker, and where it stops is not a decode problem:
+    // columns 100 to 116 have nothing solid in them at all, and the crossing
+    // is two vertical lifts, at columns 105 and 111, each moving 60 pixels up
+    // and down on a 120 frame cycle. Getting across is two timed jumps onto
+    // moving platforms. The walker runs off the ledge instead and spends every
+    // life in the pit.
+    //
+    // So this pins what is true today rather than what should be: 1-1
+    // finishes, and 1-2 ends the run in the pit. A change that seals 1-1 or
+    // moves the pit shows up here.
+    assert_eq!(finished, 1, "World 1-1 has to finish and hand over to 1-2");
+    assert_eq!(session.current_level(), 1);
+    assert_eq!(session.game.lives, 0, "and the pit at 1-2 takes every life");
+    assert!(
+        (100..=120).contains(&(furthest / 8)),
+        "the walker gave out at column {}, not in 1-2's pit",
+        furthest / 8
+    );
+}

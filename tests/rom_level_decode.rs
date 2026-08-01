@@ -773,3 +773,4 @@ fn the_thirteenth_entry_of_each_bank() {
     assert!(screen.iter().all(|c| (2..13).all(|r| !level::is_solid(c[r]))));
 }
 
+

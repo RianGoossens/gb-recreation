@@ -139,6 +139,12 @@ impl Session {
         Self::new(campaign_levels())
     }
 
+    /// Which phase the session is in: the title, playing, paused, or one of
+    /// the two endings.
+    pub fn phase(&self) -> Phase {
+        self.phase
+    }
+
     /// Which level index is being played (0-based).
     pub fn current_level(&self) -> usize {
         self.current

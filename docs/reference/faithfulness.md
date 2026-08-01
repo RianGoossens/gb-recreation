@@ -210,7 +210,7 @@ playing it faithfully.
 
 (Brick breaking and superball coin collection are already canonical, done.)
 
-## World 2 is decoded but not playable
+## Worlds 2 to 4 are decoded but not playable
 
 World 2's three levels decode from the cartridge and `sml extract-level 2-1`
 writes them, but they cannot be finished:
@@ -226,3 +226,26 @@ writes them, but they cannot be finished:
 
 So World 2 is geometry only. It is not wired into the default campaign, which
 stays World 1.
+
+Worlds 3 and 4 arrived later, from the bank header rather than from playing,
+and stand in the same place with more caveats:
+
+- **Nobody has played there.** Their screen lists, object lists and tile
+  overlays all come from tables in the ROM. The tables are checked against the
+  eleven entries that were measured, and each list's records run to the end of
+  the level they are paired with, but the levels themselves have never been
+  compared column by column against the running cartridge the way World 1's
+  and World 2's were.
+- **World 3 and 4 numbering is an inference.** Bank 1 is the only bank whose
+  tables hold two distinct triples, which makes its second triple World 4, and
+  World 3 is what is left for bank 3. The graphics agree (3-1 opens on stone
+  heads, 4-1 on bamboo, which are Easton and Chai) but that is corroboration,
+  not a measurement.
+- **No enemies, for the same reason as World 2.** Their object lists are named
+  and geometrically sane, and they stay out of the level files until the row
+  question is settled.
+- **World 4-3 is a vehicle stage.** It has no ground under the spawn, no exit
+  door, and 4 of its 480 columns are solid. The engine has no aeroplane, so
+  nothing in it can be played at all.
+
+Only World 1 is wired into the default campaign.

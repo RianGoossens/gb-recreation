@@ -263,3 +263,48 @@ fn world_2_1s_list_only_sorts_in_the_bank_the_probe_found() {
     assert!(!sorted_at(object::LEVEL_2_1_OBJECTS + 0x4000));
     assert!(!sorted_at(object::LEVEL_2_1_OBJECTS + 0x8000));
 }
+
+/// The control for the second header table. Five object lists were pinned by
+/// reading the game's own read pointer at level open, three of them in a bank
+/// that had to be measured from the spawns. The table at bank + 0x1A has to
+/// reproduce all five at the same index the screen list sits at.
+#[test]
+fn the_bank_headers_reproduce_every_measured_object_list() {
+    let Some(data) = rom() else { return };
+
+    let measured = [
+        ("1-1", object::LEVEL_1_1_OBJECTS),
+        ("1-2", object::LEVEL_1_2_OBJECTS),
+        ("1-3", object::LEVEL_1_3_OBJECTS),
+        ("2-1", object::LEVEL_2_1_OBJECTS),
+        ("2-2", object::LEVEL_2_2_OBJECTS),
+    ];
+    for (name, start) in measured {
+        assert_eq!(
+            level::level_objects(&data, name),
+            Some(start),
+            "header disagrees with the measured object list for {name}"
+        );
+    }
+}
+
+/// Every list the header names is a run of three-byte records ending on 0xFF,
+/// sorted by x, and inside its own bank. Reading a list against the wrong bank
+/// gives an unsorted run, which is what the probe used to tell World 2's bank.
+#[test]
+fn every_object_list_the_headers_name_is_sorted_and_terminated() {
+    let Some(data) = rom() else { return };
+
+    for name in level::LEVEL_NAMES {
+        let start = level::level_objects(&data, name).expect("header entry");
+        let records = object::object_list(&data, start);
+        assert!(!records.is_empty(), "{name} has no records");
+        let end = start + 3 * records.len();
+        assert_eq!(data[end], 0xFF, "{name} is not terminated");
+        assert_eq!(level::bank_of(start), level::bank_of(end), "{name} crosses a bank");
+        let xs: Vec<u8> = records.iter().map(|r| r.x).collect();
+        let mut sorted = xs.clone();
+        sorted.sort_unstable();
+        assert_eq!(xs, sorted, "{name} is not sorted by x");
+    }
+}

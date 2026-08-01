@@ -95,8 +95,9 @@ pub const WORLD_2: [(&str, usize); 3] = [
     ("2-3", LEVEL_2_3_LIST),
 ];
 
-/// Every level whose screen list has been pinned by playing to it.
-pub const KNOWN_LEVELS: [(&str, usize); 6] = [
+/// Every level whose screen list has been pinned by playing to it. These are
+/// the control for [`level_list`], which derives all twelve from the ROM.
+pub const MEASURED_LEVELS: [(&str, usize); 6] = [
     ("1-1", LEVEL_1_1_LIST),
     ("1-2", LEVEL_1_2_LIST),
     ("1-3", LEVEL_1_3_LIST),
@@ -104,6 +105,77 @@ pub const KNOWN_LEVELS: [(&str, usize); 6] = [
     ("2-2", LEVEL_2_2_LIST),
     ("2-3", LEVEL_2_3_LIST),
 ];
+
+/// Every bank holding level data opens with a 0x32-byte header, and the tile
+/// graphics start right after it. The header is two tables of 16-bit pointers
+/// indexed by `world * 3 + level`: thirteen for screen lists, then twelve for
+/// object lists at [`OBJECT_TABLE`].
+///
+/// A bank holds only some of the twelve levels and the slots for the rest
+/// repeat a triple rather than sitting empty, so a table read alone does not
+/// say which world it belongs to. The six lists already measured by playing
+/// pin it: the header reproduces all six exactly, at the index their world and
+/// level number give, with the level's own first screen [`LIST_PREFIX`] bytes
+/// past the entry every time.
+pub const BANK_HEADER: usize = 0x32;
+const SCREEN_TABLE: usize = 0x00;
+const OBJECT_TABLE: usize = 0x1A;
+/// A header entry points three pointers before the level's own first screen.
+/// Those three are the world's opening screen and the level's two bonus rooms
+/// (see [`bonus_rooms`]).
+pub const LIST_PREFIX: usize = 6;
+
+/// Which bank holds each world's data.
+///
+/// Worlds 1 and 2 are measured by playing to them. Worlds 3 and 4 come from
+/// the headers: bank 1 is the only bank whose tables hold two distinct triples,
+/// so it carries two worlds, and its screen table names the second at indices 9
+/// to 11, which is World 4. Bank 3's table is a single triple repeated, and
+/// World 3 is the only world left for it. Neither has been checked by playing
+/// there.
+pub const WORLD_BANKS: [usize; 4] = [0x08000, 0x04000, 0x0C000, 0x04000];
+
+/// The cartridge's twelve levels, in play order.
+pub const LEVEL_NAMES: [&str; 12] = [
+    "1-1", "1-2", "1-3", "2-1", "2-2", "2-3", "3-1", "3-2", "3-3", "4-1", "4-2", "4-3",
+];
+
+/// The index a level is read from the header tables at.
+pub fn level_index(name: &str) -> Option<usize> {
+    LEVEL_NAMES.iter().position(|&n| n == name)
+}
+
+fn header_entry(rom: &[u8], bank: usize, table: usize, index: usize) -> Option<usize> {
+    let at = bank + table + index * 2;
+    let pointer = u16::from_le_bytes([*rom.get(at)?, *rom.get(at + 1)?]);
+    rom_offset(pointer, bank)
+}
+
+/// Where a level's screen list starts, skipping the bonus-room prefix.
+pub fn level_list(rom: &[u8], name: &str) -> Option<usize> {
+    Some(level_list_head(rom, name)? + LIST_PREFIX)
+}
+
+/// Where a level's screen list starts including its prefix, which is what the
+/// header points at and what [`bonus_rooms`] measures back from.
+pub fn level_list_head(rom: &[u8], name: &str) -> Option<usize> {
+    let index = level_index(name)?;
+    header_entry(rom, WORLD_BANKS[index / 3], SCREEN_TABLE, index)
+}
+
+/// Where a level's object list starts, from the second header table.
+pub fn level_objects(rom: &[u8], name: &str) -> Option<usize> {
+    let index = level_index(name)?;
+    header_entry(rom, WORLD_BANKS[index / 3], OBJECT_TABLE, index)
+}
+
+/// The name of the level a screen list belongs to, if it is one of the twelve.
+pub fn level_of_list(rom: &[u8], start: usize) -> Option<&'static str> {
+    LEVEL_NAMES
+        .iter()
+        .find(|&&name| level_list_head(rom, name) == Some(start))
+        .copied()
+}
 
 /// A switchable ROM bank is 16 KB, and the CPU sees it at `0x4000`. World 1's
 /// data is in bank 2, so a pointer of `0x62BE` is ROM file offset `0xA2BE`.

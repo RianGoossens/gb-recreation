@@ -190,7 +190,7 @@ fn the_decode_matches_every_column_the_real_game_draws() {
 
     let mut checked: Vec<(&str, usize)> = Vec::new();
     for captured in captured_levels(&text) {
-        let Some((name, columns)) = level::KNOWN_LEVELS
+        let Some((name, columns)) = level::MEASURED_LEVELS
             .iter()
             .map(|&(name, list)| (name, level::decode_level(&data, list)))
             // A whole screen, not one column: World 2-1 and 2-2 open on the
@@ -375,7 +375,7 @@ fn the_gameplay_tile_block_is_one_contiguous_copy() {
 #[test]
 fn the_pointers_before_a_level_are_its_bonus_rooms() {
     let Some(data) = rom() else { return };
-    for (name, list) in level::KNOWN_LEVELS {
+    for (name, list) in level::MEASURED_LEVELS {
         let rooms = level::bonus_rooms(&data, list).expect("a list to have a run before it");
         let bank = level::bank_of(list);
         for pointer in rooms {
@@ -396,7 +396,7 @@ fn the_pointers_before_a_level_are_its_bonus_rooms() {
 #[test]
 fn a_levels_own_opening_screen_is_not_a_sealed_room() {
     let Some(data) = rom() else { return };
-    for (name, list) in level::KNOWN_LEVELS {
+    for (name, list) in level::MEASURED_LEVELS {
         let pointer = level::screen_list(&data, list)[0];
         let columns = level::screen(&data, pointer, level::bank_of(list)).unwrap();
         assert!(
@@ -463,4 +463,54 @@ fn world_2_1s_opening_draws_from_the_overlaid_tiles() {
         .filter(|&&t| replaced(t))
         .count();
     assert!(used > 0, "World 2-1's opening screen has to use an overlaid tile");
+}
+
+/// The control for the header tables. Six of the twelve screen lists were
+/// pinned by playing to them, one at a time, over several sessions. The
+/// twelve-entry table at the start of each bank has to reproduce all six at
+/// the index `world * 3 + level` gives, or it is not what it looks like.
+#[test]
+fn the_bank_headers_reproduce_every_measured_screen_list() {
+    let Some(rom) = rom() else { return };
+
+    for (name, measured) in level::MEASURED_LEVELS {
+        assert_eq!(
+            level::level_list(&rom, name),
+            Some(measured),
+            "header disagrees with the measured list for {name}"
+        );
+    }
+}
+
+/// Every level the headers name decodes in the bank the world lives in: a
+/// whole number of screens, none of them empty. A bank mix-up does not
+/// survive this, since a screen pointer read against the wrong bank lands in
+/// unrelated bytes.
+#[test]
+fn every_level_the_headers_name_decodes_in_its_own_bank() {
+    let Some(rom) = rom() else { return };
+
+    for name in level::LEVEL_NAMES {
+        let list = level::level_list(&rom, name).expect("header entry");
+        let columns = level::decode_level(&rom, list);
+        assert!(columns.len() >= 240, "{name} decoded {} columns", columns.len());
+        assert_eq!(columns.len() % SCREEN_COLUMNS, 0, "{name} is not whole screens");
+    }
+}
+
+/// Each header entry points three pointers before the level's own first
+/// screen, so the prefix is uniform across all twelve. World 1-1 looked like
+/// the exception (its list appeared to start four pointers early) because the
+/// scan finds lists by structure and one extra pointer before 1-1 happens to
+/// decode.
+#[test]
+fn every_level_carries_the_same_three_pointer_prefix() {
+    let Some(rom) = rom() else { return };
+
+    for name in level::LEVEL_NAMES {
+        let head = level::level_list_head(&rom, name).expect("header entry");
+        let list = level::level_list(&rom, name).expect("header entry");
+        assert_eq!(list - head, level::LIST_PREFIX, "{name}");
+        assert!(level::bonus_rooms(&rom, list).is_some(), "{name} has no bonus rooms");
+    }
 }

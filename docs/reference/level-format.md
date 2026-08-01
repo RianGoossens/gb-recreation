@@ -117,11 +117,56 @@ cargo run --features gui -- run levels/example.txt [tuning.txt]
 cargo run -- play shot.png 1 "" levels/example.txt [tuning.txt]
 ```
 
+## The table at the start of a bank
+
+Every ROM bank that holds level data opens with a 0x32-byte header, and the
+tile graphics start right after it (which is why World 1's tiles are at
+`0x08032` and World 2's at `0x04032`). The header is two tables of 16-bit
+pointers:
+
+| offset | contents |
+| --- | --- |
+| `0x00` | thirteen screen list pointers |
+| `0x1A` | twelve object list pointers |
+
+Both are indexed by `world * 3 + level`, so World 1-1 is index 0 and World 4-3
+is index 11. `level::level_list`, `level::level_objects` and
+`level::level_list_head` read them.
+
+A bank holds only some of the twelve levels, and the slots for the rest repeat
+a triple rather than sitting empty, so a table read alone does not say which
+world it belongs to. What pins it is the six screen lists and five object
+lists already measured by playing to them: the tables reproduce every one of
+them, at the index the world and level number give, and the level's own first
+screen is six bytes past the entry every time. Two tests keep that control in
+place.
+
+That is enough to name the rest. Bank 1 is the only bank whose tables hold two
+distinct triples, so it carries two worlds: World 2 at indices 3 to 5, which is
+measured, and a second at 9 to 11, which is World 4. Bank 3's table is a single
+triple repeated, and World 3 is the only world left for it.
+
+| world | bank | screen lists | object lists |
+| --- | --- | --- | --- |
+| 1 | 2 | `0x0A192` `0x0A1B7` `0x0A1DA` | `0x0A002` `0x0A073` `0x0A0FE` |
+| 2 | 1 | `0x055BB` `0x055E2` `0x05605` | `0x05179` `0x05222` `0x0529B` |
+| 3 | 3 | `0x0D03F` `0x0D074` `0x0D09B` | `0x0CE74` `0x0CF1D` `0x0CFD8` |
+| 4 | 1 | `0x05630` `0x05665` `0x05694` | `0x05311` `0x05405` `0x054D5` |
+
+Worlds 3 and 4 have not been played to. Their entries decode, sort and
+terminate like the measured ones, and the world numbering is an inference from
+where the distinct triples sit.
+
+The thirteenth screen pointer, at `0x18`, is unexplained: `0x55BB` in bank 1,
+`0x6190` in bank 2, `0x50C0` in bank 3.
+
 ## The pointers before a level
 
-Every screen list in the ROM starts a few pointers before the level's own
-first screen: three for five of the six pinned levels, four for World 1-1.
-What they were for was open from the moment the first list was found.
+Every screen list in the ROM starts three pointers before the level's own
+first screen. What they were for was open from the moment the first list was
+found. (World 1-1 looked like it had four. The scan finds lists by structure
+and one extra pointer before 1-1 happens to decode; the bank header points at
+the same three-pointer prefix every other level has.)
 
 They are the level's bonus rooms, the coin chambers the raised exit door
 leads to. Decoding the last two of them shows closed boxes with a solid floor
@@ -139,9 +184,11 @@ A level with one bonus room stores the same pointer twice: World 2-3 has
 
 What the pointer before those two is for is still open. World 1's three levels
 all carry `0x62BE` there, which is 1-1's own opening screen, and World 2's
-three all carry `0x56CD`, which is 2-1's. The lists that are not yet tied to a
-level do not follow that, so it is a pattern across two worlds rather than a
-rule.
+three all carry `0x56CD`, which is 2-1's. Naming worlds 3 and 4 from the bank
+header does not extend it: World 4's three levels all carry `0x6C81`, which is
+not 4-1's opening screen (`0x65D3`) nor any screen its levels use, and World
+3's carry `0x56A5` against a 3-1 opening on `0x52CC`. So it holds for two
+worlds and breaks on the other two.
 
 ## A world loads its own tiles
 

@@ -137,6 +137,30 @@ fn extract_tiles(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Read the ROM and resolve a level name to where its screen list starts,
+/// reporting to stderr why not if either fails.
+fn rom_and_list(name: &str) -> Option<(Vec<u8>, usize)> {
+    use sml::assets::level;
+
+    let rom = match std::fs::read(DEFAULT_ROM) {
+        Ok(rom) => rom,
+        Err(e) => {
+            eprintln!("could not read {DEFAULT_ROM}: {e}");
+            return None;
+        }
+    };
+    match level::level_list(&rom, name) {
+        Some(list) => Some((rom, list)),
+        None => {
+            eprintln!(
+                "unknown level {name}; the cartridge's levels are {}",
+                level::LEVEL_NAMES.join(", ")
+            );
+            None
+        }
+    }
+}
+
 fn parse_number(s: &str) -> Option<usize> {
     if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
         usize::from_str_radix(hex, 16).ok()
@@ -219,9 +243,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     };
 
     let name = args.first().map(|s| s.as_str()).unwrap_or("1-1");
-    let Some(&(_, list)) = level::KNOWN_LEVELS.iter().find(|(n, _)| *n == name) else {
-        let known: Vec<&str> = level::KNOWN_LEVELS.iter().map(|(n, _)| *n).collect();
-        eprintln!("unknown level {name}; known levels are {}", known.join(", "));
+    let Some((_rom, list)) = rom_and_list(name) else {
         return ExitCode::FAILURE;
     };
     let suffix = if expert { "_expert" } else { "" };
@@ -324,8 +346,7 @@ fn render_level(args: &[String]) -> ExitCode {
         eprintln!("usage: sml render-level <level> <column> <out.png>");
         return ExitCode::FAILURE;
     };
-    let Some(&(_, list)) = level::KNOWN_LEVELS.iter().find(|(n, _)| n == name) else {
-        eprintln!("unknown level {name}");
+    let Some((_rom, list)) = rom_and_list(name) else {
         return ExitCode::FAILURE;
     };
     let Ok(column) = column.parse::<usize>() else {
@@ -359,9 +380,11 @@ fn list_objects(args: &[String]) -> ExitCode {
     use sml::assets::object;
 
     let name = args.first().map(String::as_str).unwrap_or("1-1");
-    let Some(&(_, start)) = object::WORLD_1_OBJECTS.iter().find(|(n, _)| *n == name) else {
-        let known: Vec<&str> = object::WORLD_1_OBJECTS.iter().map(|(n, _)| *n).collect();
-        eprintln!("unknown level {name}; known levels are {}", known.join(", "));
+    let Some((rom, _)) = rom_and_list(name) else {
+        return ExitCode::FAILURE;
+    };
+    let Some(start) = sml::assets::level::level_objects(&rom, name) else {
+        eprintln!("no object list for {name}");
         return ExitCode::FAILURE;
     };
     let records = match object::extract_objects(DEFAULT_ROM, start) {
@@ -409,15 +432,19 @@ fn scan_levels() -> ExitCode {
     for (start, pointers) in level::find_screen_lists(&rom) {
         let unique: std::collections::BTreeSet<u16> = pointers.iter().copied().collect();
         let end = start + 2 * pointers.len();
-        let pinned = level::KNOWN_LEVELS
-            .iter()
-            .find(|&&(_, at)| (start..end).contains(&at));
-        let mark = match pinned {
-            Some(&(name, at)) => {
-                let skipped = (at - start) / 2;
-                format!("  <- World {name}, starting {skipped} pointers in")
+        let named = level::LEVEL_NAMES.iter().find_map(|&name| {
+            let head = level::level_list_head(&rom, name)?;
+            let tail = head + 2 * level::screen_list(&rom, head).len();
+            let overlaps = (head..tail).contains(&start) || (start..end).contains(&head);
+            overlaps.then_some((name, head))
+        });
+        let mark = match named {
+            Some((name, head)) => {
+                let measured = level::MEASURED_LEVELS.iter().any(|&(n, _)| n == name);
+                let how = if measured { "measured" } else { "from the header" };
+                format!("  <- World {name} ({how}), list at 0x{head:05X}")
             }
-            None => "  <- not yet tied to a level".to_string(),
+            None => "  <- not tied to a level".to_string(),
         };
         println!(
             "0x{start:05X}  bank 0x{:05X}  {:2} screens ({} unique), {} columns{mark}",
@@ -752,9 +779,7 @@ fn bonus_rooms(args: &[String]) -> ExitCode {
     use sml::assets::level;
 
     let name = args.first().map(|s| s.as_str()).unwrap_or("1-1");
-    let Some(&(_, list)) = level::KNOWN_LEVELS.iter().find(|(n, _)| *n == name) else {
-        let known: Vec<&str> = level::KNOWN_LEVELS.iter().map(|(n, _)| *n).collect();
-        eprintln!("unknown level {name}; known levels are {}", known.join(", "));
+    let Some((_rom, list)) = rom_and_list(name) else {
         return ExitCode::FAILURE;
     };
     if let Err(e) = sml::rom::verify_file(DEFAULT_ROM) {

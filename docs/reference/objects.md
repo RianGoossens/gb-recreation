@@ -376,11 +376,27 @@ The kind byte matched on every one of those spawns. The row did not. 23 of
 of `0x13` reads as row 1 and the slot holds a Y of 166, the bottom of the
 screen. 2-2 has 2 such spawns, and every one of World 1's agreed exactly.
 
-That is not a bank question, so it did not change the reading above, but it
-does mean World 2's object lists stay out of `sml extract-level`. The affected
-records include kinds the engine already implements, so writing them into a
-level file would put a known enemy in the wrong place, which is worse than
-leaving the level short of enemies.
+That is not a bank question, so it did not change the reading above.
+
+**What the disagreeing records are.** Naming the kinds answers most of it from
+the ROM alone. Two kinds live only in World 2: Honen (`0x10`) and Yurarin Boo
+(`0x24`), 38 records between them, and every single one has a row byte of 1.
+Nothing else in the cartridge holds one row across a whole kind. A byte that
+never varies is not carrying a position, and the observed Y agrees: 166 is not
+`8 * row + 16` for any row, so it was never derived from the record. Those two
+kinds place themselves, below the bottom of the screen, and swim up into it.
+
+The counts line up on 2-2 exactly, where 2 records of those kinds spawn in
+normal play and the trace found 2 disagreements. 2-1 has 22 and the trace found
+23, so one spawn there is still unattributed. The nearest candidate is 2-1's
+lone Chibibo at row 1, the only other row-1 record in the level, but nothing
+here settles whether it is that one.
+
+**World 2's lists are extracted now**, gated on placement rather than on the
+trace. Every record of a kind the engine implements, across all twelve levels,
+lands on a cell that is not solid, which is the same check World 1 passed and
+which the row question would break. Neither Honen nor Yurarin Boo is among
+them, so the records in doubt are left out of the level file regardless.
 
 ## What World 1-3's own kinds do
 

@@ -396,6 +396,77 @@ fn the_cartridge_uses_forty_one_object_kinds() {
     assert_eq!((implemented, records), (171, 481));
 }
 
+/// Honen and Yurarin Boo never vary their row byte. Both live only in World 2,
+/// and all 38 of their records across the cartridge sit at row 1, which is why
+/// their spawns land at a screen Y of 166 that no row maps to: the byte is not
+/// a position for these kinds and their own code places them, below the
+/// visible screen, to swim up into it.
+#[test]
+fn the_two_swimming_kinds_never_vary_their_row() {
+    let Some(data) = rom() else { return };
+
+    let mut rows = std::collections::BTreeSet::new();
+    let mut levels = std::collections::BTreeSet::new();
+    let mut count = 0;
+    for name in level::LEVEL_NAMES {
+        let start = level::level_objects(&data, name).expect("header entry");
+        for r in object::object_list(&data, start) {
+            if matches!(r.kind_id(), 0x10 | 0x24) {
+                rows.insert(r.row());
+                levels.insert(name);
+                count += 1;
+            }
+        }
+    }
+    assert_eq!(rows, std::collections::BTreeSet::from([1]));
+    assert_eq!(levels.len(), 3, "only World 2 uses them: {levels:?}");
+    assert_eq!(count, 38);
+}
+
+/// Every record of a kind the engine implements lands somewhere it can be.
+/// This is the gate that let World 2's lists into `extract-level`: its rows
+/// were in doubt, and the kinds the doubt attaches to are not among these.
+/// Rows above the playfield are dropped by the spawn readers rather than
+/// placed, so they are skipped here too.
+#[test]
+fn implemented_kinds_are_placed_in_open_space() {
+    let Some(data) = rom() else { return };
+
+    let implemented = [
+        object::WALKER,
+        object::LEDGE_TURNER,
+        object::HOPPER,
+        object::FALLER,
+        object::LIFT_VERTICAL,
+        object::LIFT_HORIZONTAL,
+    ];
+    let mut checked = 0;
+    for name in level::LEVEL_NAMES {
+        let list = level::level_list(&data, name).expect("header entry");
+        let columns = level::decode_level(&data, list);
+        let start = level::level_objects(&data, name).expect("header entry");
+        for r in object::spawning(&object::object_list(&data, start)) {
+            if !implemented.contains(&r.kind_id()) || r.row() < 0 {
+                continue;
+            }
+            let row = r.row() as usize;
+            // World 1-3's two fallers start inside terrain on the cartridge
+            // itself, which the spawn trace confirmed, so they are known.
+            if name == "1-3" && r.kind_id() == object::FALLER {
+                continue;
+            }
+            checked += 1;
+            assert!(
+                !level::is_solid(columns[r.column()][row]),
+                "World {name}: kind 0x{:02X} starts inside terrain at column {} row {row}",
+                r.kind_id(),
+                r.column(),
+            );
+        }
+    }
+    assert!(checked > 100, "only checked {checked} records");
+}
+
 /// The four bosses check the naming table and the header's world numbering at
 /// once. Each of these ids appears exactly once in the whole cartridge, in the
 /// third level of the world whose boss it is named for. Worlds 3 and 4 were

@@ -257,7 +257,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     };
 
     let name = args.first().map(|s| s.as_str()).unwrap_or("1-1");
-    let Some((_rom, list)) = rom_and_list(name) else {
+    let Some((rom, list)) = rom_and_list(name) else {
         return ExitCode::FAILURE;
     };
     let suffix = if expert { "_expert" } else { "" };
@@ -282,10 +282,13 @@ fn extract_level(args: &[String]) -> ExitCode {
         }
     };
 
-    let objects = object::WORLD_1_OBJECTS
-        .iter()
-        .find(|(n, _)| *n == name)
-        .map(|&(_, start)| object::extract_objects(DEFAULT_ROM, start))
+    // Worlds 1 and 2. Worlds 3 and 4 have object lists in the same table and
+    // are held back until their placements are checked the same way.
+    let has_objects = name.starts_with("1-") || name.starts_with("2-");
+    let objects = has_objects
+        .then(|| level::level_objects(&rom, name))
+        .flatten()
+        .map(|start| object::extract_objects(DEFAULT_ROM, start))
         .transpose();
     let records = match objects {
         Ok(records) => records.unwrap_or_default(),

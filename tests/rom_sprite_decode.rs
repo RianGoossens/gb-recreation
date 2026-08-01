@@ -7,8 +7,12 @@ use sml::assets::sprite::{self, Size};
 const ROM: &str = "super_mario_land.gb";
 
 fn sheet() -> Option<Vec<sml::tiles::Tile>> {
+    world_sheet(1)
+}
+
+fn world_sheet(world: usize) -> Option<Vec<sml::tiles::Tile>> {
     let data = std::fs::read(ROM).ok()?;
-    sprite::sprite_sheet(&data).ok()
+    sprite::sprite_sheet(&data, world).ok()
 }
 
 /// The reason these four tiles are Mario and not some other figure in the
@@ -57,5 +61,34 @@ fn each_size_has_three_distinct_frames() {
         assert_ne!(frames[0], frames[1]);
         assert_ne!(frames[1], frames[2]);
         assert_ne!(frames[0], frames[2]);
+    }
+}
+
+/// A world loads its own enemies over part of the atlas. Comparing the four
+/// worlds' sheets tile for tile leaves exactly the ids in `PER_WORLD`
+/// differing, and Mario's frames among the ones that do not: he is the same
+/// drawing in every world, the enemies are not.
+#[test]
+fn a_world_replaces_only_the_enemy_tiles() {
+    let Some(first) = world_sheet(1) else { return };
+    let sheets: Vec<_> = (1..=4).filter_map(world_sheet).collect();
+    assert_eq!(sheets.len(), 4);
+
+    let differing: Vec<usize> = (0..256)
+        .filter(|&id| sheets.iter().any(|s| s[id] != first[id]))
+        .collect();
+    assert_eq!(differing.first().copied(), Some(*sprite::PER_WORLD.start() as usize));
+    assert_eq!(differing.last().copied(), Some(*sprite::PER_WORLD.end() as usize));
+    assert_eq!(differing.len(), 61);
+
+    for size in [Size::Small, Size::Big] {
+        for frame in 0..sprite::FRAMES {
+            for id in sprite::mario_frame(size, frame) {
+                assert!(
+                    !differing.contains(&(id as usize)),
+                    "Mario's tile {id} changes between worlds"
+                );
+            }
+        }
     }
 }

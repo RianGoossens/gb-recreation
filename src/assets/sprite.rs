@@ -6,6 +6,10 @@
 //! the object atlas, and the whole of it has been in the tree since the tile
 //! copy was pinned; what was missing was which tiles are which object.
 //!
+//! Part of the atlas is per world. A world's tile copy overwrites ids `0xA0`
+//! through `0xDC`, which is where its own enemies are drawn from; the rest,
+//! Mario included, is the same in all four.
+//!
 //! Mario is at the start of it. The atlas is stored as a picture 16 tiles
 //! wide, so a frame is a block of tiles rather than a run of consecutive ids:
 //! two columns wide and two rows tall, 16 by 16 pixels. Reading it as
@@ -19,7 +23,7 @@
 //! box a pixel wider than the drawing is ordinary.
 
 use crate::tiles::Tile;
-use super::level::gameplay_tiles;
+use super::level::tiles_for_world;
 use super::AssetError;
 
 /// Tiles across the atlas as stored.
@@ -29,9 +33,15 @@ pub const FRAME_TILES: usize = 2;
 /// A frame's size in pixels.
 pub const FRAME_SIZE: usize = FRAME_TILES * 8;
 
-/// Every tile of the object atlas, by id.
-pub fn sprite_sheet(rom: &[u8]) -> Result<Vec<Tile>, AssetError> {
-    let vram = gameplay_tiles(rom)?;
+/// The ids a world's own tile copy replaces in the object atlas, which is
+/// where its enemies are drawn from. Everything else, Mario included, is the
+/// same in all four worlds: comparing the four sheets byte for byte leaves
+/// exactly these 61 ids differing and no others.
+pub const PER_WORLD: std::ops::RangeInclusive<u8> = 0xA0..=0xDC;
+
+/// Every tile of the object atlas as a world loads it, by id.
+pub fn sprite_sheet(rom: &[u8], world: usize) -> Result<Vec<Tile>, AssetError> {
+    let vram = tiles_for_world(rom, world)?;
     Ok((0..256)
         .map(|id| Tile::decode(vram[id * 16..id * 16 + 16].try_into().unwrap()))
         .collect())

@@ -11,6 +11,12 @@ background reads from `0x8800` up. Everything below `0x9000` is the object
 atlas, so the sprite graphics have been extracted for as long as the background
 ones have. What was missing was which tiles are which object.
 
+Part of it is per world. Comparing the four worlds' atlases tile for tile
+leaves exactly ids `0xA0` through `0xDC` differing, 61 of the 256, which is
+where a world's own enemies are drawn from. Everything else, Mario included, is
+the same in all four. `sml sprites <world> <out.png>` writes a world's atlas
+out as a picture.
+
 ## A frame is a block, not a run
 
 The atlas is stored as a picture 16 tiles wide. A character frame is two tiles

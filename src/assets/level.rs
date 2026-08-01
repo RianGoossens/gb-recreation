@@ -764,7 +764,7 @@ pub fn level_graphics(rom: &[u8], name: &str) -> Option<Graphics> {
     let world = index / 3 + 1;
     let tiles = world_tile_sheet(rom, world).ok()?;
     let animated = animated_tile_pair(rom, world).map(|(a, b)| (ANIMATED_TILE, a, b));
-    let sprites = super::sprite::sprite_sheet(rom).ok()?;
+    let sprites = super::sprite::sprite_sheet(rom, world).ok()?;
     Some(Graphics { cells, tiles, palette: DEFAULT_BGP, animated, sprites })
 }
 

@@ -9,6 +9,7 @@
 //!   bonus-rooms <level>                     draw a level's two bonus rooms
 //!   list-objects [1-1|1-2|1-3]              print a level's object list
 //!   render-level <level> <col> <out.png>    draw a level screen with its real tiles
+//!   sprites <world> <out.png>               draw a world's object atlas
 //!   screenshot <out.png>                    render a frame to a PNG (headless)
 
 use std::process::ExitCode;
@@ -32,6 +33,7 @@ fn main() -> ExitCode {
         Some("extract-level") => extract_level(&args[1..]),
         Some("scan-levels") => scan_levels(),
         Some("bonus-rooms") => bonus_rooms(&args[1..]),
+        Some("sprites") => sprites(&args[1..]),
         Some("list-objects") => list_objects(&args[1..]),
         Some("render-level") => render_level(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
@@ -768,6 +770,62 @@ fn run_game(_args: &[String]) -> ExitCode {
     ExitCode::FAILURE
 }
 
+/// `sprites <world> <out.png>` draws a world's object atlas as the cartridge
+/// stores it: 16 tiles across, so a character frame reads as a 2x2 block.
+/// Mario is at the top left and a world's own enemies are the band this
+/// command exists to look at (`docs/reference/sprites.md`).
+fn sprites(args: &[String]) -> ExitCode {
+    use sml::assets::sprite;
+    use sml::render::{Framebuffer, Palette};
+
+    let (world, out) = match args {
+        [world, out] => (world.parse::<usize>().unwrap_or(0), out.as_str()),
+        _ => {
+            eprintln!("usage: sml sprites <world 1-4> <out.png>");
+            return ExitCode::FAILURE;
+        }
+    };
+    let rom = match std::fs::read(DEFAULT_ROM) {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!("could not read {DEFAULT_ROM}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let sheet = match sprite::sprite_sheet(&rom, world) {
+        Ok(sheet) => sheet,
+        Err(e) => {
+            eprintln!("could not read world {world}'s sprites: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let across = sprite::SHEET_COLUMNS;
+    let (w, h) = (across * 8, sheet.len() / across * 8);
+    let mut pixels = vec![0u8; w * h];
+    let palette = Palette::new(sml::assets::DEFAULT_BGP);
+    for (id, tile) in sheet.iter().enumerate() {
+        let (tx, ty) = ((id % across) * 8, (id / across) * 8);
+        let mut fb = Framebuffer::new();
+        fb.draw_tile(tile, 0, 0, &palette);
+        for y in 0..8 {
+            for x in 0..8 {
+                pixels[(ty + y) * w + tx + x] = fb.get(x as u32, y as u32).to_gray();
+            }
+        }
+    }
+    match std::fs::write(out, sml::png::encode_gray(w as u32, h as u32, &pixels)) {
+        Ok(()) => {
+            println!("wrote world {world}'s object atlas, {w}x{h}, to {out}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("could not write {out}: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn usage() {
     println!("\nusage:");
     println!("  sml                                       print status");
@@ -776,6 +834,7 @@ fn usage() {
     println!("  sml extract-title [outdir]                extract title screen from ROM");
     println!("  sml screenshot <out.png>                  render a frame to a PNG");
     println!("  sml render-title <out.png>                render the extracted title screen");
+    println!("  sml sprites <world> <out.png>             draw a world's object atlas");
     println!("  sml run [level.txt] [tuning.txt]          play in a window (needs --features gui)");
     println!("  sml play <out.png> [frames] [keys] [lvl] [tuning]  run headlessly to a PNG");
     println!("\n  run and play accept --allow-non-canonical anywhere in the arguments,");

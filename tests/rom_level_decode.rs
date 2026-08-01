@@ -579,3 +579,24 @@ fn every_world_after_the_first_draws_from_its_own_overlay() {
         assert!(used > 0, "World {name}'s opening screen draws no overlaid tile");
     }
 }
+
+/// Which levels carry the cartridge's exit door. Worlds 1 and 2 showed the
+/// pattern (the first two levels of a world have one, the third does not,
+/// because it ends the world rather than leading anywhere) and the four levels
+/// named from the bank header follow it, all eight of them.
+#[test]
+fn only_a_worlds_last_level_lacks_an_exit_door() {
+    let Some(data) = rom() else { return };
+
+    for name in level::LEVEL_NAMES {
+        let list = level::level_list(&data, name).expect("header entry");
+        let columns = level::decode_level(&data, list);
+        let door = level::exit_door(&columns);
+        assert_eq!(
+            door.is_some(),
+            !name.ends_with("-3"),
+            "World {name} {} an exit door",
+            if door.is_some() { "has" } else { "has no" }
+        );
+    }
+}

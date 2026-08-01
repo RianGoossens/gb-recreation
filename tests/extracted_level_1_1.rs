@@ -297,8 +297,13 @@ fn mario_fits_through_the_real_level_at_his_measured_size() {
 /// open cells from the spawn catches that, where checking the cell itself
 /// does not.
 #[test]
-fn every_world_1_end_trigger_is_reachable_from_the_spawn() {
-    for (i, path) in ["1_1", "1_2", "1_3", "2_1", "2_2", "2_3"].iter().enumerate() {
+fn every_end_trigger_is_reachable_from_the_spawn() {
+    // World 4-3 is left out: it is a vehicle stage with no ground under the
+    // spawn at all, so walking it is not the question.
+    for (i, path) in ["1_1", "1_2", "1_3", "2_1", "2_2", "2_3", "3_1", "3_2", "3_3", "4_1", "4_2"]
+        .iter()
+        .enumerate()
+    {
         let file = format!("assets/extracted/level_{path}.txt");
         if !std::path::Path::new(&file).exists() {
             continue;
@@ -393,11 +398,14 @@ fn world_2_ends_on_the_cartridges_own_door() {
 
 /// Every extracted level has to put Mario somewhere he can stand. A spawn in
 /// mid-air or inside terrain is what a mis-decoded opening screen looks like,
-/// and World 2's levels are decoded from a bank the extractor had never read
-/// before.
+/// and the levels of worlds 2 to 4 are decoded from banks and from a header
+/// the extractor had never read before.
+///
+/// World 4-3 is the one level with no ground under its spawn. It is a vehicle
+/// stage: nothing in it is walked.
 #[test]
-fn mario_can_stand_at_every_world_2_spawn() {
-    for name in ["2_1", "2_2", "2_3"] {
+fn mario_can_stand_at_every_spawn_outside_the_vehicle_stage() {
+    for name in ["2_1", "2_2", "2_3", "3_1", "3_2", "3_3", "4_1", "4_2"] {
         let path = format!("assets/extracted/level_{name}.txt");
         if !std::path::Path::new(&path).exists() {
             continue;
@@ -408,35 +416,52 @@ fn mario_can_stand_at_every_world_2_spawn() {
             (0..ROWS).any(|row| level.solids.is_solid(column, row)),
             "World {name} has nothing under Mario's spawn"
         );
+        // Holding right is not enough on its own: World 3-2 spawns Mario a
+        // step away from a two-tile block, which he has to jump. Our spawn
+        // column is a stand-in rather than the cartridge's own, so this asks
+        // whether he can leave the spot at all, not whether he can walk it.
         let mut game = Game::new(level.clone());
         let start = game.mario.pixel_x();
-        let mut buttons = Buttons::default();
-        buttons.set(Button::Right, true);
         let mut furthest = start;
-        for _ in 0..120 {
+        let mut stuck = 0;
+        for _ in 0..240 {
+            let mut buttons = Buttons::default();
+            buttons.set(Button::Right, true);
+            buttons.set(Button::A, stuck > 8);
             game.step(buttons);
-            furthest = furthest.max(game.mario.pixel_x());
+            if game.mario.pixel_x() > furthest {
+                furthest = game.mario.pixel_x();
+                stuck = 0;
+            } else {
+                stuck += 1;
+            }
         }
         assert!(
-            furthest > start,
-            "World {name} never lets Mario move right from the spawn"
+            furthest > start + 16,
+            "World {name} never lets Mario get away from his spawn"
         );
     }
 }
 
-/// How far the geometry walker gets through each of World 2's levels.
+/// How far the geometry walker gets through each level of worlds 2 to 4.
 ///
-/// Not a pass/fail on the level. The walker only knows how to run right and
-/// jump gaps, and World 2's levels open into water: 2-1 and 2-2 both stop at
-/// column 69, because both lists point at screen `0x5D32` for world columns 60
-/// to 79 and it has no floor. Swimming is not implemented, so that is where a
-/// walker ends up, and the number is recorded rather than asserted away.
+/// Not a pass/fail on the levels. The walker only knows how to run right and
+/// jump when it stalls, so these numbers measure it as much as they measure
+/// the geometry, and none of the nine is a level finished. World 2's are
+/// understood: 2-1 and 2-2 both stop at column 69 because both lists point at
+/// screen `0x5D32` for world columns 60 to 79 and it has no floor, which is
+/// the water the cartridge expects Mario to swim. Worlds 3 and 4 stop earlier
+/// still and why is not looked into yet.
 ///
 /// What this pins is the geometry. A decode that breaks these levels open or
 /// seals them shut moves the number.
 #[test]
-fn world_2s_geometry_is_walkable_as_far_as_it_is_recorded() {
-    for (name, expected) in [("2_1", 69), ("2_2", 69), ("2_3", 178)] {
+fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
+    for (name, expected) in [
+        ("2_1", 69), ("2_2", 69), ("2_3", 178),
+        ("3_1", 53), ("3_2", 34), ("3_3", 12),
+        ("4_1", 66), ("4_2", 106), ("4_3", 7),
+    ] {
         let path = format!("assets/extracted/level_{name}.txt");
         if !std::path::Path::new(&path).exists() {
             continue;
@@ -481,3 +506,4 @@ fn world_2s_geometry_is_walkable_as_far_as_it_is_recorded() {
         assert_eq!(reached, expected, "World {name}: the walker reached a different column");
     }
 }
+

@@ -9,7 +9,7 @@
 use crate::camera::Camera;
 use crate::core::animation::{AnimState, Animator};
 use crate::core::block::{Block, BlockKind};
-use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
+use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_CONTACT, ENEMY_SIZE};
 use crate::core::entity::{pixels, Facing, Mario, Power};
 use crate::core::level::{Level, ANIMATION_HOLD, TILE};
 use crate::core::lift::{ride_lifts, Lift};
@@ -521,7 +521,7 @@ impl Game {
             if !enemy.alive {
                 continue;
             }
-            let (el, et, er, eb) = enemy.edges();
+            let (el, et, er, eb) = enemy.contact_edges();
             let overlap = ml <= er && mr >= el && mt <= eb && mb >= et;
             if !overlap {
                 continue;
@@ -530,7 +530,7 @@ impl Game {
                 // A star runs straight through enemies, defeating them.
                 enemy.alive = false;
                 plowed = true;
-            } else if descending && mb <= et + ENEMY_SIZE / 2 {
+            } else if descending && mb <= et + ENEMY_CONTACT / 2 {
                 enemy.alive = false;
                 stomped = true;
             } else {

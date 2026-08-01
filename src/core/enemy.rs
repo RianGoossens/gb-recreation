@@ -10,8 +10,23 @@ use crate::core::level::{Solids, TILE};
 use crate::core::physics::GRAVITY;
 use crate::SCREEN_WIDTH;
 
-/// Enemies are one tile square.
+/// Enemies are one tile square. This is the body that walks into walls and
+/// stands on floors; it has never been measured on the cartridge.
 pub const ENEMY_SIZE: i32 = 8;
+/// How much of an enemy hurts Mario, which is smaller than its body and
+/// smaller than its drawing.
+///
+/// Measured by holding Mario at every offset from a Chibibo a pixel at a time
+/// and watching the life counter (`tools/measure_enemy_box.py`). Both of them
+/// have to be written every frame: a walker covers more than a screen in the
+/// 212 frames a death takes to register, so left alone it reaches Mario from
+/// any starting offset and every trial reports a hit.
+///
+/// Contact runs over a window of 15 across and 16 down. Mario's own box is 11
+/// by 12, measured on the cartridge by an unrelated route, and 15 - 11 + 1 and
+/// 16 - 12 + 1 both give 5. The two axes agreeing is the check: a wrong Mario
+/// box would have to be wrong by the same amount on both to land there.
+pub const ENEMY_CONTACT: i32 = 5;
 /// Horizontal walk speed in subpixels per frame.
 ///
 /// Measured from the cartridge with `tools/measure_enemy_walk.py`, on the
@@ -183,6 +198,15 @@ impl Enemy {
         let t = self.pixel_y();
         (l, t, l + ENEMY_SIZE - 1, t + ENEMY_SIZE - 1)
     }
+
+    /// The smaller box that decides whether Mario is hurt or stomps, centred
+    /// in the body. See [`ENEMY_CONTACT`].
+    pub fn contact_edges(&self) -> (i32, i32, i32, i32) {
+        let inset = (ENEMY_SIZE - ENEMY_CONTACT) / 2;
+        let l = self.pixel_x() + inset;
+        let t = self.pixel_y() + inset;
+        (l, t, l + ENEMY_CONTACT - 1, t + ENEMY_CONTACT - 1)
+    }
 }
 
 /// One position update of a hop: sideways, then the table's rise or fall.
@@ -330,6 +354,27 @@ pub fn despawn_offscreen(enemies: &mut Vec<Enemy>, camera_x: i32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two windows measured on the cartridge with
+    /// `tools/measure_enemy_box.py`: Mario is hurt across 15 pixels of
+    /// horizontal offset and 16 of vertical. Those are what fix
+    /// `ENEMY_CONTACT` at 5, given his own box of 11 by 12, and the engine has
+    /// to reproduce them or the constant is decoration.
+    #[test]
+    fn contact_covers_the_window_the_cartridge_covers() {
+        let enemy = Enemy::goomba(100, 100, true);
+        let (el, et, er, eb) = enemy.contact_edges();
+        let (mw, mh) = (11, 12);
+
+        let across = (60..160)
+            .filter(|&mx| mx <= er && mx + mw > el)
+            .count();
+        let down = (60..160)
+            .filter(|&my| my <= eb && my + mh > et)
+            .count();
+        assert_eq!(across, 15, "horizontal contact window");
+        assert_eq!(down, 16, "vertical contact window");
+    }
     use crate::core::level::Solids;
 
     fn floor() -> Solids {

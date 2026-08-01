@@ -605,3 +605,38 @@ fn the_water_line_animates_on_the_cartridges_cadence() {
     assert_ne!(seen[0], seen[1], "the water never changed");
     assert_eq!(seen[0], seen[2], "the water did not come back");
 }
+
+/// The status bar, against the emulator capture it was read off. The capture
+/// is a tilemap plus its own sheet, so this compares pixels drawn through our
+/// renderer with pixels the real game put on screen: same font, same layout,
+/// same two rows.
+#[test]
+fn the_status_bar_matches_the_captured_one() {
+    use sml::assets::level as assets;
+    use sml::render::{render_background, Framebuffer, Palette};
+
+    let (Ok(map), Ok(sheet)) = (
+        sml::assets::load_tilemap("assets/extracted/level_1_1_opening.tmap"),
+        sml::assets::TileSheet::load("assets/extracted/level_1_1_opening.tiles"),
+    ) else {
+        return;
+    };
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    if level.graphics.is_none() {
+        return;
+    }
+
+    let mut captured = Framebuffer::new();
+    render_background(&mut captured, &map, &sheet.tiles, 0, 0, &Palette::new(sheet.palette));
+
+    // The values the capture was taken at: two lives left, no coins, no score,
+    // 393 on the clock.
+    let mut game = Game::new(level);
+    game.lives = 2;
+    game.timer = 393;
+    let ours = game.render();
+
+    let (a, b) = (ours.to_gray(), captured.to_gray());
+    let rows = 16 * 160;
+    assert_eq!(&a[..rows], &b[..rows], "the status bar does not match the capture");
+}

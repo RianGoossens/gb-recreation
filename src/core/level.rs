@@ -145,6 +145,9 @@ pub struct Level {
     /// The cartridge's own background graphics, when the level came from the
     /// ROM. A hand-written level file has none and renders with placeholders.
     pub graphics: Option<Graphics>,
+    /// World and level number, for the status bar, when the level is one of
+    /// the cartridge's twelve.
+    pub number: Option<(u8, u8)>,
 }
 
 /// A level's background as the cartridge draws it: one tile id per cell, row
@@ -217,6 +220,7 @@ impl Level {
             items,
             lifts,
             graphics: None,
+            number: None,
         }
     }
 

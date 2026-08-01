@@ -794,6 +794,8 @@ pub const DEFAULT_ROM: &str = "super_mario_land.gb";
 pub fn extracted_level(name: &str) -> Result<Level, String> {
     let path = format!("{EXTRACTED}/level_{}.txt", name.replace('-', "_"));
     let mut level = Level::from_file(&path)?;
+    let index = level_index(name).ok_or_else(|| format!("{name} is not a level of the cartridge"))?;
+    level.number = Some((index as u8 / 3 + 1, index as u8 % 3 + 1));
     if let Ok(rom) = std::fs::read(DEFAULT_ROM) {
         level.graphics = level_graphics(&rom, name);
     }

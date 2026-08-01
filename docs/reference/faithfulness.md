@@ -192,6 +192,10 @@ playing it faithfully.
 | Piece | Label | Notes |
 |-------|-------|-------|
 | World 1 level graphics | canonical | drawn from the ROM's own tile data (one block, `0x08032` to VRAM `0x8000`), scored at 99.60% of playfield pixels against the emulator's first frame; the only difference is Mario's sprite, which the background renderer does not draw (`tools/compare_level_render.py`) |
+| Level background in the game loop | canonical | the game itself now draws every one of the twelve levels with the cartridge's own tiles, its world's overlay included. A level written by hand carries no graphics and keeps the placeholder blocks |
+| The animated background tile | canonical | tile `0x5D` alternates between two pictures every eight frames, the cadence the routine at `0x02416` runs on. In World 2 it is the water line |
+| Status bar | canonical | the cartridge's own font, ids and layout, read off the World 1-1 capture and checked pixel for pixel against it (`src/hud.rs`). A level with no cartridge graphics falls back to the invented 3x5 font in `src/font.rs` |
+| Mario, enemies, items, blocks | **stand-in** | still drawn as flat blocks. The sprite tiles are in the ROM (`0x08032` to VRAM `0x8000`, visibly Mario's frames and the enemy set), but which tile ids each entity uses and in what order has not been pinned |
 
 ## Sound
 

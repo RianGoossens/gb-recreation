@@ -854,11 +854,32 @@ impl Game {
         fb
     }
 
+    /// Draw the cartridge's own status bar, when the level brought the tiles
+    /// and the level number to do it with. Reports whether it drew.
+    fn draw_cartridge_hud(&self, fb: &mut Framebuffer) -> bool {
+        let (Some(graphics), Some(number)) = (self.level.graphics.as_ref(), self.level.number)
+        else {
+            return false;
+        };
+        let bar = crate::hud::status_bar(self.score, self.coins_collected, self.lives, number, self.timer);
+        for (row, cells) in bar.iter().enumerate() {
+            for (column, &id) in cells.iter().enumerate() {
+                let Some(tile) = graphics.tiles.get(id as usize) else { continue };
+                fb.draw_tile(tile, column as i32 * TILE, row as i32 * TILE, &self.palette);
+            }
+        }
+        true
+    }
+
     /// Draw the HUD along the top: a coin icon and count, a Mario icon and life
     /// count, the score, and the timer. Numbers use the small digit font.
     fn draw_hud(&self, fb: &mut Framebuffer) {
         use crate::font::draw_number;
         use crate::render::Shade;
+
+        if self.draw_cartridge_hud(fb) {
+            return;
+        }
 
         // Coin icon + count.
         fb.draw_tile(&self.coin_tile, 2, 1, &self.palette);

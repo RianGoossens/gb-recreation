@@ -161,6 +161,9 @@ pub struct Graphics {
     /// the order the game shows them. Each is held for [`ANIMATION_HOLD`]
     /// frames.
     pub animated: Option<(u8, Tile, Tile)>,
+    /// The object atlas the same tile copy loads, which is where Mario and the
+    /// enemies are drawn from (`docs/reference/sprites.md`).
+    pub sprites: Vec<Tile>,
 }
 
 /// How long the cartridge holds each frame of its animated background tile.

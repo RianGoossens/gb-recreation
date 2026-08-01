@@ -7,10 +7,10 @@
 //! checks, so the game is fully testable without anyone opening a window.
 
 use crate::camera::Camera;
-use crate::core::animation::Animator;
+use crate::core::animation::{AnimState, Animator};
 use crate::core::block::{Block, BlockKind};
 use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_SIZE};
-use crate::core::entity::{pixels, Mario, Power};
+use crate::core::entity::{pixels, Facing, Mario, Power};
 use crate::core::level::{Level, ANIMATION_HOLD, TILE};
 use crate::core::lift::{ride_lifts, Lift};
 use crate::core::physics::step_motion;
@@ -100,6 +100,9 @@ pub struct Game {
     /// door in its own background already.
     draw_end_marker: bool,
     palette: Palette,
+    /// Objects get their own palette on the hardware. Its value has not been
+    /// read off the cartridge, so this is the default one.
+    sprite_palette: Palette,
 }
 
 /// A small black dot: a superball.
@@ -218,6 +221,10 @@ fn coin_tile() -> Tile {
 pub const SPAWN_AHEAD: i32 = 183;
 
 /// Where the playfield starts on screen: below the two rows of status bar.
+/// How far into his 16 by 16 sprite block Mario's drawing starts, measured
+/// off the atlas (`docs/reference/sprites.md`).
+const MARIO_SPRITE_INSET: i32 = 3;
+
 pub const PLAYFIELD_TOP: i32 = crate::SCREEN_HEIGHT as i32 - crate::camera::VIEW_HEIGHT;
 
 /// The spawns a level still has ahead of the camera, furthest first so the
@@ -341,6 +348,7 @@ impl Game {
             end_tile: end_tile(),
             draw_end_marker,
             palette: Palette::new(bgp),
+            sprite_palette: Palette::new(crate::assets::DEFAULT_BGP),
         }
     }
 
@@ -860,14 +868,59 @@ impl Game {
             // 12 px tall), so the placeholder tiles are anchored to his feet
             // and the leftover sits above his head, where the cartridge's own
             // sprite overhangs the box too.
-            let tiles = mh / TILE;
-            let top = my + mh - tiles * TILE;
-            for i in 0..tiles {
-                fb.draw_tile(&self.mario_tile, mx, top + i * TILE, &self.palette);
+            if !self.draw_mario_sprite(&mut fb, mx, my) {
+                let tiles = mh / TILE;
+                let top = my + mh - tiles * TILE;
+                for i in 0..tiles {
+                    fb.draw_tile(&self.mario_tile, mx, top + i * TILE, &self.palette);
+                }
             }
         }
         self.draw_hud(&mut fb);
         fb
+    }
+
+    /// Draw Mario from the cartridge's object atlas, if the level brought it.
+    /// Reports whether it drew, so the caller can fall back to the placeholder
+    /// block for a hand-written level.
+    ///
+    /// A frame is a 16 by 16 block whose drawing sits on its bottom edge, and
+    /// Mario's collision box is measured from his feet too, so the block is
+    /// anchored there. Horizontally the drawing starts 3 pixels into the block
+    /// (`docs/reference/sprites.md`), which lines its 10 pixels up inside his
+    /// 11 pixel box.
+    fn draw_mario_sprite(&self, fb: &mut Framebuffer, mx: i32, my: i32) -> bool {
+        use crate::assets::sprite::{self, Size, FRAME_SIZE};
+
+        let Some(graphics) = self.level.graphics.as_ref() else {
+            return false;
+        };
+        if graphics.sprites.len() < 256 {
+            return false;
+        }
+        let size = if self.mario.power == Power::Small {
+            Size::Small
+        } else {
+            Size::Big
+        };
+        let frame = match crate::core::animation::Animator::state(&self.mario) {
+            AnimState::Walk => 1 + (self.animator.frame() as usize % 2),
+            _ => 0,
+        };
+        let ids = sprite::mario_frame(size, frame);
+        let flip = self.mario.facing == Facing::Left;
+        let (_, mh) = self.mario.size();
+        let left = mx - MARIO_SPRITE_INSET;
+        let top = my + mh - FRAME_SIZE as i32;
+        for (i, id) in ids.iter().enumerate() {
+            let Some(tile) = graphics.sprites.get(*id as usize) else {
+                return false;
+            };
+            let (dx, dy) = ((i % 2) as i32 * TILE, (i / 2) as i32 * TILE);
+            let dx = if flip { TILE - dx } else { dx };
+            fb.draw_sprite_tile(tile, left + dx, top + dy, &self.sprite_palette, flip);
+        }
+        true
     }
 
     /// Draw the cartridge's own status bar, when the level brought the tiles

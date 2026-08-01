@@ -805,3 +805,102 @@ fn the_status_bar_names_each_level_of_a_world() {
         }
     }
 }
+
+/// Mario is drawn from the cartridge's own atlas, not as a black block. Every
+/// pixel his frame draws has to be on screen in the right shade, and every
+/// pixel it leaves transparent has to show what was behind him.
+#[test]
+fn mario_draws_with_the_cartridges_sprite() {
+    use sml::assets::level as assets;
+    use sml::assets::sprite::{self, Size, FRAME_SIZE};
+    use sml::render::Palette;
+
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    let Some(graphics) = level.graphics.clone() else { return };
+
+    let mut game = Game::new(level);
+    // A frame of nothing held: still on the ground, so the still frame.
+    game.step(Buttons::default());
+    let drawn = game.render().to_gray();
+
+    let pixels = sprite::mario_pixels(&graphics.sprites, Size::Small, 0);
+    let (_, mh) = game.mario.size();
+    let left = game.mario.pixel_x() - game.camera.x - 3;
+    let top = game.mario.pixel_y() - game.camera.y + sml::game::PLAYFIELD_TOP + mh
+        - FRAME_SIZE as i32;
+    let palette = Palette::new(sml::assets::DEFAULT_BGP);
+
+    let mut ink = 0;
+    for (dy, row) in pixels.iter().enumerate() {
+        for (dx, &index) in row.iter().enumerate() {
+            if index == 0 {
+                continue;
+            }
+            ink += 1;
+            let (x, y) = (left + dx as i32, top + dy as i32);
+            assert_eq!(
+                drawn[(y as usize) * 160 + x as usize],
+                palette.shade(index).to_gray(),
+                "sprite pixel {dx},{dy}"
+            );
+        }
+    }
+    assert_eq!(ink, 84, "the still frame draws 84 pixels");
+}
+
+/// Facing left mirrors the frame rather than drawing a second set of tiles,
+/// which is what the hardware's flip bit does and why the atlas holds only
+/// right-facing Mario. The control is the unmirrored comparison, which has to
+/// fail: Mario is not symmetric, and a test that passes either way is measuring
+/// nothing.
+#[test]
+fn walking_left_mirrors_him() {
+    use sml::assets::level as assets;
+    use sml::assets::sprite::{self, Size, FRAME_SIZE};
+    use sml::render::Palette;
+
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    let Some(graphics) = level.graphics.clone() else { return };
+    let mut game = Game::new(level);
+
+    let mut left = Buttons::default();
+    left.set(Button::Left, true);
+    game.step(left);
+    let drawn = game.render().to_gray();
+
+    let pixels = sprite::mario_pixels(&graphics.sprites, Size::Small, 0);
+    let (_, mh) = game.mario.size();
+    let block_left = game.mario.pixel_x() - game.camera.x - 3;
+    let top = game.mario.pixel_y() - game.camera.y + sml::game::PLAYFIELD_TOP + mh
+        - FRAME_SIZE as i32;
+    let palette = Palette::new(sml::assets::DEFAULT_BGP);
+
+    let matches = |mirror: bool| {
+        pixels.iter().enumerate().all(|(dy, row)| {
+            row.iter().enumerate().all(|(dx, &index)| {
+                if index == 0 {
+                    return true;
+                }
+                let sx = if mirror { FRAME_SIZE - 1 - dx } else { dx };
+                let (x, y) = (block_left + sx as i32, top + dy as i32);
+                drawn[(y as usize) * 160 + x as usize] == palette.shade(index).to_gray()
+            })
+        })
+    };
+    assert!(matches(true), "facing left did not draw the mirrored frame");
+    assert!(!matches(false), "the unmirrored frame also matched, so this proves nothing");
+}
+
+/// A hand-written level has no atlas to draw from, so it keeps the block. A
+/// custom level still renders.
+#[test]
+fn a_hand_written_level_keeps_the_placeholder_mario() {
+    let level = Game::demo_level();
+    assert!(level.graphics.is_none());
+    let game = Game::new(level);
+    let drawn = game.render().to_gray();
+    let x = (game.mario.pixel_x() - game.camera.x) as usize;
+    let y = (game.mario.pixel_y() - game.camera.y + sml::game::PLAYFIELD_TOP) as usize;
+    // The placeholder is solid black across its whole width.
+    assert!((0..8).all(|dx| drawn[(y + 6) * 160 + x + dx] == 0));
+}

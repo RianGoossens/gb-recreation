@@ -198,7 +198,10 @@ playing it faithfully.
 | The animated background tile | canonical | tile `0x5D` alternates between two pictures every eight frames, the cadence the routine at `0x02416` runs on. In World 2 it is the water line |
 | Status bar | canonical | the cartridge's own font, ids and layout, read off the World 1-1 capture and checked pixel for pixel against it (`src/hud.rs`). A level with no cartridge graphics falls back to the invented 3x5 font in `src/font.rs` |
 | Coins and the exit door | canonical | a coin is the cartridge's tile `0xF4` from the world's own sheet; the door is part of the level's background and the engine draws no marker over it |
-| Mario, enemies, items, blocks | **stand-in** | still drawn as flat blocks. The sprite tiles are in the ROM (`0x08032` to VRAM `0x8000`, visibly Mario's frames and the enemy set), but which tile ids each entity uses and in what order has not been pinned |
+| Mario's graphics | canonical | drawn from the cartridge's object atlas. A frame is a 2x2 block of the sheet, small Mario at its start and big Mario two rows down. That these are his tiles is checked against his collision box, measured on the cartridge by a route with nothing to do with graphics: the still frame's ink is 10 by 12 against a box of 11 by 12 (`docs/reference/sprites.md`) |
+| Which of Mario's frames plays when | **stand-in** | the still pose standing and airborne, the two walking poses alternating on our own animator's cadence. The cartridge's choice, and whether it has a separate jump pose, need the running game |
+| The object palette | **stand-in** | objects have their own palette registers on the hardware and their values have not been read off the cartridge, so Mario draws through the default |
+| Enemies, items, blocks | **stand-in** | still drawn as flat blocks. Their tiles are in the same atlas Mario's came out of, but which frames belong to which kind has not been pinned |
 
 ## Sound
 

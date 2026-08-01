@@ -48,3 +48,24 @@ ordinary. Big Mario's is 16 tall, which is the difference between the sizes.
 The ink also sits on the bottom edge of the block, `y` 4 through 15, so a
 frame lines up with a position given as feet on the ground with no offset to
 guess at. Horizontally it starts at `x` 3.
+
+## Drawing him
+
+`Game` draws Mario from this atlas whenever the level brought cartridge
+graphics, and keeps the placeholder block for a hand-written level, the same
+split the background already uses.
+
+The block is anchored to his feet: its bottom edge is the bottom of his
+collision box, and it starts 3 pixels left of the box so the drawing lands
+inside it. Facing left mirrors the frame, which is what the hardware's flip bit
+does and why the atlas holds only right-facing Mario.
+
+Two things here are ours rather than the cartridge's, and are logged in
+`docs/reference/faithfulness.md`:
+
+- **Which frame plays when.** The still pose is used standing and in the air,
+  and the two walking poses alternate on the existing animator's cadence. The
+  cartridge's own choice, and its jump pose, need the running game.
+- **The object palette.** The hardware gives objects their own palette
+  registers. Their values have not been read off the cartridge, so the default
+  is used.

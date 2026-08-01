@@ -116,6 +116,35 @@ impl Framebuffer {
         }
     }
 
+    /// Draw a tile the way the hardware draws an object rather than the
+    /// background: colour 0 is transparent, and the tile can be mirrored.
+    pub fn draw_sprite_tile(
+        &mut self,
+        tile: &Tile,
+        ox: i32,
+        oy: i32,
+        palette: &Palette,
+        flip_x: bool,
+    ) {
+        for ty in 0..8 {
+            let y = oy + ty as i32;
+            if y < 0 || y >= SCREEN_HEIGHT as i32 {
+                continue;
+            }
+            for tx in 0..8 {
+                let x = ox + tx as i32;
+                if x < 0 || x >= SCREEN_WIDTH as i32 {
+                    continue;
+                }
+                let index = tile.pixels[ty][if flip_x { 7 - tx } else { tx }];
+                if index == 0 {
+                    continue;
+                }
+                self.set(x as u32, y as u32, palette.shade(index));
+            }
+        }
+    }
+
     fn index(x: u32, y: u32) -> usize {
         debug_assert!(x < SCREEN_WIDTH && y < SCREEN_HEIGHT, "pixel out of bounds");
         (y * SCREEN_WIDTH + x) as usize

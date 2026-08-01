@@ -862,10 +862,11 @@ fn bonus_rooms(args: &[String]) -> ExitCode {
         eprintln!("could not read {DEFAULT_ROM}");
         return ExitCode::FAILURE;
     };
-    let Some(pointers) = level::bonus_rooms(&rom, list) else {
-        eprintln!("World {name}'s list has nothing before it");
+    let pointers = level::prefix_rooms(&rom, list);
+    if pointers.is_empty() {
+        eprintln!("World {name}'s list has no rooms before it");
         return ExitCode::FAILURE;
-    };
+    }
 
     let bank = level::bank_of(list);
     for pointer in pointers {
@@ -873,12 +874,7 @@ fn bonus_rooms(args: &[String]) -> ExitCode {
             println!("0x{pointer:04X}: does not decode in bank 0x{bank:05X}");
             continue;
         };
-        let sealed = if level::is_bonus_room(&columns) {
-            "coin room"
-        } else {
-            "not a coin room"
-        };
-        println!("World {name}, screen 0x{pointer:04X} ({sealed}):");
+        println!("World {name}, coin room 0x{pointer:04X}:");
         print!("{}", level::to_level_text(&columns));
         println!();
         let Some(prefix) = prefix else { continue };

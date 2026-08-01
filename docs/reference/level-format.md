@@ -167,8 +167,15 @@ Worlds 3 and 4 have not been played to. Their entries decode, sort and
 terminate like the measured ones, and the world numbering is an inference from
 where the distinct triples sit.
 
-The thirteenth screen pointer, at `0x18`, is unexplained: `0x55BB` in bank 1,
-`0x6190` in bank 2, `0x50C0` in bank 3.
+The thirteenth screen pointer, at `0x18`, sits one past the twelve levels.
+Bank 2's (`0x6190`) is the title screen, which is where the title screen's
+tilemap is decoded from. Bank 1's (`0x55BB`) is its own first level's entry
+over again, the same filler its unused level slots use, so it holds nothing
+new. Bank 3's (`0x50C0`) is a list of four pointers to one screen: a corridor
+walled across the top two rows and the bottom three and open for the eleven
+between, with no coins in it, stored immediately after World 3-3's list. No
+level list mentions that screen anywhere. What the game shows it for is still
+open.
 
 ## The pointers before a level
 
@@ -192,13 +199,19 @@ rows, and requiring the wall threw it out.
 A level with one bonus room stores the same pointer twice: World 2-3 has
 `0x6327` in both places.
 
-What the pointer before those two is for is still open. World 1's three levels
-all carry `0x62BE` there, which is 1-1's own opening screen, and World 2's
-three all carry `0x56CD`, which is 2-1's. Naming worlds 3 and 4 from the bank
-header does not extend it: World 4's three levels all carry `0x6C81`, which is
-not 4-1's opening screen (`0x65D3`) nor any screen its levels use, and World
-3's carry `0x56A5` against a 3-1 opening on `0x52CC`. So it holds for two
-worlds and breaks on the other two.
+The pointer before those two is one of two things, and never a third room.
+In worlds 1 and 2 it is the world's own opening screen: all three of World 1's
+levels carry `0x62BE`, which is 1-1's first screen, and all three of World 2's
+carry `0x56CD`, which is 2-1's. In worlds 3 and 4 it repeats one of the
+level's own rooms instead: World 4's levels carry `0x6C81`, which is also
+their second pointer, and World 3's carry `0x56A5` or `0x5CC2`, which are its
+two rooms. Decoding it settles it either way, since the opening screens fail
+the room test and the repeats pass it.
+
+Worlds 3 and 4 also share one prefix across a whole world, so all three levels
+of World 4 have the same two chambers. `level::prefix_rooms` reads all three
+pointers, keeps the ones that decode to rooms and drops repeats, which gives
+two rooms for every level except World 2-3's single one.
 
 ## A world loads its own tiles
 

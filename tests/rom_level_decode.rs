@@ -696,3 +696,79 @@ fn every_bonus_room_draws_with_its_worlds_tiles() {
         assert!(coins > 0, "World {name}'s bonus rooms hold no coins");
     }
 }
+
+/// What the first of a level's three prefix pointers is. It had been explained
+/// for worlds 1 and 2, where it is the world's own first screen, and left open
+/// for the rest. Worlds 3 and 4 answer it differently: there it repeats one of
+/// the level's two coin rooms. Either way it is never a third distinct room,
+/// which is what `prefix_rooms` relies on.
+#[test]
+fn the_first_prefix_pointer_is_never_a_third_room() {
+    let Some(data) = rom() else { return };
+
+    for name in level::LEVEL_NAMES {
+        let head = level::level_list_head(&data, name).expect("header entry");
+        let at = |i: usize| u16::from_le_bytes([data[head + i * 2], data[head + i * 2 + 1]]);
+        let world = &name[..1];
+        let opening = level::level_list(&data, &format!("{world}-1")).expect("first level");
+        let opening = u16::from_le_bytes([data[opening], data[opening + 1]]);
+
+        let first = at(0);
+        let repeats_a_room = first == at(1) || first == at(2);
+        assert!(
+            first == opening || repeats_a_room,
+            "World {name}'s first prefix pointer 0x{first:04X} is neither the world's \
+             opening screen nor one of its rooms"
+        );
+        assert!(level::prefix_rooms(&data, head + level::LIST_PREFIX).len() <= 2);
+    }
+}
+
+/// How many distinct coin rooms each level has. World 2-3 stores the same
+/// pointer twice and has one; every other level has two. Worlds 3 and 4 share
+/// one prefix across all three of a world's levels, so their levels have the
+/// same rooms as each other.
+#[test]
+fn every_level_has_one_or_two_coin_rooms() {
+    let Some(data) = rom() else { return };
+
+    let counts: Vec<usize> = level::LEVEL_NAMES
+        .iter()
+        .map(|name| {
+            let list = level::level_list(&data, name).expect("header entry");
+            level::prefix_rooms(&data, list).len()
+        })
+        .collect();
+    assert_eq!(counts, vec![2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2]);
+}
+
+/// Each bank's screen table has a thirteenth entry, one past the twelve
+/// levels. Bank 2's is the title screen, which is where the title screen's
+/// tilemap comes from. The other two had never been explained: bank 1's is
+/// its own first level's entry over again, the same filler its unused level
+/// slots use, and bank 3's is a list of four pointers to one screen, a brick
+/// corridor open across the middle that no level list mentions anywhere.
+#[test]
+fn the_thirteenth_entry_of_each_bank() {
+    let Some(data) = rom() else { return };
+
+    let entry = |bank: usize| {
+        let at = bank + level::TITLE_SCREEN_INDEX * 2;
+        u16::from_le_bytes([data[at], data[at + 1]])
+    };
+    // Bank 1 holds worlds 2 and 4; its first level is 2-1.
+    let head = level::level_list_head(&data, "2-1").expect("header entry");
+    assert_eq!(level::bank_of(head) + entry(0x04000) as usize % 0x4000, head);
+
+    // Bank 3's corridor: four pointers to one screen, and no level uses it.
+    let corridor = entry(0x0C000) as usize % 0x4000 + 0x0C000;
+    let pointers: Vec<u16> = (0..4)
+        .map(|i| u16::from_le_bytes([data[corridor + i * 2], data[corridor + i * 2 + 1]]))
+        .collect();
+    assert_eq!(pointers.iter().collect::<std::collections::BTreeSet<_>>().len(), 1);
+    let screen = level::screen(&data, pointers[0], 0x0C000).expect("it decodes");
+    assert!(!level::is_bonus_room(&screen), "it has no coins, so it is not a room");
+    // Solid across the top two rows and the bottom three, open between them.
+    assert!(screen.iter().all(|c| level::is_solid(c[0]) && level::is_solid(c[1])));
+    assert!(screen.iter().all(|c| (2..13).all(|r| !level::is_solid(c[r]))));
+}

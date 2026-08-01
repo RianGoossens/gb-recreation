@@ -433,6 +433,36 @@ pub fn bonus_rooms(rom: &[u8], list_start: usize) -> Option<[u16; 2]> {
     ])
 }
 
+/// Every screen in a level's prefix that is a bonus room, in stored order and
+/// without repeats.
+///
+/// The prefix is three pointers. The last two are always rooms. The first is a
+/// room as well in worlds 3 and 4, where all three levels of a world share one
+/// prefix and each has three chambers; in worlds 1 and 2 it is the world's
+/// first level's opening screen instead, which is open terrain and fails the
+/// room test.
+pub fn prefix_rooms(rom: &[u8], list_start: usize) -> Vec<u16> {
+    let bank = bank_base(list_start);
+    let mut out: Vec<u16> = Vec::new();
+    let Some(first) = list_start.checked_sub(LIST_PREFIX) else {
+        return out;
+    };
+    for i in 0..3 {
+        let at = first + i * 2;
+        let (Some(lo), Some(hi)) = (rom.get(at), rom.get(at + 1)) else {
+            continue;
+        };
+        let pointer = u16::from_le_bytes([*lo, *hi]);
+        if out.contains(&pointer) {
+            continue;
+        }
+        if decode_screen(rom, pointer, bank).is_some_and(|columns| is_bonus_room(&columns)) {
+            out.push(pointer);
+        }
+    }
+    out
+}
+
 /// The 20 columns a single screen pointer draws, resolved in `bank`.
 pub fn screen(rom: &[u8], pointer: u16, bank: usize) -> Option<Vec<Column>> {
     decode_screen(rom, pointer, bank)

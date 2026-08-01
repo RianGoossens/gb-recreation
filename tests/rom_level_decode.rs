@@ -514,3 +514,68 @@ fn every_level_carries_the_same_three_pointer_prefix() {
         assert!(level::bonus_rooms(&rom, list).is_some(), "{name} has no bonus rooms");
     }
 }
+
+/// The control for the copy tables. The measured World 2 overlay came from
+/// searching video RAM at 2-1's opening; the loader in bank 0 gives the same
+/// blocks from the ROM alone, for every world. Each measured span has to sit
+/// inside a derived copy at the same ROM-to-VRAM delta.
+///
+/// The measured `0x09732` span is skipped: it is the shared atlas at that
+/// address, so it is not part of the overlay at all.
+#[test]
+fn the_loaders_own_tables_reproduce_the_measured_world_2_overlay() {
+    let Some(data) = rom() else { return };
+    let derived = level::tile_overlay(&data, 2).expect("World 2 loads an overlay");
+
+    for (from, to, size) in level::WORLD_2_TILE_BLOCKS {
+        if from == level::TILES_ROM_OFFSET + (to - 0x8000) {
+            continue;
+        }
+        let holder = derived
+            .iter()
+            .find(|&&(_, dest, len)| dest <= to && to + size <= dest + len)
+            .unwrap_or_else(|| panic!("no derived copy covers {to:#06X}"));
+        let (src, dest, _) = *holder;
+        assert_eq!(from, src + (to - dest), "the copy at {to:#06X} reads elsewhere");
+    }
+    assert!(level::tile_overlay(&data, 1).is_none(), "World 1 loads no overlay");
+}
+
+/// Worlds 3 and 4 read their tiles from the same tables, and each level's
+/// opening screen has to draw from the spans its world replaces. Without this
+/// the overlay could land entirely on tiles nothing uses and still look fine.
+#[test]
+fn every_world_after_the_first_draws_from_its_own_overlay() {
+    let Some(data) = rom() else { return };
+    let shared = level::gameplay_tiles(&data).unwrap();
+
+    for name in level::LEVEL_NAMES {
+        let world = name[..1].parse::<usize>().unwrap();
+        let list = level::level_list(&data, name).expect("header entry");
+        let tiles = level::tiles_for_level(&data, list).unwrap();
+        if world == 1 {
+            assert_eq!(tiles, shared, "World {name} uses the shared atlas unchanged");
+            continue;
+        }
+        assert_ne!(tiles, shared, "World {name} has to differ from World 1's");
+
+        let blocks = level::tile_overlay(&data, world).unwrap();
+        let overlaid = |id: u8| {
+            // Background tiles use signed addressing: below 128 reads from
+            // 0x9000, the rest from 0x8800.
+            let addr = if id < 128 {
+                0x9000 + (id as usize) * 16
+            } else {
+                0x8800 + (id as usize - 128) * 16
+            };
+            blocks.iter().any(|&(_, to, size)| (to..to + size).contains(&addr))
+        };
+        let used = level::decode_level(&data, list)
+            .iter()
+            .take(SCREEN_COLUMNS)
+            .flatten()
+            .filter(|&&t| overlaid(t))
+            .count();
+        assert!(used > 0, "World {name}'s opening screen draws no overlaid tile");
+    }
+}

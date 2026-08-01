@@ -603,6 +603,12 @@ pub fn gameplay_tiles(rom: &[u8]) -> Result<&[u8], AssetError> {
 /// Measured on 2-1 and 2-2, which load byte-identical block layouts, so the
 /// overlay is per world rather than per level. 2-3 is not measured, but it
 /// renders as a coherent underwater scene through the same spans.
+///
+/// Superseded by [`tile_overlay`], which reads the cartridge's own copy
+/// tables. These four blocks are what the VRAM search could see: it works in
+/// 0x40-byte chunks and drops any chunk that is uniform or that turns up more
+/// than once in the ROM, so its picture has gaps. The two agree everywhere the
+/// search had something to say.
 pub const WORLD_2_TILE_BLOCKS: [(usize, usize, usize); 4] = [
     (0x04032, 0x8A00, 0x03C0),
     (0x04432, 0x9340, 0x0100),
@@ -610,20 +616,53 @@ pub const WORLD_2_TILE_BLOCKS: [(usize, usize, usize); 4] = [
     (0x09732, 0x9700, 0x0100),
 ];
 
-/// The tile data in video RAM while the level whose list is at `list` plays.
+/// Where the world's two tile-copy sources are listed, one 16-bit pointer per
+/// world for worlds 2, 3 and 4.
 ///
-/// World 1's levels use the shared atlas unchanged. World 2's overlay
-/// [`WORLD_2_TILE_BLOCKS`] on top of it.
+/// The loader is in bank 0 at `0x0D8B`. It takes the world number in `b`,
+/// subtracts two, doubles it, and indexes these two tables; each copy then
+/// runs until the destination address reaches a fixed end, which is where the
+/// sizes below come from. The source pointer is a bank-window address read
+/// with the world's own bank switched in, which is why worlds 2 and 3 share
+/// the entry `0x4032` and land on different data.
+const TILE_SOURCE_TABLES: [usize; 2] = [0x0DED, 0x0DF3];
+
+/// Where each copy lands in video RAM, and how much it writes.
+const TILE_BLOCK_DESTS: [(usize, usize); 2] = [(0x8A00, 0x03D0), (0x9310, 0x03F0)];
+
+/// The blocks `world` (1 to 4) loads over the shared atlas, as
+/// `(rom, vram, size)`. World 1 loads no overlay: the loader only covers the
+/// other three, and the shared atlas is World 1's own.
+pub fn tile_overlay(rom: &[u8], world: usize) -> Option<Vec<(usize, usize, usize)>> {
+    if !(2..=4).contains(&world) {
+        return None;
+    }
+    let bank = WORLD_BANKS[world - 1];
+    let mut blocks = Vec::new();
+    for (table, &(dest, size)) in TILE_SOURCE_TABLES.iter().zip(&TILE_BLOCK_DESTS) {
+        let at = table + (world - 2) * 2;
+        let pointer = u16::from_le_bytes([*rom.get(at)?, *rom.get(at + 1)?]);
+        blocks.push((rom_offset(pointer, bank)?, dest, size));
+    }
+    Some(blocks)
+}
+
+/// The tile data in video RAM while the level whose list is at `list` plays.
 pub fn tiles_for_level(rom: &[u8], list: usize) -> Result<Vec<u8>, AssetError> {
     let mut vram = gameplay_tiles(rom)?.to_vec();
-    if WORLD_2.iter().any(|&(_, start)| start == list) {
-        for (from, to, size) in WORLD_2_TILE_BLOCKS {
-            if from + size > rom.len() {
-                return Err(AssetError::OutOfRange { end: from + size, len: rom.len() });
-            }
-            let at = to - VRAM_TILE_BASE;
-            vram[at..at + size].copy_from_slice(&rom[from..from + size]);
+    let world = LEVEL_NAMES
+        .iter()
+        .position(|&name| level_list(rom, name) == Some(list))
+        .map(|index| index / 3 + 1);
+    let Some(blocks) = world.and_then(|world| tile_overlay(rom, world)) else {
+        return Ok(vram);
+    };
+    for (from, to, size) in blocks {
+        if from + size > rom.len() {
+            return Err(AssetError::OutOfRange { end: from + size, len: rom.len() });
         }
+        let at = to - VRAM_TILE_BASE;
+        vram[at..at + size].copy_from_slice(&rom[from..from + size]);
     }
     Ok(vram)
 }

@@ -212,11 +212,45 @@ Three of the four come from `0x04032` onward, which is bank 1 plus `0x32`.
 World 1's tiles are at `0x08032`, bank 2 plus `0x32`. So a world's own tiles
 sit at the same offset into whichever bank holds its levels.
 
-`level::tiles_for_level` applies the overlay. Measured on 2-1 and 2-2, which
-load byte-identical block layouts, so it is per world rather than per level.
-2-3 is not measured (the run to reach it kills the machine), but it renders as
-a coherent underwater scene through the same overlay, which is evidence rather
-than a measurement.
+Measured on 2-1 and 2-2, which load byte-identical block layouts, so it is per
+world rather than per level. 2-3 is not measured (the run to reach it kills the
+machine), but it renders as a coherent underwater scene through the same
+overlay.
+
+### The cartridge's own copy tables
+
+The search above cannot see worlds 3 and 4 without playing to them, and it
+cannot see everything even where it does run: it works in `0x40`-byte chunks
+and drops any chunk that is uniform or that turns up more than once in the ROM,
+so its picture of the overlay has gaps.
+
+The loader that does the copying is in bank 0 at `0x0D8B`. It takes the world
+number, subtracts two, doubles it, and indexes two tables of pointers; each
+copy then runs until the destination reaches a fixed address, which is where
+the sizes come from.
+
+| table | world 2 | world 3 | world 4 | destination | size |
+|---|---|---|---|---|---|
+| `0x0DED` | `0x4032` | `0x4032` | `0x47F2` | `0x8A00` | `0x03D0` |
+| `0x0DF3` | `0x4402` | `0x4402` | `0x4BC2` | `0x9310` | `0x03F0` |
+
+Two copies, not four blocks. The source is a bank-window address read with the
+world's own bank switched in, which is why worlds 2 and 3 share an entry and
+land on different data. World 1 is not in the tables at all: the shared atlas
+is World 1's own.
+
+Every measured World 2 span sits inside one of these two copies at the same
+ROM-to-VRAM delta, and the fourth measured span (`0x09732` to `0x9700`) turns
+out to be the shared atlas at that address rather than an overlay. So the two
+readings agree wherever the search had anything to say, and the tables fill in
+the rest. `level::tile_overlay` reads them and `level::tiles_for_level` applies
+them.
+
+That makes worlds 3 and 4 render, and what they draw is a check on the world
+numbering the bank header gave: 3-1 opens on stone heads under clouds and 4-1
+on bamboo stalks under a Chinese key pattern, which are Easton and Chai, the
+third and fourth worlds of Super Mario Land. Reading the tables wrong, or
+naming the worlds wrong, would not produce either picture.
 
 One trap worth keeping: background tiles use the signed addressing mode, so an
 id below 128 reads from `0x9000` and the rest from `0x8800`. Computing

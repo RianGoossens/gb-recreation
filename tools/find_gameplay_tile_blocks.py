@@ -19,6 +19,12 @@ that is not one atlas for the whole cartridge: World 2's geometry decodes
 correctly and renders as garbage through World 1's blocks. So the level to
 read from is an argument.
 
+This gives a partial picture on purpose: it works in 0x40-byte chunks and
+drops any chunk that is uniform or that turns up more than once in the ROM,
+so a real copy shows up here with gaps in it. `level::tile_overlay` reads the
+cartridge's own copy tables instead and covers every byte; the two agree
+everywhere this tool has something to say.
+
 Usage: uv run tools/find_gameplay_tile_blocks.py [level]
 """
 

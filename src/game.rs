@@ -235,6 +235,21 @@ fn pending_enemies(level: &Level) -> Vec<(i32, i32, crate::core::enemy::EnemyKin
     pending
 }
 
+/// The cartridge's drawing for an enemy kind, where there is one. The Fly is
+/// ours rather than the cartridge's, so it has no sprite and keeps the
+/// placeholder block.
+fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::assets::sprite::Piece]> {
+    use crate::assets::sprite;
+    use crate::core::enemy::EnemyKind;
+    Some(match kind {
+        EnemyKind::Goomba => sprite::CHIBIBO,
+        EnemyKind::LedgeTurner => sprite::NOKOBON,
+        EnemyKind::Hopper => sprite::FLY,
+        EnemyKind::Faller => sprite::FALLING_SLAB,
+        EnemyKind::Fly => return None,
+    })
+}
+
 fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
     use crate::core::enemy::EnemyKind;
     match kind {
@@ -847,15 +862,26 @@ impl Game {
                 &self.palette,
             );
         }
+        for lift in &self.lifts {
+            self.draw_object_sprite(
+                &mut fb,
+                crate::assets::sprite::LIFT,
+                lift.x - self.camera.x,
+                lift.y + crate::core::lift::LIFT_HEIGHT - view_y,
+            );
+        }
         for enemy in &self.enemies {
-            if enemy.alive {
-                fb.draw_tile(
-                    &self.enemy_tile,
-                    enemy.pixel_x() - self.camera.x,
-                    enemy.pixel_y() - view_y,
-                    &self.palette,
-                );
+            if !enemy.alive {
+                continue;
             }
+            let left = enemy.pixel_x() - self.camera.x;
+            let bottom = enemy.pixel_y() + ENEMY_SIZE - view_y;
+            if enemy_pieces(enemy.kind)
+                .is_some_and(|pieces| self.draw_object_sprite(&mut fb, pieces, left, bottom))
+            {
+                continue;
+            }
+            fb.draw_tile(&self.enemy_tile, left, bottom - ENEMY_SIZE, &self.palette);
         }
         // Flicker Mario while invulnerable. Big Mario is two tiles tall.
         let flicker = self.mario.invuln.max(self.mario.invincible);
@@ -919,6 +945,32 @@ impl Game {
             let (dx, dy) = ((i % 2) as i32 * TILE, (i / 2) as i32 * TILE);
             let dx = if flip { TILE - dx } else { dx };
             fb.draw_sprite_tile(tile, left + dx, top + dy, &self.sprite_palette, flip);
+        }
+        true
+    }
+
+    /// Draw an object from the cartridge's atlas, anchored to the bottom left
+    /// corner given. Reports whether it drew, so a hand-written level (which
+    /// brought no graphics) keeps the placeholder block.
+    fn draw_object_sprite(
+        &self,
+        fb: &mut Framebuffer,
+        pieces: &[crate::assets::sprite::Piece],
+        left: i32,
+        bottom: i32,
+    ) -> bool {
+        let Some(graphics) = self.level.graphics.as_ref() else {
+            return false;
+        };
+        if !pieces
+            .iter()
+            .all(|p| graphics.sprites.len() > p.tile as usize)
+        {
+            return false;
+        }
+        for p in pieces {
+            let tile = &graphics.sprites[p.tile as usize];
+            fb.draw_sprite_tile(tile, left + p.dx, bottom + p.dy, &self.sprite_palette, false);
         }
         true
     }

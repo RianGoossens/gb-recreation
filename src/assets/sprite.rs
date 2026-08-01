@@ -117,6 +117,66 @@ pub fn ink_box(pixels: &[[u8; FRAME_SIZE]; FRAME_SIZE]) -> Option<(usize, usize,
     any.then(|| (x0, y0, x1 - x0 + 1, y1 - y0 + 1))
 }
 
+// Which tiles each object kind is drawn from, measured on the cartridge with
+// `tools/measure_object_sprites.py`: play through the worlds, and for every
+// slot that holds a kind, collect the OAM entries the game placed near it and
+// report them as offsets from the slot's own position. Objects with a
+// neighbour or Mario inside the window are skipped, since two overlapping
+// sets would each be labelled with the other's tiles.
+//
+// The anchor came out the same for every kind measured: the lowest row of the
+// drawing sits at the slot's y and the left column one pixel right of its x.
+// The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id with
+// nothing to decode, and the Fly's four ids (`0xA0`, `0xA1`, `0xB0`, `0xB1`)
+// are the 2x2 block of a 16-wide sheet that Mario's frames are, which
+// confirms that layout from the running game rather than from the picture.
+//
+// The drawings are taller and wider than the 8 by 8 collision box the engine
+// gives an enemy. That box has never been measured on the cartridge, so it
+// stays as it is and the drawing is anchored to its bottom left corner
+// (`docs/reference/faithfulness.md`).
+
+/// One tile of an object's drawing, placed relative to the bottom left corner
+/// of the object.
+///
+/// `dy` counts up from the bottom edge, so the lowest row of a drawing is
+/// `-8` and the row above it `-16`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Piece {
+    pub dx: i32,
+    pub dy: i32,
+    pub tile: u8,
+}
+
+const fn piece(dx: i32, dy: i32, tile: u8) -> Piece {
+    Piece { dx, dy, tile }
+}
+
+/// The Chibibo (object kind `0x00`), a single tile.
+pub const CHIBIBO: &[Piece] = &[piece(0, -8, 0x90)];
+
+/// The Nokobon (kind `0x04`), one tile wide and two tall.
+pub const NOKOBON: &[Piece] = &[piece(0, -16, 0x96), piece(0, -8, 0x97)];
+
+/// The Fly (kind `0x0E`), a 2x2 block out of the per-world band.
+pub const FLY: &[Piece] = &[
+    piece(0, -16, 0xA0),
+    piece(8, -16, 0xA1),
+    piece(0, -8, 0xB0),
+    piece(8, -8, 0xB1),
+];
+
+/// The Falling Slab (kind `0x0C`), two tiles side by side.
+pub const FALLING_SLAB: &[Piece] = &[piece(0, -8, 0xDD), piece(8, -8, 0xDE)];
+
+/// A lift (kinds `0x0A` and `0x0B`), the same tile three times over. Both
+/// axes draw identically; only their movement differs.
+pub const LIFT: &[Piece] = &[
+    piece(0, -8, 0xEF),
+    piece(8, -8, 0xEF),
+    piece(16, -8, 0xEF),
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;

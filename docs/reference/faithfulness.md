@@ -200,8 +200,12 @@ playing it faithfully.
 | Coins and the exit door | canonical | a coin is the cartridge's tile `0xF4` from the world's own sheet; the door is part of the level's background and the engine draws no marker over it |
 | Mario's graphics | canonical | drawn from the cartridge's object atlas. A frame is a 2x2 block of the sheet, small Mario at its start and big Mario two rows down. That these are his tiles is checked against his collision box, measured on the cartridge by a route with nothing to do with graphics: the still frame's ink is 10 by 12 against a box of 11 by 12 (`docs/reference/sprites.md`) |
 | Which of Mario's frames plays when | **stand-in** | the still pose standing and airborne, the two walking poses alternating on our own animator's cadence. The cartridge's choice, and whether it has a separate jump pose, need the running game |
-| The object palette | **stand-in** | objects have their own palette registers on the hardware and their values have not been read off the cartridge, so Mario draws through the default |
-| Enemies, items, blocks | **stand-in** | still drawn as flat blocks. Their tiles are in the same atlas Mario's came out of, but which frames belong to which kind has not been pinned |
+| The object palette | canonical | read off the running cartridge: `OBP0` holds `0xE4` and every object sprite measured selects it, so the default the renderer already used is the cartridge's value (`tools/measure_object_sprites.py`) |
+| Enemy graphics | canonical | the four cartridge enemy kinds the engine implements draw from the atlas at the tiles the running game placed for them: Chibibo `0x90`, Nokobon `0x96`/`0x97`, Fly `0xA0`,`0xA1`,`0xB0`,`0xB1`, Falling Slab `0xDD`/`0xDE`. `EnemyKind::Fly` is ours, not the cartridge's, and keeps the placeholder block |
+| The lift's drawing | canonical | tile `0xEF` three times over, the same for both axes |
+| An enemy's collision box | **stand-in** | 8 by 8 for every kind, which is what the engine has always used and has never been measured on the cartridge. The drawings are taller and wider than that, so a sprite is anchored to the box's bottom left corner and overhangs it |
+| The lift's width | **stand-in** | the engine collides over 16 pixels, the cartridge draws 24, and the support window measured by dropping Mario onto one is 29 pixels of his own x, which matches neither. Left as it is until the width is measured directly |
+| Items and blocks | **stand-in** | still drawn as flat blocks. Their tiles are in the same atlas, but which ones has not been pinned |
 
 ## Sound
 

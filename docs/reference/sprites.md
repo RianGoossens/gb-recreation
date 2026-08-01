@@ -55,6 +55,46 @@ The ink also sits on the bottom edge of the block, `y` 4 through 15, so a
 frame lines up with a position given as feet on the ground with no offset to
 guess at. Horizontally it starts at `x` 3.
 
+## Which tiles each object is drawn from
+
+Measured on the running cartridge with `tools/measure_object_sprites.py`.
+For every slot holding a kind, it collects the OAM entries the game placed
+near the slot and reports them as offsets from the slot's own position.
+Objects with a neighbour inside the window are skipped, and so are objects
+close to Mario, who is drawn from this same atlas and was collected as if he
+were kind `0x23`'s own tiles on the first attempt.
+
+The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id directly.
+
+| kind | name | tiles | size |
+|---|---|---|---|
+| `0x00` | Chibibo | `0x90` | 8x8 |
+| `0x02` | Pakkun Flower | `0x92` over `0x93` | 8x16 |
+| `0x04` | Nokobon | `0x96` over `0x97` | 8x16 |
+| `0x08` | King Totomesu | `0xCD` `0xCE` / `0xAB` `0xC6` `0xC7` / `0xBB` `0xD6` `0xD7` | 24x24 |
+| `0x0A` `0x0B` | lifts | `0xEF` three times | 24x8 |
+| `0x0C` | Falling Slab | `0xDD` `0xDE` | 16x8 |
+| `0x0E` | Fly | `0xA0` `0xA1` / `0xB0` `0xB1` | 16x16 |
+| `0x10` | Honen | `0xC1` over `0xD1` | 8x16 |
+| `0x24` | Yurarin Boo | `0xA6` `0xA7` / `0xB6` `0xB7` | 16x16 |
+
+The Fly's four ids are `n`, `n + 1`, `n + 16`, `n + 17`, the same 2x2 block
+Mario's frames are, which confirms the sheet's 16-tile width from the running
+game rather than from looking at the picture. Not every object uses that
+layout: the 8x16 kinds in the `0x9x` range stack consecutive ids instead.
+
+The anchor is the same for every kind measured. The lowest row of the drawing
+sits at the slot's y, and the left column one pixel right of its x. So an
+object's position is the bottom left corner of what it draws.
+
+Two things the measurement settled beyond the tiles. `OBP0`, the palette
+register objects are drawn through, holds `0xE4`, which is the value the
+renderer had been using as a default, so it stops being a guess. And a lift is
+drawn 24 pixels wide, against the 16 the engine collides over; the support
+window measured by dropping Mario onto one is 29 pixels, which matches
+neither, so the lift's true width is still open and the collision box was left
+alone.
+
 ## Drawing him
 
 `Game` draws Mario from this atlas whenever the level brought cartridge

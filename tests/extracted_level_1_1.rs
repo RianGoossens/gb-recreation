@@ -947,3 +947,122 @@ fn a_session_plays_a_world_other_than_the_first() {
         }
     }
 }
+
+/// The enemies draw from the cartridge's atlas too, at the tiles measured off
+/// the running game (`tools/measure_object_sprites.py`). World 1-1's list is
+/// mostly Chibibos, so this walks until one is on screen and checks every ink
+/// pixel of tile 0x90 against the shade it should be.
+///
+/// The control is the same comparison against a different tile, which has to
+/// fail: a test that passes for any tile would only be showing that something
+/// was drawn.
+#[test]
+fn a_chibibo_draws_with_the_cartridges_tile() {
+    use sml::assets::level as assets;
+    use sml::core::enemy::{EnemyKind, ENEMY_SIZE};
+    use sml::render::Palette;
+
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    let Some(graphics) = level.graphics.clone() else { return };
+
+    let mut game = Game::new(level);
+    let mut held = Buttons::default();
+    held.set(Button::Right, true);
+    let mut found = None;
+    for _ in 0..1200 {
+        game.step(held);
+        let on_screen = game.enemies.iter().find(|e| {
+            e.alive
+                && e.kind == EnemyKind::Goomba
+                && (16..140).contains(&(e.pixel_x() - game.camera.x))
+        });
+        if let Some(enemy) = on_screen {
+            found = Some((enemy.pixel_x(), enemy.pixel_y()));
+            break;
+        }
+    }
+    let Some((ex, ey)) = found else {
+        panic!("no Chibibo came on screen in 1200 frames");
+    };
+
+    let drawn = game.render().to_gray();
+    let left = ex - game.camera.x;
+    let top = ey - game.camera.y + sml::game::PLAYFIELD_TOP + ENEMY_SIZE - 8;
+    let palette = Palette::new(sml::assets::DEFAULT_BGP);
+
+    let matches = |tile: &sml::tiles::Tile| {
+        let mut ink = 0;
+        for (dy, row) in tile.pixels.iter().enumerate() {
+            for (dx, &index) in row.iter().enumerate() {
+                if index == 0 {
+                    continue;
+                }
+                let (x, y) = (left + dx as i32, top + dy as i32);
+                if drawn[(y as usize) * 160 + x as usize] != palette.shade(index).to_gray() {
+                    return None;
+                }
+                ink += 1;
+            }
+        }
+        Some(ink)
+    };
+
+    let ink = matches(&graphics.sprites[0x90]).expect("the Chibibo draws tile 0x90");
+    assert!(ink > 20, "tile 0x90 is a drawing rather than a blank, {ink} pixels");
+    assert!(
+        matches(&graphics.sprites[0x96]).is_none(),
+        "control: the Nokobon's tile must not match where the Chibibo is"
+    );
+}
+
+/// The lifts were never drawn at all before their tiles were measured, so
+/// Mario rode an invisible platform. The cartridge draws one as the same tile
+/// three times over, which is 24 pixels against the 16 the collision box uses
+/// (`docs/reference/objects.md` records that disagreement).
+#[test]
+fn a_lift_draws_three_tiles_wide() {
+    use sml::assets::level as assets;
+    use sml::render::Palette;
+
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    let Some(graphics) = level.graphics.clone() else { return };
+    assert!(!level.lifts.is_empty(), "1-1's list has lifts in it");
+
+    let mut game = Game::new(level);
+    // Put the camera on the first lift rather than walking the whole level.
+    let lift = game.lifts[0];
+    game.camera.x = (lift.x - 60).max(0);
+    let drawn = game.render().to_gray();
+
+    let palette = Palette::new(sml::assets::DEFAULT_BGP);
+    let tile = &graphics.sprites[0xEF];
+    let left = lift.x - game.camera.x;
+    let top = lift.y - game.camera.y + sml::game::PLAYFIELD_TOP;
+
+    for column in 0..3 {
+        for (dy, row) in tile.pixels.iter().enumerate() {
+            for (dx, &index) in row.iter().enumerate() {
+                if index == 0 {
+                    continue;
+                }
+                let x = left + column * 8 + dx as i32;
+                let y = top + dy as i32;
+                assert_eq!(
+                    drawn[(y as usize) * 160 + x as usize],
+                    palette.shade(index).to_gray(),
+                    "lift column {column} pixel {dx},{dy}"
+                );
+            }
+        }
+    }
+}
+
+/// A hand-written level brings no cartridge graphics, so its enemies keep the
+/// placeholder block. Custom levels have to keep working.
+#[test]
+fn a_hand_written_level_keeps_the_placeholder_enemy() {
+    let level = sml::core::level::Level::from_rows(&["M...G.", "######", "######"]);
+    let mut game = Game::new(level);
+    game.step(Buttons::default());
+    assert!(game.render().to_gray().iter().any(|&p| p != 0xFF));
+}

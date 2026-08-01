@@ -44,23 +44,36 @@ fn big_mario_is_taller_than_small_mario() {
     assert!(big.3 > small.3);
 }
 
-/// The three frames of a size are three different pictures, all Mario-shaped.
-/// A layout read wrongly gives blank blocks or repeats, and this catches both.
+/// The blocks a walk cycles through are three different pictures, all
+/// Mario-shaped, and so is the jump pose. A layout read wrongly gives blank
+/// blocks or repeats, and this catches both.
 #[test]
-fn each_size_has_three_distinct_frames() {
+fn each_size_has_three_distinct_walk_frames_and_a_jump() {
     let Some(sheet) = sheet() else { return };
     for size in [Size::Small, Size::Big] {
-        let frames: Vec<_> = (0..sprite::FRAMES)
-            .map(|f| sprite::mario_pixels(&sheet, size, f))
+        let blocks: Vec<usize> = sprite::WALK_BLOCKS
+            .iter()
+            .copied()
+            .chain([sprite::JUMP_BLOCK])
+            .collect();
+        let frames: Vec<_> = blocks
+            .iter()
+            .map(|&b| sprite::mario_pixels(&sheet, size, b))
             .collect();
         for (i, frame) in frames.iter().enumerate() {
             let (_, _, w, h) = sprite::ink_box(frame).expect("frame draws something");
-            assert!((9..=13).contains(&w), "frame {i} is {w} wide");
+            // The jump pose has his arms out, so it is wider than a walk
+            // frame. Keeping the walk bound tight is what makes this test
+            // catch a misread layout at all.
+            let widest = if blocks[i] == sprite::JUMP_BLOCK { 15 } else { 13 };
+            assert!((9..=widest).contains(&w), "frame {i} is {w} wide");
             assert!((12..=16).contains(&h), "frame {i} is {h} tall");
         }
-        assert_ne!(frames[0], frames[1]);
-        assert_ne!(frames[1], frames[2]);
-        assert_ne!(frames[0], frames[2]);
+        for a in 0..frames.len() {
+            for b in a + 1..frames.len() {
+                assert_ne!(frames[a], frames[b], "blocks {a} and {b} draw the same");
+            }
+        }
     }
 }
 
@@ -82,8 +95,8 @@ fn a_world_replaces_only_the_enemy_tiles() {
     assert_eq!(differing.len(), 61);
 
     for size in [Size::Small, Size::Big] {
-        for frame in 0..sprite::FRAMES {
-            for id in sprite::mario_frame(size, frame) {
+        for block in sprite::WALK_BLOCKS.iter().copied().chain([sprite::JUMP_BLOCK]) {
+            for id in sprite::mario_frame(size, block) {
                 assert!(
                     !differing.contains(&(id as usize)),
                     "Mario's tile {id} changes between worlds"

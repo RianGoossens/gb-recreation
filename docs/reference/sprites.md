@@ -27,18 +27,33 @@ Reading the same bytes as four consecutive ids draws a scramble. That is how
 the arrangement was settled: only one of the two readings produces figures.
 
 Mario is at the start of the atlas. The first two rows are small Mario and the
-next two are big Mario, eight blocks across each, of which the first three are
-a still pose and two walking poses:
+next two are big Mario, eight blocks across each. Four of the eight are
+identified:
 
-| frame | small | big |
+| pose | small | big |
 |---|---|---|
-| still | 0, 1, 16, 17 | 32, 33, 48, 49 |
-| walk 1 | 2, 3, 18, 19 | 34, 35, 50, 51 |
-| walk 2 | 4, 5, 20, 21 | 36, 37, 52, 53 |
+| still, and walk 1 | 0, 1, 16, 17 | 32, 33, 48, 49 |
+| walk 2 | 2, 3, 18, 19 | 34, 35, 50, 51 |
+| walk 3 | 4, 5, 20, 21 | 36, 37, 52, 53 |
+| jump | 8, 9, 24, 25 | 40, 41, 56, 57 |
 
-What the remaining five blocks in each row are has not been settled, and which
-frame the game shows at which moment is a separate question that needs the
-running cartridge.
+Which block plays when was traced on the running game
+(`tools/trace_mario_frames.py`), by reading the tile of the sprite the game
+drew at Mario's own position every frame alongside the state bytes that could
+explain the choice:
+
+- Standing still is the first block, held indefinitely.
+- A walk cycles the first three blocks in order, about four frames each. The
+  standing block is part of the cycle rather than separate from it.
+- Every airborne frame is the fourth-across block, through both the rising and
+  falling values of the cartridge's phase byte, so there is one jump pose and
+  it does not change on the way down. Its ink is 14 wide against a walk
+  frame's 10, which is his arms.
+- Facing left draws the same blocks with the hardware's flip bit, which shows
+  up in the trace as the top left sprite becoming the block's right tile.
+
+What the remaining four blocks in each row are has not been settled, and
+whether the walk's rate changes with his speed is not measured.
 
 ## Why these tiles are Mario
 
@@ -112,12 +127,8 @@ collision box, and it starts 3 pixels left of the box so the drawing lands
 inside it. Facing left mirrors the frame, which is what the hardware's flip bit
 does and why the atlas holds only right-facing Mario.
 
-Two things here are ours rather than the cartridge's, and are logged in
-`docs/reference/faithfulness.md`:
-
-- **Which frame plays when.** The still pose is used standing and in the air,
-  and the two walking poses alternate on the existing animator's cadence. The
-  cartridge's own choice, and its jump pose, need the running game.
-- **The object palette.** The hardware gives objects their own palette
-  registers. Their values have not been read off the cartridge, so the default
-  is used.
+Which block plays when now comes from the trace above rather than from our own
+animator, and the palette is the cartridge's `0xE4`. What is left open here is
+narrow: the four unidentified blocks per row, and whether the walk's four-frame
+cadence changes with his speed. Both are in
+`docs/reference/faithfulness.md`.

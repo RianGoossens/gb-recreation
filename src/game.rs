@@ -929,11 +929,19 @@ impl Game {
         } else {
             Size::Big
         };
-        let frame = match crate::core::animation::Animator::state(&self.mario) {
-            AnimState::Walk => 1 + (self.animator.frame() as usize % 2),
-            _ => 0,
+        // Traced on the cartridge (`tools/trace_mario_frames.py`): airborne is
+        // one pose that does not change between rising and falling, a walk
+        // cycles through three blocks including the standing one, and standing
+        // still is that same first block.
+        let block = match crate::core::animation::Animator::state(&self.mario) {
+            AnimState::Jump => sprite::JUMP_BLOCK,
+            AnimState::Walk => {
+                let step = (self.frames / sprite::WALK_HOLD) as usize;
+                sprite::WALK_BLOCKS[step % sprite::WALK_BLOCKS.len()]
+            }
+            AnimState::Idle => sprite::WALK_BLOCKS[0],
         };
-        let ids = sprite::mario_frame(size, frame);
+        let ids = sprite::mario_frame(size, block);
         let flip = self.mario.facing == Facing::Left;
         let (_, mh) = self.mario.size();
         let left = mx - MARIO_SPRITE_INSET;

@@ -55,23 +55,43 @@ pub enum Size {
     Big,
 }
 
-/// The frames of a size, in the order they sit in the atlas. Only the first
-/// three of the eight blocks in a row are Mario standing and walking; what the
-/// rest are has not been settled, so they are not offered here.
-pub const FRAMES: usize = 3;
+/// Blocks across one row of a size.
+pub const BLOCKS: usize = 8;
+
+/// The blocks a walk cycles through, in order.
+///
+/// Traced on the running game (`tools/trace_mario_frames.py`): holding right
+/// cycles the top left sprite through tiles `0x00`, `0x02`, `0x04` and back,
+/// each held about four frames. The still pose is part of the walk rather than
+/// separate from it, which is why there are three and not two.
+pub const WALK_BLOCKS: [usize; 3] = [0, 1, 2];
+
+/// The block Mario is drawn in while he is off the ground.
+///
+/// The same trace, jumping from a stand and jumping from a run: the sprite is
+/// tile `0x08` for every airborne frame, through both the rising and falling
+/// values of the cartridge's own phase byte. So there is one jump pose and it
+/// does not change on the way down. This is one of the five blocks per row
+/// that reading the atlas alone could not identify.
+pub const JUMP_BLOCK: usize = 4;
+
+/// How long a walking block is held, in frames. Read off the trace, where the
+/// three spans come out around four frames each. Whether the rate changes with
+/// his speed is not measured.
+pub const WALK_HOLD: u32 = 4;
 
 /// The tile ids of one of Mario's frames, in reading order: top left, top
 /// right, bottom left, bottom right.
 ///
-/// `frame` 0 is the still pose, 1 and 2 are the two walking poses. Which frame
-/// the cartridge shows at which moment is a separate question that needs the
-/// running game; this only says where the pictures are.
-pub fn mario_frame(size: Size, frame: usize) -> [u8; 4] {
+/// `block` indexes across a size's row of eight. [`WALK_BLOCKS`] are the three
+/// a walk cycles through and [`JUMP_BLOCK`] is the airborne pose; the other
+/// four have not been identified.
+pub fn mario_frame(size: Size, block: usize) -> [u8; 4] {
     let row = match size {
         Size::Small => 0,
         Size::Big => 2,
     };
-    let column = (frame % FRAMES) * FRAME_TILES;
+    let column = (block % BLOCKS) * FRAME_TILES;
     let top = row * SHEET_COLUMNS + column;
     [
         top as u8,
@@ -83,8 +103,8 @@ pub fn mario_frame(size: Size, frame: usize) -> [u8; 4] {
 
 /// The pixels of one of Mario's frames, 16 by 16, as palette indices with 0
 /// meaning transparent.
-pub fn mario_pixels(sheet: &[Tile], size: Size, frame: usize) -> [[u8; FRAME_SIZE]; FRAME_SIZE] {
-    let ids = mario_frame(size, frame);
+pub fn mario_pixels(sheet: &[Tile], size: Size, block: usize) -> [[u8; FRAME_SIZE]; FRAME_SIZE] {
+    let ids = mario_frame(size, block);
     let mut out = [[0u8; FRAME_SIZE]; FRAME_SIZE];
     for (i, id) in ids.iter().enumerate() {
         let (ox, oy) = ((i % 2) * 8, (i / 2) * 8);

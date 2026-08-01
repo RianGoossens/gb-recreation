@@ -636,6 +636,10 @@ fn the_opening_frame_matches_the_emulator_capture() {
     let mut game = Game::new(level);
     game.lives = 2;
     game.timer = 393;
+    // One frame, because the capture is of a game that has run one. A Game
+    // that has never stepped has Mario off the ground, and he is drawn in the
+    // airborne pose, which the cartridge does not do at a level's opening.
+    game.step(Buttons::default());
 
     let (mw, mh) = game.mario.size();
     let mario = (

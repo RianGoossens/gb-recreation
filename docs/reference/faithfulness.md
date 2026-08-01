@@ -47,7 +47,7 @@ playing it faithfully.
 
 | Piece | Notes |
 |-------|-------|
-| Big Mario's box | 11 x 16, of which only the width is measured. No run has reached a mushroom on the cartridge, so the height is still twice the small sprite's tile height rather than a number off the game. |
+| Big Mario's box | 11 x 16, of which only the width is measured. No run has reached a mushroom on the cartridge, so the height is still twice the small sprite's tile height rather than a number off the game. Making the game think he already has one was tried and failed: `tools/find_power_byte.py` poked every byte of work RAM in turn and watched whether the sprite drawn at his position became one of big Mario's blocks, and none did. There is no positive control for that probe, since there is no other way to make him big, so a negative from it is weak. High RAM is unswept, because poking it hangs the emulator. |
 
 ## Items, blocks, scoring
 

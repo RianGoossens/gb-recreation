@@ -251,7 +251,7 @@ pub fn faller_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)
 }
 
 /// Where a level puts its jumpers, as (column, row).
-pub fn hopper_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+pub fn fly_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
     spawning_in(records, mode)
         .iter()
         .filter(|r| r.kind_id() == HOPPER)

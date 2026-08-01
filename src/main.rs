@@ -57,7 +57,7 @@ fn main() -> ExitCode {
     }
 }
 
-/// Opt back in to content Super Mario Land does not have (the star, the Fly).
+/// Opt back in to content Super Mario Land does not have (the star, the Bouncer).
 /// The default build plays the cartridge's own content only; see
 /// `docs/reference/faithfulness.md`.
 const ALLOW_NON_CANONICAL: &str = "--allow-non-canonical";
@@ -312,7 +312,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     };
     let walkers = object::walker_spawns(&records, mode);
     let lifts = object::lift_spawns(&records, mode);
-    let hoppers = object::hopper_spawns(&records, mode);
+    let hoppers = object::fly_spawns(&records, mode);
     let fallers = object::faller_spawns(&records, mode);
     let mut objects: Vec<(usize, usize, u8)> =
         walkers
@@ -855,7 +855,7 @@ fn usage() {
     println!("       a level is a file, a name like 3-1, or a world number like 3");
     println!("  sml play <out.png> [frames] [keys] [lvl] [tuning]  run headlessly to a PNG");
     println!("\n  run and play accept --allow-non-canonical anywhere in the arguments,");
-    println!("  which keeps content Super Mario Land does not have (the star, the Fly).");
+    println!("  which keeps content Super Mario Land does not have (the star, the Bouncer).");
     println!("  Without it those spawns are dropped, so the default game is the cartridge's.");
 }
 

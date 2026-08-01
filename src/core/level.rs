@@ -173,7 +173,7 @@ pub const ANIMATION_HOLD: u32 = 8;
 
 impl Level {
     /// Build a level from rows of text. `#` is a solid tile, `^` a one-way
-    /// platform, `M` marks Mario's spawn, `G` a Goomba, `F` a Fly, `C` a coin,
+    /// platform, `M` marks Mario's spawn, `G` a Goomba, `F` a Bouncer, `C` a coin,
     /// `T` a walker that turns at ledges,
     /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
     /// `E` the level-end trigger, `V` and `H` a lift running up and down or
@@ -197,8 +197,8 @@ impl Level {
                     'M' => spawn = (px, py),
                     'G' => enemy_spawns.push((px, py, EnemyKind::Goomba)),
                     'T' => enemy_spawns.push((px, py, EnemyKind::LedgeTurner)),
-                    'F' => enemy_spawns.push((px, py, EnemyKind::Fly)),
-                    'J' => enemy_spawns.push((px, py, EnemyKind::Hopper)),
+                    'F' => enemy_spawns.push((px, py, EnemyKind::Bouncer)),
+                    'J' => enemy_spawns.push((px, py, EnemyKind::Fly)),
                     'D' => enemy_spawns.push((px, py, EnemyKind::Faller)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
@@ -240,7 +240,7 @@ impl Level {
     /// fail to load rather than simply play faithfully.
     pub fn without_non_canonical(mut self) -> Self {
         self.items.retain(|&(_, _, kind)| kind != ItemKind::Star);
-        self.enemy_spawns.retain(|&(_, _, kind)| kind != EnemyKind::Fly);
+        self.enemy_spawns.retain(|&(_, _, kind)| kind != EnemyKind::Bouncer);
         self
     }
 
@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(
             faithful.enemy_spawns.len(),
             1,
-            "the Goomba stays, the Fly goes"
+            "the Goomba stays, the Bouncer goes"
         );
         assert_eq!(faithful.enemy_spawns[0].2, EnemyKind::Goomba);
         assert_eq!(faithful.coins.len(), 1, "coins are canonical");

@@ -15,9 +15,9 @@ code with `Level::from_file` / `Level::from_text`.
 | `M` | Mario's spawn (use one) |
 | `G` | a ground walker: turns at walls, walks off ledges |
 | `T` | a ground walker that turns at ledges too |
-| `J` | a jumper: still for 54 frames, then a 32 px hop 15 px high |
+| `J` | the cartridge's Fly (kind `0x0E`): still for 54 frames, then a 32 px hop 15 px high |
 | `D` | a faller: holds position for 175 frames, then drops a pixel a frame |
-| `F` | a Fly enemy (walks and hops), see the note on non-cartridge content |
+| `F` | a Bouncer (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility), see the note on non-cartridge content |
 | `W` | a flower (makes Mario fire-powered) |
@@ -36,7 +36,10 @@ is passable.
 
 Two markers spawn things the cartridge has no equivalent of: `S`, since Super
 Mario Land has no invincibility star at all, and `F`, a generic hopping enemy
-standing in for an SML enemy that has not been pinned yet. See
+of our own (the `Bouncer`) standing in for an SML enemy that has not been
+pinned yet. It kept the letter `F` after being renamed, because the cartridge's
+own kind `0x0E` turned out to be named Fly and a level file should not break
+over what we call something. See
 `docs/reference/faithfulness.md`.
 
 The end goal is a faithful recreation, so **`run` and `play` drop both spawns

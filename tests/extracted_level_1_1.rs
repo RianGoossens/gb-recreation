@@ -49,7 +49,7 @@ fn the_extracted_level_carries_the_cartridge_s_walkers() {
     let hoppers = level
         .enemy_spawns
         .iter()
-        .filter(|&&(_, _, kind)| kind == EnemyKind::Hopper)
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Fly)
         .count();
     assert_eq!(hoppers, 3, "and three jumpers");
     // Every one of them, at 16 * x across and 8 * row down. The one at pixel

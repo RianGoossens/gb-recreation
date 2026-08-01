@@ -3,7 +3,7 @@
 //! An enemy walks, falls under gravity, and collides with the world much like
 //! Mario, but with simpler behavior. This module owns the shared parts: the
 //! entity, one physics step (walk plus falling plus collision), and despawning
-//! enemies that have scrolled off screen. Per-type quirks (like a Fly's hop)
+//! enemies that have scrolled off screen. Per-type quirks (like a hop)
 //! build on top of this.
 
 use crate::core::level::{Solids, TILE};
@@ -36,9 +36,9 @@ pub const ENEMY_WALK_SPEED: i32 = 85;
 pub const ENEMY_FALL_SPEED: i32 = crate::core::entity::SUBPIXEL;
 /// How far past the screen edges an enemy may be before it despawns.
 pub const DESPAWN_MARGIN: i32 = 32;
-/// Upward speed a Fly gets on each hop. Provisional.
+/// Upward speed a Bouncer gets on each hop. Provisional, and ours.
 pub const HOP_VELOCITY: i32 = 520;
-/// Frames a Fly waits on the ground between hops.
+/// Frames a Bouncer waits on the ground between hops. Ours.
 pub const HOP_INTERVAL: u32 = 40;
 
 /// The cartridge's jumper (object kind `0x0E`) runs on a fixed cycle of 102
@@ -80,7 +80,14 @@ pub enum EnemyKind {
     /// kind `0x04` to turn at both. They share a walk speed exactly.
     LedgeTurner,
     /// Walks but hops on a timer, so it does not respect ledges.
-    Fly,
+    ///
+    /// Ours, not the cartridge's. It predates any of the object list work and
+    /// is dropped by [`Level::without_non_canonical`], so the default game
+    /// never sees one. It keeps the marker `F` so a custom level written
+    /// against it still loads.
+    ///
+    /// [`Level::without_non_canonical`]: crate::core::level::Level::without_non_canonical
+    Bouncer,
     /// World 1-3's faller: holds its position for 175 frames and then drops
     /// straight down at a pixel a frame. It never moves sideways. Its contact
     /// sweep matches a walker's exactly, so it hurts Mario from every side but
@@ -91,7 +98,11 @@ pub enum EnemyKind {
     /// settled against a control run with no obstacle
     /// (`tools/probe_walker_turn.py`), which a hopper needs because it
     /// reverses and falls on its own anyway.
-    Hopper,
+    ///
+    /// Named for what the cartridge calls object kind `0x0E`. It is drawn from
+    /// atlas tiles `0xA0`, `0xA1`, `0xB0`, `0xB1`, measured on the running
+    /// game (`docs/reference/sprites.md`).
+    Fly,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,9 +115,9 @@ pub struct Enemy {
     pub on_ground: bool,
     pub alive: bool,
     pub kind: EnemyKind,
-    /// Countdown to the next hop, for a Fly. Ignored by other kinds.
+    /// Countdown to the next hop, for a Bouncer. Ignored by other kinds.
     pub hop_timer: u32,
-    /// Frames into the current cycle, for a Hopper. Ignored by other kinds.
+    /// Frames into the current cycle, for a Fly. Ignored by other kinds.
     pub phase: u32,
 }
 
@@ -137,9 +148,9 @@ impl Enemy {
         Self::new(pixel_x, pixel_y, going_left, EnemyKind::LedgeTurner)
     }
 
-    /// A Fly at a whole-pixel position: it walks and hops.
-    pub fn fly(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
-        Self::new(pixel_x, pixel_y, going_left, EnemyKind::Fly)
+    /// A Bouncer at a whole-pixel position: it walks and hops.
+    pub fn bouncer(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        Self::new(pixel_x, pixel_y, going_left, EnemyKind::Bouncer)
     }
 
     /// World 1-3's faller, at the start of its wait.
@@ -150,8 +161,8 @@ impl Enemy {
     }
 
     /// The cartridge's jumper, resting at the start of its cycle.
-    pub fn hopper(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
-        let mut hopper = Self::new(pixel_x, pixel_y, going_left, EnemyKind::Hopper);
+    pub fn fly(pixel_x: i32, pixel_y: i32, going_left: bool) -> Self {
+        let mut hopper = Self::new(pixel_x, pixel_y, going_left, EnemyKind::Fly);
         // The still half of the cycle comes second in the trace, but starting
         // there gives it a moment on the ground before its first hop.
         hopper.phase = HOP_FRAMES;
@@ -228,7 +239,7 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     if !enemy.alive {
         return;
     }
-    if enemy.kind == EnemyKind::Hopper {
+    if enemy.kind == EnemyKind::Fly {
         update_hopper(enemy, solids);
         return;
     }
@@ -266,8 +277,8 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
         enemy.vx = -enemy.vx;
     }
 
-    // A Fly hops on a timer while it is on the ground.
-    if enemy.kind == EnemyKind::Fly && enemy.on_ground {
+    // A Bouncer hops on a timer while it is on the ground.
+    if enemy.kind == EnemyKind::Bouncer && enemy.on_ground {
         if enemy.hop_timer == 0 {
             enemy.vy = -HOP_VELOCITY;
             enemy.on_ground = false;
@@ -470,7 +481,7 @@ mod tests {
     #[test]
     fn a_fly_hops_off_the_ground() {
         let solids = floor();
-        let mut f = Enemy::fly(40, 16, false);
+        let mut f = Enemy::bouncer(40, 16, false);
         f.vx = 0; // isolate the hop
         // Settle onto the floor.
         for _ in 0..10 {
@@ -487,14 +498,14 @@ mod tests {
                 break;
             }
         }
-        assert!(rose, "a Fly should hop above its resting height");
+        assert!(rose, "a Bouncer should hop above its resting height");
     }
 
     /// The whole traced cycle, checked against the numbers the cartridge gave.
     #[test]
     fn a_hopper_reproduces_the_traced_arc() {
         let solids = floor();
-        let mut h = Enemy::hopper(80, 16, true);
+        let mut h = Enemy::fly(80, 16, true);
         update_enemy(&mut h, &solids);
         assert!(h.on_ground);
         let (rest_x, rest_y) = (h.pixel_x(), h.pixel_y());
@@ -519,7 +530,7 @@ mod tests {
     #[test]
     fn a_hopper_stands_perfectly_still_between_hops() {
         let solids = floor();
-        let mut h = Enemy::hopper(80, 16, true);
+        let mut h = Enemy::fly(80, 16, true);
         for _ in 0..2 {
             update_enemy(&mut h, &solids);
         }
@@ -546,7 +557,7 @@ mod tests {
         let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
         let solids = Solids::from_rows(&refs);
 
-        let mut h = Enemy::hopper(40, 16, false); // hopping toward the wall
+        let mut h = Enemy::fly(40, 16, false); // hopping toward the wall
         let mut reversed = false;
         for _ in 0..(HOP_CYCLE * 3) {
             update_enemy(&mut h, &solids);
@@ -568,7 +579,7 @@ mod tests {
             &".".repeat(20),
             &floor_row,
         ]);
-        let mut h = Enemy::hopper(48, 16, false);
+        let mut h = Enemy::fly(48, 16, false);
         let start_y = h.pixel_y();
         for _ in 0..(HOP_CYCLE * 3) {
             update_enemy(&mut h, &solids);

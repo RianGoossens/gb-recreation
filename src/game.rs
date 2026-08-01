@@ -244,9 +244,9 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
     Some(match kind {
         EnemyKind::Goomba => sprite::CHIBIBO,
         EnemyKind::LedgeTurner => sprite::NOKOBON,
-        EnemyKind::Hopper => sprite::FLY,
+        EnemyKind::Fly => sprite::FLY,
         EnemyKind::Faller => sprite::FALLING_SLAB,
-        EnemyKind::Fly => return None,
+        EnemyKind::Bouncer => return None,
     })
 }
 
@@ -255,8 +255,8 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
     match kind {
         EnemyKind::Goomba => Enemy::goomba(px, py, true),
         EnemyKind::LedgeTurner => Enemy::ledge_turner(px, py, true),
+        EnemyKind::Bouncer => Enemy::bouncer(px, py, true),
         EnemyKind::Fly => Enemy::fly(px, py, true),
-        EnemyKind::Hopper => Enemy::hopper(px, py, true),
         EnemyKind::Faller => Enemy::faller(px, py),
     }
 }

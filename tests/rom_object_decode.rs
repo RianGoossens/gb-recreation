@@ -495,7 +495,7 @@ fn every_level_hands_over_the_same_objects_each_time() {
         let records = object::object_list(&data, start);
         let got = (
             object::walker_spawns(&records, mode).len(),
-            object::hopper_spawns(&records, mode).len(),
+            object::fly_spawns(&records, mode).len(),
             object::faller_spawns(&records, mode).len(),
             object::lift_spawns(&records, mode).len(),
         );

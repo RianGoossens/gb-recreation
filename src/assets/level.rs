@@ -169,6 +169,24 @@ pub fn level_objects(rom: &[u8], name: &str) -> Option<usize> {
     header_entry(rom, WORLD_BANKS[index / 3], OBJECT_TABLE, index)
 }
 
+/// The title screen's index in bank 2's screen table, one past the twelve
+/// levels. The extraction code already knew the number from the disassembly
+/// ("level index 0x0C"); the table is where it lives.
+pub const TITLE_SCREEN_INDEX: usize = 12;
+
+/// The title screen's background, decoded from bank 2's screen table.
+///
+/// It is one screen in the same column format a level uses, so the picture
+/// under the two HUD rows comes out of the ROM rather than out of a captured
+/// constant. Only the other two banks' thirteenth entries stay unexplained:
+/// bank 1's repeats World 2-1's list and bank 3's is a four-screen brick
+/// corridor.
+pub fn title_screen(rom: &[u8]) -> Option<Vec<Column>> {
+    let list = header_entry(rom, WORLD_BANKS[0], SCREEN_TABLE, TITLE_SCREEN_INDEX)?;
+    let pointer = u16::from_le_bytes([*rom.get(list)?, *rom.get(list + 1)?]);
+    decode_screen(rom, pointer, WORLD_BANKS[0])
+}
+
 /// The name of the level a screen list belongs to, if it is one of the twelve.
 pub fn level_of_list(rom: &[u8], start: usize) -> Option<&'static str> {
     LEVEL_NAMES

@@ -600,3 +600,22 @@ fn only_a_worlds_last_level_lacks_an_exit_door() {
         );
     }
 }
+
+/// The title screen's background is a screen record like any level's, at index
+/// 12 of bank 2's table, which is the "level index 0x0C" the extraction code
+/// already knew from the disassembly.
+#[test]
+fn the_title_screens_background_comes_out_of_the_rom() {
+    let Some(data) = rom() else { return };
+    let columns = level::title_screen(&data).expect("bank 2 names the title screen");
+    assert_eq!(columns.len(), SCREEN_COLUMNS);
+    assert!(columns.iter().all(|c| c.len() == ROWS));
+
+    // The screen has to be the title screen rather than some other record: the
+    // word START sits on screen row 13, so those cells cannot all be empty.
+    let row = 13 - 2;
+    assert!(
+        columns.iter().filter(|c| c[row] != level::FILLER).count() >= 5,
+        "the decoded screen has nothing drawn where START is"
+    );
+}

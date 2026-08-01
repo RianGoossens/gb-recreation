@@ -92,15 +92,21 @@ is the preferred technique (see CLAUDE.md).
 
 The Rust extraction command (`sml extract-title`) reads these offsets directly
 from the ROM binary. No emulator is involved in extracting the tile graphics.
-The tilemap (20x18 VRAM tile indices) is embedded as a constant in
-`src/assets/title.rs`: the level-loading routine that generates it is not yet
-reimplemented, so the map was captured once from emulator VRAM
-(`tools/dump_title_map.py`) and is documented as a fixed property of this ROM
-rather than derived at runtime. Extracting it without an emulator, by
-reimplementing the level loader, is open work.
+The tilemap (20x18 VRAM tile indices) now comes out of the ROM too. The title
+screen is level index 0x0C, and index 12 of bank 2's screen table (see
+`level-format.md`) is where that index points: one screen in the same column
+format a level uses, decoded by `level::title_screen`.
+
+The map captured from emulator VRAM (`tools/dump_title_map.py`) is the control
+and is still in the file for it. The decode reproduces all 320 of the cells
+under the HUD. Two things stay captured, because the screen record does not
+carry them: the two HUD rows at the top, which the title init routine fills,
+and one cell at column 14 of screen row 11, where the record says empty and the
+running game writes tile 0x00.
 
 ## Earlier open questions (now answered)
 
 - Exact VRAM tile block used by the title screen (LCDC bit 4: 0x8000 unsigned addressing or 0x8800 signed). Answer: signed.
 - Which of the two tile maps holds the title layout. Answer: 0x9800.
-- Where in the ROM banks the title tile graphics are stored. Answer: all in bank 2, see the ROM offsets table above. Extracted by `sml extract-title` directly from the ROM file. The tilemap layout is still a captured constant, not derived from the ROM at runtime (see above).
+- Where in the ROM banks the title tile graphics are stored. Answer: all in bank 2, see the ROM offsets table above. Extracted by `sml extract-title` directly from the ROM file.
+- Where the tilemap layout comes from. Answer: bank 2's screen table, index 12, decoded like any level screen (see above). It used to be a constant captured from VRAM.

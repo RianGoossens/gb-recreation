@@ -129,7 +129,7 @@ pub fn extract_title(rom_path: impl AsRef<Path>) -> Result<(TileSheet, Vec<u8>, 
     // data at level index 0x0C always produces this exact map).
     //
     // The map is 20x18 = 360 bytes of VRAM tile indices.
-    let map_indices = title_screen_map();
+    let map_indices = title_screen_map(&rom);
 
     // Decode all referenced tiles, deduplicating.
     let mut unique_tiles: Vec<Tile> = Vec::new();
@@ -155,17 +155,46 @@ pub fn extract_title(rom_path: impl AsRef<Path>) -> Result<(TileSheet, Vec<u8>, 
     Ok((sheet, remapped_cells, cols, rows))
 }
 
-/// The 20x18 VRAM tile indices the title screen produces. These are the raw
-/// tile indices (for signed addressing) that the game writes to the background
-/// map at 0x9800 for level index 0x0C.
+/// The 20x18 VRAM tile indices the title screen produces, with the sixteen
+/// rows under the HUD read from the ROM.
 ///
-/// This data is a fixed property of the ROM: the game's level loading routine
-/// (Call_807 with hLevelIndex=0x0C) plus explicit tile writes in the title init
-/// code always produce this exact map. Captured once from VRAM after booting
-/// the verified ROM for 600 frames (LCDC=0xC3, map_base=0x9800, SCX=0, SCY=0).
+/// Level index 0x0C is the title screen, and index 12 of bank 2's screen table
+/// is where that index points: one screen in the same column format a level
+/// uses. Decoding it reproduces 319 of the 320 cells of the map that was
+/// captured from emulator VRAM, so the picture is derived rather than stored.
 ///
-/// Source: kaspermeerts/supermarioland disassembly, verified against emulator VRAM.
-fn title_screen_map() -> Vec<u8> {
+/// What stays captured is what the level record does not carry: the two HUD
+/// rows at the top, which the title init routine fills, and one cell at column
+/// 14 of screen row 11, where the level says empty and the running game writes
+/// tile 0x00.
+fn title_screen_map(rom: &[u8]) -> Vec<u8> {
+    let mut map = captured_title_map();
+    let Some(columns) = crate::assets::level::title_screen(rom) else {
+        return map;
+    };
+    for (c, column) in columns.iter().enumerate() {
+        for (r, &tile) in column.iter().enumerate() {
+            let cell = (r + HUD_ROWS) * 20 + c;
+            if cell != PATCHED_CELL {
+                map[cell] = tile;
+            }
+        }
+    }
+    map
+}
+
+/// The two rows the title screen's own init routine fills, above the screen
+/// the level format carries.
+const HUD_ROWS: usize = 2;
+
+/// The one cell the running game writes that the level record does not:
+/// column 14 of screen row 11.
+const PATCHED_CELL: usize = 11 * 20 + 14;
+
+/// The map as captured from VRAM after booting the verified ROM for 600 frames
+/// (LCDC=0xC3, map_base=0x9800, SCX=0, SCY=0). Still the source for the two HUD
+/// rows and the one patched cell, and the control for everything else.
+fn captured_title_map() -> Vec<u8> {
     vec![
         // Row 0: HUD row (patched by FillStartMenuTopRow with 0x3C, plus tile 0x94)
         0x3C, 0x3C, 0x3C, 0x3C, 0x94, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C,
@@ -268,5 +297,31 @@ mod tests {
     fn tile_block_offsets_are_bank_2() {
         let offsets: Vec<usize> = TILE_BLOCKS.iter().map(|b| b.rom_offset).collect();
         assert_eq!(offsets, vec![0x9032, 0xB91A, 0xBE1A, 0x8862]);
+    }
+
+    /// The control for reading the title screen's background out of the ROM.
+    /// The map used to be carried whole as a constant, captured from emulator
+    /// VRAM; the decode has to reproduce it. 319 of the 320 cells under the two
+    /// HUD rows agree, and the one that does not is the cell the running game
+    /// patches.
+    #[test]
+    fn the_rom_reproduces_the_captured_title_map() {
+        let Ok(rom) = std::fs::read("super_mario_land.gb") else {
+            return;
+        };
+        let captured = captured_title_map();
+        let derived = title_screen_map(&rom);
+        assert_eq!(derived.len(), captured.len());
+
+        let differing: Vec<usize> = (0..captured.len())
+            .filter(|&i| captured[i] != derived[i])
+            .collect();
+        assert!(differing.is_empty(), "cells {differing:?} differ from the capture");
+
+        // And the decode really did write those cells, rather than the
+        // fallback quietly returning the capture.
+        let columns = crate::assets::level::title_screen(&rom).expect("bank 2 names it");
+        let filled = columns.iter().flatten().filter(|&&t| t != 0x2C).count();
+        assert!(filled > 100, "the decoded screen is nearly empty");
     }
 }

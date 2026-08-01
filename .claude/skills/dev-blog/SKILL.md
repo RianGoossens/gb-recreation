@@ -34,10 +34,10 @@ A hand-built chart or diagram illustrating numeric data (a curve fit, a trace, a
 ### AI-ism check (run before committing, on the post file itself)
 
 ```sh
-grep -nE ', not [A-Za-z]|not [A-Za-z]+ but [A-Za-z]|is not [^.]*\.[[:space:]]*It is|not a [a-z]+, (it'"'"'s|it is)' docs/blog/posts/YYYY-MM-DD-slug.html
+grep -nE ', not [A-Za-z0-9]|not [A-Za-z0-9]+ but [A-Za-z0-9]|is not [^.]*\.[[:space:]]*It is|not a [a-z]+, (it'"'"'s|it is)' docs/blog/posts/YYYY-MM-DD-slug.html
 ```
 
-Any hit is a candidate for the "not X, it is Y" / "X, not Y" antithesis pattern and needs a look, including in the `<title>` and `<h1>`/`<h2>` lines, not just body paragraphs. This is the exact construction that slipped through once as the whole framing device of a post title ("watching, not reading" in the `<title>`, `<h1>`, and an `<h2>`) and once as a split-sentence version ("is not X. It is Y.") that an earlier, narrower comma-only check missed. Grep the file, not memory.
+Any hit is a candidate for the "not X, it is Y" / "X, not Y" antithesis pattern and needs a look, including in the `<title>` and `<h1>`/`<h2>` lines, not just body paragraphs. The character class includes digits because the pattern turns up around measurements: "24 pixels, not 16" is the same tic and an earlier letters-only version of this grep walked straight past it. This is the exact construction that slipped through once as the whole framing device of a post title ("watching, not reading" in the `<title>`, `<h1>`, and an `<h2>`) and once as a split-sentence version ("is not X. It is Y.") that an earlier, narrower comma-only check missed. Grep the file, not memory.
 
 ## Post rules
 

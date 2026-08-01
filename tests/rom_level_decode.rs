@@ -619,3 +619,57 @@ fn the_title_screens_background_comes_out_of_the_rom() {
         "the decoded screen has nothing drawn where START is"
     );
 }
+
+/// Every world animates one background tile. Both tile loaders end by saving
+/// its high bitplane to `0xC600`, and the routine at `0x02416` alternates
+/// between that and a per-world frame in bank 0.
+#[test]
+fn every_world_animates_one_tile_between_two_frames() {
+    let Some(data) = rom() else { return };
+    let mut seen = Vec::new();
+    for world in 1..=4 {
+        let (loaded, alternate) =
+            level::animation_frames(&data, world).expect("both frames of the animated tile");
+        assert_ne!(loaded, alternate, "world {world}'s two frames are the same picture");
+        assert!(loaded.iter().any(|&b| b != 0), "world {world} loads a blank tile");
+        assert!(alternate.iter().any(|&b| b != 0), "world {world}'s second frame is blank");
+        assert!(!seen.contains(&alternate), "world {world} repeats another world's frame");
+        seen.push(alternate);
+    }
+}
+
+/// The relation that pins the table's base and index. World 2's second frame
+/// is its first shifted down a row with every row rotated right two pixels,
+/// which is a water surface flowing. A wrong base or a wrong index would put
+/// some other world's bytes here and break it.
+#[test]
+fn world_2s_second_frame_is_its_first_one_shifted() {
+    let Some(data) = rom() else { return };
+    let (loaded, alternate) = level::animation_frames(&data, 2).expect("world 2's frames");
+    assert_eq!(alternate[0], 0x00);
+    for row in 1..8 {
+        assert_eq!(
+            alternate[row],
+            loaded[row - 1].rotate_right(2),
+            "row {row} does not follow the shift"
+        );
+    }
+}
+
+/// What the animated tile draws in World 2: the water line. It runs along the
+/// bottom row of 2-1 and 2-2 from the first column to the last screen, which
+/// is dry ground with the exit door on it, and along the top row of 2-3 for
+/// the whole level, which plays underwater from end to end.
+#[test]
+fn the_animated_tile_is_world_2s_water_line() {
+    let Some(data) = rom() else { return };
+    for (name, row) in [("2-1", ROWS - 1), ("2-2", ROWS - 1), ("2-3", 0)] {
+        let list = level::level_list(&data, name).expect("header entry");
+        let columns = level::decode_level(&data, list);
+        let wet: Vec<bool> =
+            columns.iter().map(|c| c[row] == level::ANIMATED_TILE).collect();
+        let dry = if name == "2-3" { 0 } else { SCREEN_COLUMNS };
+        assert!(wet[..wet.len() - dry].iter().all(|&w| w), "World {name} row {row} has a gap");
+        assert!(wet[wet.len() - dry..].iter().all(|&w| !w), "World {name} ends wet");
+    }
+}

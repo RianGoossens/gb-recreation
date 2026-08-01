@@ -262,6 +262,42 @@ on bamboo stalks under a Chinese key pattern, which are Easton and Chai, the
 third and fourth worlds of Super Mario Land. Reading the tables wrong, or
 naming the worlds wrong, would not produce either picture.
 
+### One tile per world is animated
+
+Both tile loaders end with the same eight-byte copy the other way round, out
+of the tile data they just wrote and into `0xC600`, reading every other byte.
+The per-world loader takes them from its second source plus `0x2C1`; the
+shared loader at `0x005F0` takes them from bank 2's `0x5603`. Both addresses
+land on the same place in video RAM, `0x95D1`, which is the high bitplane of
+background tile `0x5D`.
+
+The routine at `0x02416` writes eight bytes back into `0x95D1`. It runs every
+eight frames (`0xFFAC & 7`), and bit 3 of the same counter picks where the
+bytes come from: `0xC600`, so the tile the world loaded with, or a table at
+`0x3FC4` indexed by the world number out of the high nibble of `0xFFB4`. So
+tile `0x5D` has two frames and holds each for eight frames.
+
+What pins the table's base and its index is World 2's pair. Its second frame
+is its first shifted down a row with every row rotated right two pixels, which
+is a water surface flowing:
+
+```
+loaded            second frame
+#.....##          ........
+##...##.          ###.....
+.##.##.#          #.##...#
+########          .#.##.##
+########          ########
+```
+
+That tile is World 2's water line: it fills the bottom row of 2-1 and 2-2 from
+the first column to the last screen (which is dry ground with the exit door on
+it) and the top row of 2-3 for all 360 columns, since 2-3 plays underwater end
+to end. World 4 uses it along the bottom of 4-2 and Worlds 1 and 3 use it as
+scenery, 25 cells in 1-3 and 1200 through the cave in 3-2.
+
+`level::animation_frames` reads both frames for a world.
+
 One trap worth keeping: background tiles use the signed addressing mode, so an
 id below 128 reads from `0x9000` and the rest from `0x8800`. Computing
 `0x8000 + id * 16` looks right and points at the wrong half of video RAM,

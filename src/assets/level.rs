@@ -665,14 +665,47 @@ pub fn tile_overlay(rom: &[u8], world: usize) -> Option<Vec<(usize, usize, usize
     Some(blocks)
 }
 
-/// The tile data in video RAM while the level whose list is at `list` plays.
-pub fn tiles_for_level(rom: &[u8], list: usize) -> Result<Vec<u8>, AssetError> {
+/// The one background tile the cartridge animates.
+///
+/// Both tile loaders end the same way: the per-world one at `0x0D8B` and the
+/// shared one at `0x005F0` each copy eight bytes out of the tile data they
+/// just wrote into `0xC600`, reading every other byte. Those eight bytes are
+/// the high bitplane of this tile, and the routine at `0x02416` writes eight
+/// bytes back into the same place every eight frames, taking them from
+/// `0xC600` or from [`ANIMATION_FRAMES`] depending on bit 3 of the frame
+/// counter at `0xFFAC`. So the tile has two frames and holds each for eight
+/// frames.
+pub const ANIMATED_TILE: u8 = 0x5D;
+
+/// The second frame of [`ANIMATED_TILE`], one 8-byte high bitplane per world,
+/// indexed by `world - 1`. The routine reads it at `0x3FC4 + (world - 1) * 8`,
+/// taking the world number from the high nibble of `0xFFB4`.
+const ANIMATION_FRAMES: usize = 0x3FC4;
+
+/// Where the tile's own eight bytes sit inside the video RAM the world loads.
+const ANIMATED_TILE_PLANE: usize = 0x95D1;
+
+/// Both frames of [`ANIMATED_TILE`] for `world` (1 to 4), each an 8-byte high
+/// bitplane, first the one the tile loads with.
+pub fn animation_frames(rom: &[u8], world: usize) -> Option<([u8; 8], [u8; 8])> {
+    if !(1..=4).contains(&world) {
+        return None;
+    }
+    let vram = tiles_for_world(rom, world).ok()?;
+    let at = ANIMATED_TILE_PLANE - VRAM_TILE_BASE;
+    let mut loaded = [0u8; 8];
+    for (i, byte) in loaded.iter_mut().enumerate() {
+        *byte = *vram.get(at + i * 2)?;
+    }
+    let from = ANIMATION_FRAMES + (world - 1) * 8;
+    let alternate = rom.get(from..from + 8)?.try_into().ok()?;
+    Some((loaded, alternate))
+}
+
+/// The tile data in video RAM while any level of `world` plays.
+pub fn tiles_for_world(rom: &[u8], world: usize) -> Result<Vec<u8>, AssetError> {
     let mut vram = gameplay_tiles(rom)?.to_vec();
-    let world = LEVEL_NAMES
-        .iter()
-        .position(|&name| level_list(rom, name) == Some(list))
-        .map(|index| index / 3 + 1);
-    let Some(blocks) = world.and_then(|world| tile_overlay(rom, world)) else {
+    let Some(blocks) = tile_overlay(rom, world) else {
         return Ok(vram);
     };
     for (from, to, size) in blocks {
@@ -683,6 +716,18 @@ pub fn tiles_for_level(rom: &[u8], list: usize) -> Result<Vec<u8>, AssetError> {
         vram[at..at + size].copy_from_slice(&rom[from..from + size]);
     }
     Ok(vram)
+}
+
+/// The tile data in video RAM while the level whose list is at `list` plays.
+pub fn tiles_for_level(rom: &[u8], list: usize) -> Result<Vec<u8>, AssetError> {
+    let world = LEVEL_NAMES
+        .iter()
+        .position(|&name| level_list(rom, name) == Some(list))
+        .map(|index| index / 3 + 1);
+    match world {
+        Some(world) => tiles_for_world(rom, world),
+        None => Ok(gameplay_tiles(rom)?.to_vec()),
+    }
 }
 
 /// A level's own graphics, as the cartridge draws them.

@@ -395,3 +395,52 @@ fn the_cartridge_uses_forty_one_object_kinds() {
     assert_eq!(normal.len(), 40);
     assert_eq!((implemented, records), (171, 481));
 }
+
+/// The four bosses check the naming table and the header's world numbering at
+/// once. Each of these ids appears exactly once in the whole cartridge, in the
+/// third level of the world whose boss it is named for. Worlds 3 and 4 were
+/// numbered from a ROM table and have never been played, so Hiyoihoi sitting
+/// in 3-3 and Biokinton in 4-3 is a check nothing else in the project makes.
+#[test]
+fn each_world_ends_on_its_own_boss() {
+    let Some(data) = rom() else { return };
+
+    let bosses = [
+        (0x08u8, "King Totomesu", "1-3"),
+        (0x1A, "Dragonzamasu", "2-3"),
+        (0x32, "Hiyoihoi", "3-3"),
+        (0x61, "Biokinton", "4-3"),
+    ];
+    for (kind, expected_name, expected_level) in bosses {
+        assert_eq!(object::kind_name(kind), Some(expected_name));
+        let mut found = Vec::new();
+        for name in level::LEVEL_NAMES {
+            let start = level::level_objects(&data, name).expect("header entry");
+            for r in object::object_list(&data, start) {
+                if r.kind_id() == kind {
+                    found.push(name);
+                }
+            }
+        }
+        assert_eq!(found, vec![expected_level], "{expected_name}");
+    }
+}
+
+/// 40 of the 41 kinds the cartridge places in a level have a name. The one
+/// left is `0x2F`, which the disassembly guesses at with a question mark
+/// against it and so is left unnamed here.
+#[test]
+fn every_kind_the_levels_place_has_a_name_but_one() {
+    let Some(data) = rom() else { return };
+
+    let mut unnamed = std::collections::BTreeSet::new();
+    for name in level::LEVEL_NAMES {
+        let start = level::level_objects(&data, name).expect("header entry");
+        for r in object::object_list(&data, start) {
+            if object::kind_name(r.kind_id()).is_none() {
+                unnamed.insert(r.kind_id());
+            }
+        }
+    }
+    assert_eq!(unnamed, std::collections::BTreeSet::from([0x2F]));
+}

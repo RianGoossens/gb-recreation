@@ -276,6 +276,116 @@ pub fn walker_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize,
         .collect()
 }
 
+/// What the cartridge's own developers called each object type, from the
+/// `enemies.asm` equate list of the `kaspermeerts/supermarioland`
+/// disassembly. Nothing observable on the running game carries a name, so this
+/// is the one thing here that cannot be measured.
+///
+/// It is not taken on trust. Seven of these ids had already been measured on
+/// the cartridge with no reference to any name, and every one of them lands on
+/// a name that matches what was measured:
+///
+/// | id | measured | name |
+/// |---|---|---|
+/// | `0x00` | walks, falls off ledges | Chibibo |
+/// | `0x02` | oscillates 16 px down and back, never moves sideways | Pakkun Flower |
+/// | `0x04` | walks, turns at ledges | Nokobon |
+/// | `0x0A` `0x0B` | carry Mario on one axis each | platforms |
+/// | `0x0C` | waits 175 frames, then falls at a pixel a frame | Falling Slab |
+/// | `0x0E` | 54 frames still, then a 32 px hop | Fly |
+///
+/// An off-by-one anywhere in the table would break all seven at once, so the
+/// alignment is checked rather than assumed.
+///
+/// Two entries disagree with what was measured and keep the measurement.
+/// `0x0A` is named the horizontal platform there and `0x0B` the vertical one;
+/// on the cartridge `0x0A` moves only on Y and `0x0B` only on X, watched twice
+/// (`tools/measure_enemy_walk.py` and `tools/probe_lift.py`), so this table
+/// says only "platform" for both. And `0x02`, named for a piranha plant, did
+/// not hurt Mario at any vertical overlap through two full cycles
+/// (`tools/probe_object_contact.py`), which is still unexplained.
+///
+/// Ids the disassembly leaves as `ENEMY_xx`, or names with a question mark
+/// against them, are left unnamed here rather than guessed at.
+pub fn kind_name(kind: u8) -> Option<&'static str> {
+    Some(match kind & !EXPERT_ONLY {
+        0x00 => "Chibibo",
+        0x01 => "Chibibo, stomped",
+        0x02 => "Pakkun Flower",
+        0x03 => "Ganchan, spawning",
+        0x04 => "Nokobon",
+        0x05 => "Nokobon's bomb",
+        0x06 => "Genkotsu",
+        0x08 => "King Totomesu",
+        0x09 => "Pompon Flower",
+        0x0A | 0x0B => "platform",
+        0x0C => "Falling Slab",
+        0x0E => "Fly",
+        0x0F => "Fly, stomped",
+        0x10 => "Honen",
+        0x13 => "lift",
+        0x14 => "lift, ascending",
+        0x16 => "Mekabon",
+        0x17 => "Mekabon's head",
+        0x18 => "Mekabon's body",
+        0x1A => "Dragonzamasu",
+        0x1C => "Mekabon, stomped",
+        0x1D => "Yurarin",
+        0x1E => "fire breath",
+        0x20 => "Gunion",
+        0x21 => "Gunion, exploding",
+        0x22 => "Gunion's fireball",
+        0x23 => "fireball",
+        0x24 => "Yurarin Boo",
+        0x25 => "Suu",
+        0x27 => "explosion",
+        0x28 => "mushroom in flight",
+        0x29 => "mushroom",
+        0x2A => "heart in flight",
+        0x2B => "heart",
+        0x2D => "flower, growing",
+        0x2E => "flower",
+        0x30 => "Torion",
+        0x31 => "Tokotoko",
+        0x32 => "Hiyoihoi",
+        0x34 => "star",
+        0x35 => "falling spike",
+        0x36 => "drop block",
+        0x37 => "drop block, falling",
+        0x38 => "diagonal platform, north east",
+        0x39 => "diagonal platform, north west",
+        0x3A => "small vertical platform",
+        0x3B => "small horizontal platform",
+        0x3C => "Batadon",
+        0x3D => "Batadon, stomped",
+        0x3F => "Gao",
+        0x40 => "Gao, stomped",
+        0x42 => "Bunbun",
+        0x43 => "Bunbun, stomped",
+        0x45 => "arrow",
+        0x47 => "Ganchan",
+        0x48 => "Tamao",
+        0x49 => "pipe cannon",
+        0x4B => "Gira",
+        0x51 => "Pompon spore",
+        0x52 => "Roketon",
+        0x53 => "chicken",
+        0x54 => "Roto Disc",
+        0x55 => "Pakkun Flower, upside down",
+        0x56 => "Pionpi",
+        0x57 => "Pionpi, stomped",
+        0x59 => "Chikako",
+        0x5A => "Gira, diagonal",
+        0x5C => "cannonball",
+        0x5D => "small cannonball, top",
+        0x5E => "small cannonball, middle",
+        0x5F => "small cannonball, bottom",
+        0x60 => "Tatanga",
+        0x61 => "Biokinton",
+        _ => return None,
+    })
+}
+
 /// Verify the ROM, then read a level's object list out of it.
 pub fn extract_objects(
     rom_path: impl AsRef<Path>,
@@ -328,6 +438,31 @@ mod tests {
         assert_eq!(low.row(), high.row());
         assert_eq!(high.pixel_x() - low.pixel_x(), 8);
         assert_eq!(low.pixel_x(), 0x76 * 16);
+    }
+
+    #[test]
+    fn every_measured_kind_lands_on_a_name_that_matches_it() {
+        // Each of these was measured on the cartridge before any name was
+        // read. They span 0x00 to 0x0E, so a table shifted by any amount
+        // breaks at least one.
+        assert_eq!(kind_name(WALKER), Some("Chibibo"));
+        assert_eq!(kind_name(LEDGE_TURNER), Some("Nokobon"));
+        assert_eq!(kind_name(HOPPER), Some("Fly"));
+        assert_eq!(kind_name(FALLER), Some("Falling Slab"));
+        assert_eq!(kind_name(LIFT_VERTICAL), Some("platform"));
+        assert_eq!(kind_name(LIFT_HORIZONTAL), Some("platform"));
+        assert_eq!(kind_name(0x02), Some("Pakkun Flower"));
+    }
+
+    #[test]
+    fn an_expert_only_record_keeps_its_name() {
+        assert_eq!(kind_name(WALKER | EXPERT_ONLY), Some("Chibibo"));
+    }
+
+    #[test]
+    fn an_unnamed_kind_stays_unnamed() {
+        // The disassembly leaves 0x07 as ENEMY_07, so we do too.
+        assert_eq!(kind_name(0x07), None);
     }
 
     #[test]

@@ -254,56 +254,94 @@ Across all twelve object lists there are 41 distinct kind bytes, 40 of them in
 normal play. Seven have been measured on the running cartridge, and those seven
 account for 171 of the 481 normal-play records.
 
-| kind | records | levels | what it is |
-|---|---|---|---|
-| `0x00` | 32 | 1-1 1-2 2-1 2-2 4-1 4-2 | ground walker |
-| `0x02` | 29 | 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | harmless oscillator (left out) |
-| `0x03` | 8 | 3-1 3-2 |  |
-| `0x04` | 54 | 1-1 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | ledge turner |
-| `0x06` | 2 | 4-3 |  |
-| `0x08` | 1 | 1-3 |  |
-| `0x09` | 3 | 4-2 |  |
-| `0x0A` | 16 | 1-1 1-2 2-1 2-2 3-1 3-2 4-1 | vertical lift |
-| `0x0B` | 21 | 1-1 1-2 2-1 2-2 3-1 3-3 4-1 4-2 | horizontal lift |
-| `0x0C` | 9 | 1-3 4-1 | faller |
-| `0x0E` | 10 | 1-1 3-2 3-3 | jumper |
-| `0x10` | 24 | 2-1 2-3 |  |
-| `0x16` | 5 | 2-2 |  |
-| `0x1A` | 1 | 2-3 |  |
-| `0x1D` | 9 | 2-3 |  |
-| `0x20` | 6 | 2-3 |  |
-| `0x24` | 7 | 2-1 2-2 2-3 |  |
-| `0x25` | 11 | 3-2 |  |
-| `0x2F` | 5 | 2-3 |  |
-| `0x31` | 7 | 3-1 3-3 |  |
-| `0x32` | 1 | 3-3 |  |
-| `0x35` | 1 | 3-2 |  |
-| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 |  |
-| `0x38` | 5 | 3-3 4-1 |  |
-| `0x39` | 4 | 3-3 4-1 |  |
-| `0x3A` | 6 | 3-1 3-2 3-3 4-2 |  |
-| `0x3B` | 4 | 3-1 3-3 |  |
-| `0x3C` | 8 | 3-1 3-3 |  |
-| `0x3F` | 6 | 1-3 4-2 |  |
-| `0x42` | 9 | 1-2 |  |
-| `0x47` | 2 | 3-3 |  |
-| `0x48` | 1 | 2-3 |  |
-| `0x49` | 21 | 3-1 3-2 4-1 4-2 |  |
-| `0x52` | 18 | 4-3 |  |
-| `0x53` | 28 | 4-3 |  |
-| `0x54` | 17 | 4-2 4-3 |  |
-| `0x55` | 14 | 4-1 4-2 |  |
-| `0x56` | 13 | 4-1 |  |
-| `0x59` | 12 | 4-3 |  |
-| `0x61` | 1 | 4-3 |  |
+| kind | records | levels | name | what it is |
+|---|---|---|---|---|
+| `0x00` | 32 | 1-1 1-2 2-1 2-2 4-1 4-2 | Chibibo | ground walker |
+| `0x02` | 29 | 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | Pakkun Flower | harmless oscillator (left out) |
+| `0x03` | 8 | 3-1 3-2 | Ganchan, spawning |  |
+| `0x04` | 54 | 1-1 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | Nokobon | ledge turner |
+| `0x06` | 2 | 4-3 | Genkotsu |  |
+| `0x08` | 1 | 1-3 | King Totomesu |  |
+| `0x09` | 3 | 4-2 | Pompon Flower |  |
+| `0x0A` | 16 | 1-1 1-2 2-1 2-2 3-1 3-2 4-1 | platform | vertical lift |
+| `0x0B` | 21 | 1-1 1-2 2-1 2-2 3-1 3-3 4-1 4-2 | platform | horizontal lift |
+| `0x0C` | 9 | 1-3 4-1 | Falling Slab | faller |
+| `0x0E` | 10 | 1-1 3-2 3-3 | Fly | jumper |
+| `0x10` | 24 | 2-1 2-3 | Honen |  |
+| `0x16` | 5 | 2-2 | Mekabon |  |
+| `0x1A` | 1 | 2-3 | Dragonzamasu |  |
+| `0x1D` | 9 | 2-3 | Yurarin |  |
+| `0x20` | 6 | 2-3 | Gunion |  |
+| `0x24` | 7 | 2-1 2-2 2-3 | Yurarin Boo |  |
+| `0x25` | 11 | 3-2 | Suu |  |
+| `0x2F` | 5 | 2-3 |  |  |
+| `0x31` | 7 | 3-1 3-3 | Tokotoko |  |
+| `0x32` | 1 | 3-3 | Hiyoihoi |  |
+| `0x35` | 1 | 3-2 | falling spike |  |
+| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | drop block |  |
+| `0x38` | 5 | 3-3 4-1 | diagonal platform, north east |  |
+| `0x39` | 4 | 3-3 4-1 | diagonal platform, north west |  |
+| `0x3A` | 6 | 3-1 3-2 3-3 4-2 | small vertical platform |  |
+| `0x3B` | 4 | 3-1 3-3 | small horizontal platform |  |
+| `0x3C` | 8 | 3-1 3-3 | Batadon |  |
+| `0x3F` | 6 | 1-3 4-2 | Gao |  |
+| `0x42` | 9 | 1-2 | Bunbun |  |
+| `0x47` | 2 | 3-3 | Ganchan |  |
+| `0x48` | 1 | 2-3 | Tamao |  |
+| `0x49` | 21 | 3-1 3-2 4-1 4-2 | pipe cannon |  |
+| `0x52` | 18 | 4-3 | Roketon |  |
+| `0x53` | 28 | 4-3 | chicken |  |
+| `0x54` | 17 | 4-2 4-3 |  |  |
+| `0x55` | 14 | 4-1 4-2 | Pakkun Flower, upside down |  |
+| `0x56` | 13 | 4-1 | Pionpi |  |
+| `0x59` | 12 | 4-3 | Chikako |  |
+| `0x61` | 1 | 4-3 | Biokinton |  |
 
 A blank in the last column means the byte has never been watched on the
 cartridge. Two are worth measuring before the others on volume alone: `0x36`
 turns up in nine of the twelve levels, and `0x04`, already measured, is the
 most common thing in the game.
 
-Nothing here says what any of them is called. That is a separate question and
-a guess would put an invented enemy into the game through the back door.
+### Where the names come from
+
+Nothing observable on the running game carries a name, so this is the one part
+of the object system that cannot be measured. The names are the equate list in
+`enemies.asm` of the `kaspermeerts/supermarioland` disassembly, and they cover
+40 of the 41 kinds the levels place. The one left out is `0x2F`, which that
+list guesses at with a question mark against it.
+
+The list is checked rather than trusted, in two ways.
+
+**The seven measured kinds.** Every id measured on the cartridge, with no
+reference to any name, lands on a name that matches what it was seen doing:
+`0x00` walks and falls off ledges (Chibibo), `0x04` walks and turns at them
+(Nokobon), `0x0E` stands still and hops (Fly), `0x0C` waits and then drops
+(Falling Slab), `0x0A` and `0x0B` carry Mario (platforms). They span `0x00` to
+`0x0E`, so a table off by any amount breaks several at once.
+
+**The four bosses.** Each of `0x08`, `0x1A`, `0x32` and `0x61` appears exactly
+once in the whole cartridge, and each appears in the third level of the world
+whose boss it is named for: King Totomesu in 1-3, Dragonzamasu in 2-3,
+Hiyoihoi in 3-3, Biokinton in 4-3. That also checks something else. Worlds 3
+and 4 were numbered from a table in the ROM and have never been played here, so
+Hiyoihoi turning up in the level the header calls 3-3 is independent
+corroboration of the numbering. Tamao (`0x48`) sits in 2-3 alongside
+Dragonzamasu, and Tatanga (`0x60`) is in no list at all, so whatever puts him
+on screen in 4-3 is Biokinton rather than the level.
+
+Two names disagree with what was measured, and the measurement wins.
+
+- `0x0A` is named the horizontal platform and `0x0B` the vertical one. On the
+  cartridge `0x0A` moves only on Y and `0x0B` only on X, watched twice
+  (`measure_enemy_walk.py` and `probe_lift.py`). Both are recorded here as
+  "platform" and the engine keeps the measured axes.
+- `0x02` is named for a piranha plant, and a piranha plant hurts Mario. The
+  contact sweep found it harmless at every vertical overlap through two full
+  cycles. That is unexplained; it stays out of the extracted levels either way,
+  and it is worth re-running the sweep on a level where the flower is not
+  already extended when the probe starts.
+
+`sml list-objects <level>` prints the name against each record.
 
 ### Every list runs to the end of its own level
 
@@ -462,12 +500,12 @@ short by his death.
 All five kinds World 1-1 spawns:
 
 | kind | count | horizontal | vertical |
-|---|---|---|---|
-| `0x00` | 10 | 1 px left every 3 frames, 143 steps, no reversal | none |
-| `0x04` | 1 | 1 px every 3 frames, turns at walls and at ledges | none |
-| `0x0E` | 3 | 1 to 4 px steps in bursts, net about zero | same, with 54-frame pauses |
-| `0x0A` | 1 | none | 1 px every 2 frames, reversing every 120 frames (a lift) |
-| `0x0B` | 1 | 1 px every 2 frames, reversing every 106 frames (a lift) | none |
+|---|---|---|---|---|
+| `0x00` | 10 | 1 px left every 3 frames, 143 steps, no reversal | Chibibo | none |
+| `0x04` | 1 | 1 px every 3 frames, turns at walls and at ledges | Nokobon | none |
+| `0x0E` | 3 | 1 to 4 px steps in bursts, net about zero | Fly | same, with 54-frame pauses |
+| `0x0A` | 1 | none | platform | 1 px every 2 frames, reversing every 120 frames (a lift) |
+| `0x0B` | 1 | 1 px every 2 frames, reversing every 106 frames (a lift) | platform | none |
 
 `0x00` and `0x04` share a cadence exactly, and they part company at a ledge.
 Writing a wall and then a pit into the tilemap in front of each

@@ -409,10 +409,10 @@ fn list_objects(args: &[String]) -> ExitCode {
         }
     };
     println!("World {name}: {} records at 0x{start:05X}", records.len());
-    println!(" bytes     pixel x  column  row  kind  mode");
+    println!(" bytes     pixel x  column  row  kind  mode    name");
     for r in &records {
         println!(
-            " {:02X} {:02X} {:02X}   {:7}  {:6}  {:3}  0x{:02X}  {}",
+            " {:02X} {:02X} {:02X}   {:7}  {:6}  {:3}  0x{:02X}  {:6}  {}",
             r.x,
             r.y,
             r.kind,
@@ -421,6 +421,7 @@ fn list_objects(args: &[String]) -> ExitCode {
             r.row(),
             r.kind_id(),
             if r.expert_only() { "expert" } else { "both" },
+            object::kind_name(r.kind_id()).unwrap_or("unnamed"),
         );
     }
     println!(

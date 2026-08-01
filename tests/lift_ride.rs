@@ -149,6 +149,58 @@ fn without_the_block_he_falls_straight_past() {
     );
 }
 
+/// World 2-1's gap, the one the geometry walker stops at, is crossed by lift
+/// rather than by swimming. On the cartridge, dropping Mario into it leaves
+/// him alive on a lift at its own resting offset, carried back and forth
+/// (`tools/probe_water.py`). This is the same thing in the engine.
+#[test]
+fn world_2_1s_water_gap_is_crossed_by_lift() {
+    use sml::assets::level as assets;
+    use sml::core::lift::Motion;
+
+    let Ok(level) = assets::extracted_level("2-1") else { return };
+    let mut game = Game::new(level);
+    let lift = *game
+        .lifts
+        .iter()
+        .filter(|l| l.motion != Motion::Drop)
+        .min_by_key(|l| (l.x - 66 * 8).abs())
+        .expect("2-1 has lifts in the gap");
+    assert!(
+        (lift.x - 66 * 8).abs() < 8 * 8,
+        "the nearest lift to the gap is at {}",
+        lift.x
+    );
+
+    // Over it, well above, with nothing else under him for the width of the
+    // gap. The camera has to be there too or the lift is never stepped.
+    game.mario.x = sml::core::entity::pixels(lift.x + 8);
+    game.mario.y = sml::core::entity::pixels(lift.y - 60);
+    game.mario.vx = 0;
+    game.mario.vy = 0;
+    game.camera.x = lift.x - 80;
+    let mut landed = None;
+    for frame in 0..200 {
+        game.step(Buttons::default());
+        if game.mario.on_ground {
+            landed = Some(frame);
+            break;
+        }
+    }
+    assert!(landed.is_some(), "he fell through the gap instead of onto a lift");
+
+    let carried = game.mario.pixel_x();
+    for _ in 0..40 {
+        game.step(Buttons::default());
+    }
+    assert!(game.mario.on_ground, "and he stays on it");
+    assert_ne!(
+        game.mario.pixel_x(),
+        carried,
+        "carried sideways without pressing anything"
+    );
+}
+
 #[test]
 fn a_level_without_lifts_has_none() {
     let level = Level::from_rows(&["....", "..M.", "####"]);

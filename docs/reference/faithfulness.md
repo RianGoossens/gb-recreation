@@ -230,10 +230,19 @@ playing it faithfully.
 World 2's three levels decode from the cartridge and `sml extract-level 2-1`
 writes them, but they cannot be finished:
 
-- **No swimming.** 2-1 and 2-2 both open into water at world columns 60 to 79
-  (both lists point at screen `0x5D32`, which has no floor), and the engine has
-  no swimming, so a walker falls out of the level there. 2-3 is the same world's
-  third level and gets to column 178.
+- **The water is crossed by lift, and there is no swimming to add.** 2-1 and
+  2-2 both open into water at world columns 60 to 79 (both lists point at
+  screen `0x5D32`, which has no floor), and a plain walker falls out of the
+  level there. Swimming was the assumed missing piece for a while and the
+  cartridge says otherwise. Its decoded tiles put the animated water line in
+  the bottom row of the screen for 300 of 2-1's 320 columns, so the water sits
+  below the playfield rather than being something he moves through, and 2-1's
+  own object list puts two horizontal lifts inside the gap. Dropping him into
+  it on the cartridge (`tools/probe_water.py`) leaves him alive on one of
+  them, at the same slot y minus 10 a lift rests him at, carried back and
+  forth by its cycle. 2-3 is the same world's third level and gets to column
+  178. What crosses the gap is already in the engine; what is missing is a
+  walker that knows to wait for a lift.
 - **Its enemies are in, minus the swimmers.** The row question turned out to be
   confined to Honen and Yurarin Boo, whose records all carry the same row byte
   and which place themselves below the screen, so neither is written to a level
@@ -242,8 +251,10 @@ writes them, but they cannot be finished:
   2-1 gets 10 walkers and 4 lifts, 2-2 gets 14 and 5. 2-3 has none of the
   implemented kinds at all, so it stays empty.
 
-World 2 cannot be finished without swimming, so it is not wired into the
-default campaign, which stays World 1.
+World 2 is not wired into the default campaign, which stays World 1, until
+something plays it end to end. That is now a question about riding lifts and
+about 2-3, whose whole 360 columns carry the water line in the *top* row, so
+the level is under water throughout.
 
 Worlds 3 and 4 arrived later, from the bank header rather than from playing,
 and stand in the same place with more caveats:

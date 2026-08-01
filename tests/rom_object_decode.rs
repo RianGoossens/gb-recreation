@@ -467,6 +467,42 @@ fn implemented_kinds_are_placed_in_open_space() {
     assert!(checked > 100, "only checked {checked} records");
 }
 
+/// What each level gets when it is extracted, as (walkers, jumpers, fallers,
+/// lifts). Pinned so a change in the decode or in which kinds are implemented
+/// is visible per level rather than only in a total. Worlds 3 and 4 have never
+/// been played here, so this is the record of what the ROM says they hold.
+#[test]
+fn every_level_hands_over_the_same_objects_each_time() {
+    let Some(data) = rom() else { return };
+
+    let expected = [
+        ("1-1", (11, 3, 0, 2)),
+        ("1-2", (8, 0, 0, 7)),
+        ("1-3", (1, 0, 8, 0)),
+        ("2-1", (10, 0, 0, 4)),
+        ("2-2", (14, 0, 0, 5)),
+        ("2-3", (0, 0, 0, 0)),
+        ("3-1", (7, 0, 0, 3)),
+        ("3-2", (8, 5, 0, 1)),
+        ("3-3", (2, 0, 0, 3)),
+        ("4-1", (8, 0, 1, 5)),
+        ("4-2", (16, 0, 0, 4)),
+        ("4-3", (0, 0, 0, 0)),
+    ];
+    let mode = object::Mode::Normal;
+    for (name, counts) in expected {
+        let start = level::level_objects(&data, name).expect("header entry");
+        let records = object::object_list(&data, start);
+        let got = (
+            object::walker_spawns(&records, mode).len(),
+            object::hopper_spawns(&records, mode).len(),
+            object::faller_spawns(&records, mode).len(),
+            object::lift_spawns(&records, mode).len(),
+        );
+        assert_eq!(got, counts, "World {name}");
+    }
+}
+
 /// The four bosses check the naming table and the header's world numbering at
 /// once. Each of these ids appears exactly once in the whole cartridge, in the
 /// third level of the world whose boss it is named for. Worlds 3 and 4 were

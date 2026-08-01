@@ -226,13 +226,16 @@ writes them, but they cannot be finished:
   (both lists point at screen `0x5D32`, which has no floor), and the engine has
   no swimming, so a walker falls out of the level there. 2-3 is the same world's
   third level and gets to column 178.
-- **No enemies.** World 2's object lists are pinned for 2-1 and 2-2 but stay out
-  of the level files, because 23 of 2-1's 37 spawns land on a row their record's
-  `y` byte does not give. Placing them would put known enemies in the wrong
-  place.
+- **Its enemies are in, minus the swimmers.** The row question turned out to be
+  confined to Honen and Yurarin Boo, whose records all carry the same row byte
+  and which place themselves below the screen, so neither is written to a level
+  file. Every other World 2 record of a kind the engine implements lands on a
+  cell that is not solid, the check World 1 passes, and those are extracted:
+  2-1 gets 10 walkers and 4 lifts, 2-2 gets 14 and 5. 2-3 has none of the
+  implemented kinds at all, so it stays empty.
 
-So World 2 is geometry only. It is not wired into the default campaign, which
-stays World 1.
+World 2 cannot be finished without swimming, so it is not wired into the
+default campaign, which stays World 1.
 
 Worlds 3 and 4 arrived later, from the bank header rather than from playing,
 and stand in the same place with more caveats:
@@ -248,9 +251,13 @@ and stand in the same place with more caveats:
   World 3 is what is left for bank 3. The graphics agree (3-1 opens on stone
   heads, 4-1 on bamboo, which are Easton and Chai) but that is corroboration,
   not a measurement.
-- **No enemies, for the same reason as World 2.** Their object lists are named
-  and geometrically sane, and they stay out of the level files until the row
-  question is settled.
+- **Their enemies are extracted, unwatched.** The kinds the engine implements
+  are written into the level files now that the row question is settled and
+  every one of their records is checked to land in open space. Nothing has seen
+  them move there, so what is being trusted is that a kind byte selects the same
+  code in World 3 that it selects in World 1. The boss ids corroborate the
+  pairing: King Totomesu, Dragonzamasu, Hiyoihoi and Biokinton each appear
+  exactly once in the cartridge, in the third level of their own world.
 - **World 4-3 is a vehicle stage.** It has no ground under the spawn, no exit
   door, and 4 of its 480 columns are solid. The engine has no aeroplane, so
   nothing in it can be played at all.

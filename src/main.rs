@@ -282,12 +282,7 @@ fn extract_level(args: &[String]) -> ExitCode {
         }
     };
 
-    // Worlds 1 and 2. Worlds 3 and 4 have object lists in the same table and
-    // are held back until their placements are checked the same way.
-    let has_objects = name.starts_with("1-") || name.starts_with("2-");
-    let objects = has_objects
-        .then(|| level::level_objects(&rom, name))
-        .flatten()
+    let objects = level::level_objects(&rom, name)
         .map(|start| object::extract_objects(DEFAULT_ROM, start))
         .transpose();
     let records = match objects {

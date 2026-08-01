@@ -89,11 +89,17 @@ object's position is the bottom left corner of what it draws.
 
 Two things the measurement settled beyond the tiles. `OBP0`, the palette
 register objects are drawn through, holds `0xE4`, which is the value the
-renderer had been using as a default, so it stops being a guess. And a lift is
-drawn 24 pixels wide, against the 16 the engine collides over; the support
-window measured by dropping Mario onto one is 29 pixels, which matches
-neither, so the lift's true width is still open and the collision box was left
-alone.
+renderer had been using as a default, so it stops being a guess.
+
+And the lift's width, which had been 16 in the engine and disagreed with a
+support window of 29 measured by dropping Mario onto one. The drawing is 24
+wide, three tiles of `0xEF`, and re-sweeping that window a pixel at a time
+(rather than two, which was the earlier resolution) puts it at offsets -2
+through +26 of the lift's own position: exactly 29. A 24 pixel surface gives
+29 for a foot of 6, and both edges of the window independently place that foot
+at the same spot, centred on Mario's position. A 16 pixel surface gives 29 for
+no foot width at all. So the lift is 24 and the game tests six pixels of
+Mario, not his whole eleven (`src/core/lift.rs`).
 
 ## Drawing him
 

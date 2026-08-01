@@ -36,7 +36,7 @@ GROUND_TOP = 112
 APPROACH = 2600
 DROP = 40
 SETTLE = 90
-OFFSETS = range(-8, 49, 2)
+OFFSETS = range(-8, 41, 1)
 
 
 def main():
@@ -78,6 +78,12 @@ def main():
     held = []
     for offset in OFFSETS:
         state = slot(pb, found)
+        # A single-pixel sweep runs long enough that the object can leave the
+        # screen and its slot be handed to something else. Anything measured
+        # after that would be a different object's surface.
+        if state[0] != want or not 8 <= state[3] + offset <= 250:
+            print(f"{offset:6d}  slot {found} no longer holds kind 0x{want:02X}, stopping")
+            break
         for _ in range(4):
             pb.memory[MARIO_Y] = FLY_Y
             pb.tick()
@@ -102,7 +108,7 @@ def main():
         print("\nnothing held him up")
         return 1
     print(f"\nheld from offset {held[0]} to {held[-1]}, "
-          f"which is {held[-1] - held[0] + 2} px of surface at this step")
+          f"which is {held[-1] - held[0] + 1} px wide")
     return 0
 
 

@@ -13,8 +13,18 @@
 
 use crate::core::entity::{pixels, Mario, SUBPIXEL};
 
-/// A lift is 16 pixels across, drawn from two 8-pixel sprites.
-pub const LIFT_WIDTH: i32 = 16;
+/// A lift is 24 pixels across, drawn as the same tile three times over.
+///
+/// This was 16 for as long as the drawing was unknown, and 16 never explained
+/// the measurement: Mario is held over a 29 pixel window of his own position
+/// (`tools/measure_lift.py`, swept a pixel at a time), which a 16 pixel
+/// surface cannot produce for any foot width and a 24 pixel one produces for
+/// a foot of 6. Reading the sprites off the running game
+/// (`tools/measure_object_sprites.py`) gave the 24 independently.
+pub const LIFT_WIDTH: i32 = 24;
+/// How much of Mario the surface test actually uses, centred in his box. See
+/// [`ride_lifts`].
+pub const FOOT_WIDTH: i32 = 6;
 /// Only its top edge matters for collision, but it needs some depth so a rect
 /// test has something to hit.
 pub const LIFT_HEIGHT: i32 = 8;
@@ -110,8 +120,14 @@ impl Lift {
 /// from above, and jumps up through it otherwise.
 pub fn ride_lifts(mario: &mut Mario, lifts: &[Lift], moves: &[(i32, i32)], was_bottom: i32) {
     let (w, h) = mario.size();
-    let left = mario.pixel_x();
-    let right = left + w - 1;
+    // The cartridge does not test his whole body against the surface. Sweeping
+    // his position across a lift one pixel at a time holds him over a window
+    // of 29 (`tools/measure_lift.py`), and the lift is 24 wide, so what is
+    // being tested is FOOT_WIDTH pixels centred in his box: 24 + 6 - 1 = 29.
+    // Both edges of the measured window agree on the same centring.
+    let inset = (w - FOOT_WIDTH) / 2;
+    let left = mario.pixel_x() + inset;
+    let right = left + FOOT_WIDTH - 1;
 
     for (lift, &(dx, dy)) in lifts.iter().zip(moves) {
         let (ll, lt, lr, _lb) = lift.edges();
@@ -141,6 +157,30 @@ pub fn ride_lifts(mario: &mut Mario, lifts: &[Lift], moves: &[(i32, i32)], was_b
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The cartridge holds Mario over a 29 pixel window of his own position,
+    /// swept a pixel at a time in `tools/measure_lift.py`. That number is the
+    /// whole reason the lift is 24 wide and the foot test is 6: no other pair
+    /// of a tile-multiple surface and a sensible foot produces 29.
+    #[test]
+    fn mario_is_held_across_the_twenty_nine_pixels_the_cartridge_holds_him() {
+        let lift = Lift::new(100, 100, LiftAxis::Vertical);
+        let held: Vec<i32> = (60..160)
+            .filter(|&x| {
+                let mut mario = Mario::new(x, 100 - 12);
+                mario.vy = 1;
+                ride_lifts(&mut mario, &[lift], &[(0, 0)], 100 - 1);
+                mario.on_ground
+            })
+            .collect();
+        assert_eq!(
+            held.len(),
+            29,
+            "held from {:?} to {:?}",
+            held.first(),
+            held.last()
+        );
+    }
 
     #[test]
     fn a_lift_moves_a_pixel_every_two_frames() {

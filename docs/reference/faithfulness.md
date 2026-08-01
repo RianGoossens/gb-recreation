@@ -204,7 +204,7 @@ playing it faithfully.
 | Enemy graphics | canonical | the four cartridge enemy kinds the engine implements draw from the atlas at the tiles the running game placed for them: Chibibo `0x90`, Nokobon `0x96`/`0x97`, Fly `0xA0`,`0xA1`,`0xB0`,`0xB1`, Falling Slab `0xDD`/`0xDE`. `EnemyKind::Fly` is ours, not the cartridge's, and keeps the placeholder block |
 | The lift's drawing | canonical | tile `0xEF` three times over, the same for both axes |
 | An enemy's collision box | **stand-in** | 8 by 8 for every kind, which is what the engine has always used and has never been measured on the cartridge. The drawings are taller and wider than that, so a sprite is anchored to the box's bottom left corner and overhangs it |
-| The lift's width | **stand-in** | the engine collides over 16 pixels, the cartridge draws 24, and the support window measured by dropping Mario onto one is 29 pixels of his own x, which matches neither. Left as it is until the width is measured directly |
+| The lift's width | canonical | 24 pixels, which is what it draws and what its support window says. Mario is held over 29 pixels of his own position, swept a pixel at a time, and 24 plus a 6 pixel foot is 29; a 16 pixel surface cannot give 29 for any foot width |
 | Items and blocks | **stand-in** | still drawn as flat blocks. Their tiles are in the same atlas, but which ones has not been pinned |
 
 ## Sound

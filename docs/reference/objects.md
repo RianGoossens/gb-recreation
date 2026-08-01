@@ -618,12 +618,26 @@ coordinate. In other words his feet sit exactly on the top of the row the
 record decodes to. The walker agrees from the other direction: its slot Y of
 136 puts its own top at screen y 120 and its bottom on the ground at 128.
 
-The width does not resolve as cleanly. The lift is drawn from two 8-pixel
-sprites, so 16 pixels across, and a 16-pixel platform under an 8-pixel Mario
-would give a window of 23 rather than 29. The extra 6 says the cartridge's
-small Mario is about 14 pixels wide for this test, against the 8 our engine
-uses. The discrepancy sits in Mario's box. It is recorded in
-`docs/reference/faithfulness.md` rather than papered over by widening the lift.
+The width took a second pass to resolve, and the first pass had it backwards.
+The lift was taken to be two sprites across, 16 pixels, which no foot width
+turns into a window of 29, so the extra was blamed on Mario's box being wider
+than the engine's.
+
+Reading the sprites off the running game
+(`tools/measure_object_sprites.py`, see `docs/reference/sprites.md`) says the
+lift is three tiles of `0xEF`, 24 pixels. Re-running the sweep a pixel at a
+time rather than two, which is what the original 29 was rounded from, puts the
+window at offsets -2 through +26 of the lift's own position: 29 exactly. A 24
+pixel surface gives 29 for a foot of 6 pixels, and both edges of the window
+place that foot in the same spot, centred on Mario's position. So the surface
+is 24 and the game tests six pixels of Mario rather than his whole eleven,
+which is what a platform game does so you cannot stand on a ledge by a
+fingernail. Nothing here is left over to blame on Mario.
+
+The sweep needs one guard at single-pixel resolution that it did not need at
+two: it runs long enough for the object to leave the screen and its slot to be
+handed to something else, and anything measured after that is a different
+object's surface.
 
 One note on method, because it cost a while. Taking a save state once the lift
 is on screen and restoring it per offset looks like the tidy way to run this
@@ -631,9 +645,8 @@ sweep, and it silently breaks the experiment: restoring and then placing Mario
 drops him through the lift at every offset, including the ones a plain run
 holds him at. Every offset has to run inside the same continuous approach.
 
-None of these has a name yet. Naming them means matching a 16-pixel sprite to
-an SML enemy, and a wrong guess would put an invented enemy in the game through
-the back door, so the ids stay as ids.
+These have names now, and drawings: see "Where the names come from" above for
+the first and `docs/reference/sprites.md` for the second.
 
 ## What is not decoded yet
 

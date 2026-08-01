@@ -167,19 +167,12 @@ fn rom_and_list(name: &str) -> Option<(Vec<u8>, usize)> {
 fn load_level_arg(arg: &str) -> Result<sml::core::level::Level, String> {
     use sml::core::level::Level;
 
-    let cartridge = sml::assets::level::LEVEL_NAMES.contains(&arg);
-    let path = if cartridge {
-        format!("assets/extracted/level_{}.txt", arg.replace('-', "_"))
-    } else {
-        arg.to_string()
-    };
-    Level::from_file(&path).map_err(|e| {
-        if cartridge {
+    if sml::assets::level::LEVEL_NAMES.contains(&arg) {
+        return sml::assets::level::extracted_level(arg).map_err(|e| {
             format!("World {arg} has not been extracted yet: run `sml extract-level {arg}` ({e})")
-        } else {
-            format!("could not load level {path}: {e}")
-        }
-    })
+        });
+    }
+    Level::from_file(arg).map_err(|e| format!("could not load level {arg}: {e}"))
 }
 
 fn parse_number(s: &str) -> Option<usize> {

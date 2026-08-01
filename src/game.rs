@@ -257,13 +257,22 @@ impl Game {
 
     pub fn new(level: Level) -> Self {
         let (w, h) = (level.solids.width, level.solids.height);
-        let mut cells = Vec::with_capacity(w * h);
-        for ty in 0..h {
-            for tx in 0..w {
-                let solid = level.solids.is_solid(tx as i32, ty as i32);
-                cells.push(if solid { 1 } else { 0 });
+        // A level out of the cartridge carries its own background. One drawn by
+        // hand does not, and renders as empty and solid blocks.
+        let cartridge = level.graphics.as_ref().filter(|g| g.cells.len() == w * h);
+        let (cells, bg_tiles, bgp) = match cartridge {
+            Some(g) => (g.cells.clone(), g.tiles.clone(), g.palette),
+            None => {
+                let mut cells = Vec::with_capacity(w * h);
+                for ty in 0..h {
+                    for tx in 0..w {
+                        let solid = level.solids.is_solid(tx as i32, ty as i32);
+                        cells.push(if solid { 1 } else { 0 });
+                    }
+                }
+                (cells, vec![solid_tile(0), solid_tile(2)], 0xE4)
             }
-        }
+        };
         let mario = Mario::new(level.spawn.0, level.spawn.1);
         let mut pending = pending_enemies(&level);
         let mut enemies = Vec::new();
@@ -301,8 +310,7 @@ impl Game {
             completed: false,
             game_over: false,
             bg_map: TileMap::new(w, h, cells),
-            // Empty tiles render white, solid tiles dark, Mario a black block.
-            bg_tiles: vec![solid_tile(0), solid_tile(2)],
+            bg_tiles,
             mario_tile: solid_tile(3),
             // Enemies render as a light-gray block so they stand out from both
             // the white background and the dark terrain.
@@ -316,7 +324,7 @@ impl Game {
             flower_tile: flower_tile(),
             superball_tile: superball_tile(),
             end_tile: end_tile(),
-            palette: Palette::new(0xE4),
+            palette: Palette::new(bgp),
         }
     }
 

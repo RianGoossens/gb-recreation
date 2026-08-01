@@ -29,7 +29,7 @@ pub fn world_levels(world: usize) -> Option<Vec<Level>> {
         return None;
     }
     (1..=3)
-        .map(|level| Level::from_file(format!("assets/extracted/level_{world}_{level}.txt")).ok())
+        .map(|level| crate::assets::level::extracted_level(&format!("{world}-{level}")).ok())
         .collect()
 }
 

@@ -8,6 +8,7 @@ use crate::core::block::BlockKind;
 use crate::core::enemy::EnemyKind;
 use crate::core::lift::LiftAxis;
 use crate::core::powerup::ItemKind;
+use crate::tiles::Tile;
 
 /// Tile size in pixels.
 pub const TILE: i32 = 8;
@@ -141,6 +142,18 @@ pub struct Level {
     pub items: Vec<(i32, i32, ItemKind)>,
     /// Moving platforms: top-left pixel and the axis they run on.
     pub lifts: Vec<(i32, i32, LiftAxis)>,
+    /// The cartridge's own background graphics, when the level came from the
+    /// ROM. A hand-written level file has none and renders with placeholders.
+    pub graphics: Option<Graphics>,
+}
+
+/// A level's background as the cartridge draws it: one tile id per cell, row
+/// major over the level's own width and height, and the sheet those ids index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Graphics {
+    pub cells: Vec<u8>,
+    pub tiles: Vec<Tile>,
+    pub palette: u8,
 }
 
 impl Level {
@@ -194,6 +207,7 @@ impl Level {
             end,
             items,
             lifts,
+            graphics: None,
         }
     }
 

@@ -530,3 +530,48 @@ fn every_extracted_world_loads_as_three_levels() {
     assert!(sml::session::world_levels(0).is_none());
     assert!(sml::session::world_levels(5).is_none());
 }
+
+/// A level out of the cartridge carries the cartridge's own background, so the
+/// game draws World 1-1's pyramid and palms rather than blocks. A level file
+/// written by hand carries none and keeps the placeholders.
+#[test]
+fn every_cartridge_level_carries_its_own_background() {
+    use sml::assets::level as assets;
+    if std::fs::read(assets::DEFAULT_ROM).is_err() {
+        return;
+    }
+    for &name in assets::LEVEL_NAMES.iter() {
+        let Ok(level) = assets::extracted_level(name) else { return };
+        let graphics = level.graphics.expect("the ROM is here, so the background is too");
+        let (w, h) = (level.solids.width, level.solids.height);
+        assert_eq!(graphics.cells.len(), w * h, "World {name} background is the wrong size");
+        assert_eq!(graphics.tiles.len(), 256);
+
+        let distinct: std::collections::HashSet<u8> = graphics.cells.iter().copied().collect();
+        assert!(distinct.len() > 10, "World {name} draws with only {} tiles", distinct.len());
+
+        // Coins are drawn into the cartridge's background, and the game draws
+        // them itself so they can disappear when taken. Leaving both would
+        // paint a coin that cannot be picked up.
+        for &(x, y) in &level.coins {
+            let cell = (y as usize / 8) * w + x as usize / 8;
+            assert_ne!(graphics.cells[cell], assets::COIN, "World {name} leaves a painted coin");
+        }
+    }
+}
+
+/// The background reaches the screen: the same level with and without it does
+/// not render the same frame.
+#[test]
+fn the_cartridges_background_changes_what_is_drawn() {
+    use sml::assets::level as assets;
+    let Ok(level) = assets::extracted_level("1-1") else { return };
+    if level.graphics.is_none() {
+        return;
+    }
+    let mut plain = level.clone();
+    plain.graphics = None;
+    let drawn = Game::new(level).render().to_gray();
+    let blocks = Game::new(plain).render().to_gray();
+    assert_ne!(drawn, blocks);
+}

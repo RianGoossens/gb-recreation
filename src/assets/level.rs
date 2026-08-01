@@ -28,6 +28,7 @@
 use std::path::Path;
 
 use crate::rom;
+use crate::core::level::{Graphics, Level};
 use crate::tiles::Tile;
 use super::title::{tile_vram_addr, VRAM_TILE_BASE};
 use super::{AssetError, TileSheet, DEFAULT_BGP};
@@ -728,6 +729,57 @@ pub fn tiles_for_level(rom: &[u8], list: usize) -> Result<Vec<u8>, AssetError> {
         Some(world) => tiles_for_world(rom, world),
         None => Ok(gameplay_tiles(rom)?.to_vec()),
     }
+}
+
+/// The 256 background tiles a world draws with, indexed by tile id.
+pub fn world_tile_sheet(rom: &[u8], world: usize) -> Result<Vec<Tile>, AssetError> {
+    let vram = tiles_for_world(rom, world)?;
+    Ok((0..=255u8)
+        .map(|id| {
+            let at = tile_vram_addr(id) - VRAM_TILE_BASE;
+            Tile::decode(vram[at..at + 16].try_into().unwrap())
+        })
+        .collect())
+}
+
+/// The cartridge's own background for one of its twelve levels: a tile id per
+/// cell, row major, and the sheet those ids index.
+///
+/// The cells the engine turns into entities are blanked, because those are
+/// drawn from the level's own state instead: a coin has to disappear when
+/// Mario takes it, and the background copy would still be sitting there.
+pub fn level_graphics(rom: &[u8], name: &str) -> Option<Graphics> {
+    let index = level_index(name)?;
+    let list = level_list(rom, name)?;
+    let columns = decode_level(rom, list);
+    if columns.is_empty() {
+        return None;
+    }
+    let mut cells = vec![0u8; columns.len() * ROWS];
+    for (x, column) in columns.iter().enumerate() {
+        for (y, &id) in column.iter().enumerate() {
+            cells[y * columns.len() + x] = if is_coin(id) { FILLER } else { id };
+        }
+    }
+    let tiles = world_tile_sheet(rom, index / 3 + 1).ok()?;
+    Some(Graphics { cells, tiles, palette: DEFAULT_BGP })
+}
+
+/// Where `sml extract-level` writes the cartridge's levels.
+pub const EXTRACTED: &str = "assets/extracted";
+/// The ROM as it sits in the tree.
+pub const DEFAULT_ROM: &str = "super_mario_land.gb";
+
+/// Load one of the cartridge's twelve levels as extracted, with the
+/// cartridge's own background attached when the ROM is at hand. Without it the
+/// level still plays, drawn in placeholder blocks.
+pub fn extracted_level(name: &str) -> Result<Level, String> {
+    let path = format!("{EXTRACTED}/level_{}.txt", name.replace('-', "_"));
+    let mut level = Level::from_file(&path)?;
+    if let Ok(rom) = std::fs::read(DEFAULT_ROM) {
+        level.graphics = level_graphics(&rom, name);
+    }
+    Ok(level)
 }
 
 /// A level's own graphics, as the cartridge draws them.

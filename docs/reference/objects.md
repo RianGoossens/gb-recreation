@@ -278,7 +278,7 @@ account for 171 of the 481 normal-play records.
 | `0x31` | 7 | 3-1 3-3 | Tokotoko |  |
 | `0x32` | 1 | 3-3 | Hiyoihoi |  |
 | `0x35` | 1 | 3-2 | falling spike |  |
-| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | drop block |  |
+| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | drop block | still; harmless; goes away when stood on (see below) |
 | `0x38` | 5 | 3-3 4-1 | diagonal platform, north east |  |
 | `0x39` | 4 | 3-3 4-1 | diagonal platform, north west |  |
 | `0x3A` | 6 | 3-1 3-2 3-3 4-2 | small vertical platform |  |
@@ -298,9 +298,35 @@ account for 171 of the 481 normal-play records.
 | `0x61` | 1 | 4-3 | Biokinton |  |
 
 A blank in the last column means the byte has never been watched on the
-cartridge. Two are worth measuring before the others on volume alone: `0x36`
-turns up in nine of the twelve levels, and `0x04`, already measured, is the
-most common thing in the game.
+cartridge.
+
+### The drop block, kind `0x36`
+
+The most-used kind nothing had watched: nine of the twelve levels place it, 50
+records in all. Three measurements, and it is still not implemented.
+
+It never moves. Traced for 600 frames in World 1-2 with the camera frozen
+(`tools/measure_level_kind.py`), its slot x and y do not change by a pixel.
+
+It is not an enemy. The whole vertical overlap was swept with Mario written
+into the game's own position bytes (`tools/probe_object_contact.py`), and it
+never cost him a life at any of them, while the positive control (World 1-1's
+walker) lost one at five offsets out of six.
+
+At exactly one offset, feet on top, the object goes away. Dropping Mario onto
+it and watching both of them frame by frame (`tools/probe_drop_block.py`) puts
+that on the frame his y reaches the slot's y minus 10, which is the height a
+lift rests him at, so it is the surface he reached rather than the overlap. The
+600 frame trace is the control that says it does not go away on its own, and
+the overlap sweep is the control that says no other contact removes it.
+
+So it is a block that gives way the moment it is stood on, which is what its
+borrowed name says. What is not settled is what happens in that frame: whether
+it holds him for it, and whether the slot emptying means the block was removed
+or handed off to a falling object in another slot. He is falling at three
+pixels a frame throughout and never slows, but the object leaves on the same
+frame it would have caught him, so the trace cannot separate those. It stays
+out of the extracted levels until it can.
 
 ### Where the names come from
 

@@ -1,14 +1,30 @@
 //! Animation state for Mario.
 //!
-//! The visible pose is derived from movement, not stored as game logic: on the
-//! ground and still is idle, on the ground and moving is a walk cycle, and off
-//! the ground is the jump pose. Keeping this separate from physics means the
-//! renderer can ask "what should Mario look like" without the simulation caring.
+//! The visible pose is derived from movement rather than stored as game logic:
+//! on the ground and still is idle, on the ground and moving is a walk cycle,
+//! off the ground is the jump pose, and moving one way while pressing the
+//! other is the skid. Keeping this separate from physics means the renderer
+//! can ask "what should Mario look like" without the simulation caring.
+//!
+//! Which pose plays when is measured, not chosen: `tools/trace_mario_frames.py`
+//! reads the tile of the sprite the cartridge draws at Mario's own position
+//! every frame (`docs/reference/sprites.md`).
 
-use super::entity::Mario;
+use super::entity::{Facing, Mario};
+
+fn facing_of(vx: i32) -> Facing {
+    if vx < 0 {
+        Facing::Left
+    } else {
+        Facing::Right
+    }
+}
 
 /// How many frames each walk-cycle sprite is shown before advancing.
-pub const WALK_FRAME_TICKS: u8 = 6;
+///
+/// Four, and the same four whether he is walking or running: every stretch of
+/// the trace holds each pose for exactly 4 frames, with B held and without.
+pub const WALK_FRAME_TICKS: u8 = 4;
 /// Number of frames in the walk cycle.
 pub const WALK_FRAMES: u8 = 3;
 
@@ -17,6 +33,10 @@ pub enum AnimState {
     Idle,
     Walk,
     Jump,
+    /// Moving one way with the other direction pressed. The cartridge shows
+    /// its own pose for this, drawn facing the way he is still travelling
+    /// rather than the way he is now pressing.
+    Skid,
 }
 
 /// Tracks the current animation state and the walk-cycle position over time.
@@ -35,6 +55,8 @@ impl Animator {
     pub fn state(mario: &Mario) -> AnimState {
         if !mario.on_ground {
             AnimState::Jump
+        } else if mario.vx != 0 && mario.facing == facing_of(-mario.vx) {
+            AnimState::Skid
         } else if mario.vx != 0 {
             AnimState::Walk
         } else {
@@ -84,6 +106,33 @@ mod tests {
         assert_eq!(Animator::state(&m), AnimState::Walk);
         m.on_ground = false;
         assert_eq!(Animator::state(&m), AnimState::Jump);
+    }
+
+    /// Pressing the opposite way while still moving is its own pose on the
+    /// cartridge, and it is not the walk: the trace draws block 5 there.
+    #[test]
+    fn pressing_against_the_movement_is_a_skid() {
+        let mut m = walking();
+        assert_eq!(Animator::state(&m), AnimState::Walk);
+        m.facing = Facing::Left;
+        assert_eq!(Animator::state(&m), AnimState::Skid);
+        // And the other way round, which is the second of the two the trace
+        // caught.
+        m.vx = -m.vx;
+        assert_eq!(Animator::state(&m), AnimState::Walk);
+        m.facing = Facing::Right;
+        assert_eq!(Animator::state(&m), AnimState::Skid);
+    }
+
+    #[test]
+    fn a_skid_needs_him_on_the_ground_and_moving() {
+        let mut m = walking();
+        m.facing = Facing::Left;
+        m.on_ground = false;
+        assert_eq!(Animator::state(&m), AnimState::Jump, "airborne wins");
+        m.on_ground = true;
+        m.vx = 0;
+        assert_eq!(Animator::state(&m), AnimState::Idle, "standing still cannot skid");
     }
 
     #[test]

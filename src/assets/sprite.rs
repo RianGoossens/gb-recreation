@@ -74,18 +74,29 @@ pub const WALK_BLOCKS: [usize; 3] = [0, 1, 2];
 /// does not change on the way down. This is one of the five blocks per row
 /// that reading the atlas alone could not identify.
 pub const JUMP_BLOCK: usize = 4;
+/// The pose for changing direction at speed, block 5.
+///
+/// Seen twice in the trace, both times for exactly 7 frames, at the moment the
+/// input reversed while he was running: once as tile `0x0A` unflipped after
+/// pressing left while moving right, once as `0x0B` mirrored after the
+/// opposite. Nothing else in the trace draws it.
+pub const SKID_BLOCK: usize = 5;
 
-/// How long a walking block is held, in frames. Read off the trace, where the
-/// three spans come out around four frames each. Whether the rate changes with
-/// his speed is not measured.
+/// How long a walking block is held, in frames.
+///
+/// Four, and it does not change with his speed: every stretch of the trace
+/// holds each block for exactly four frames, walking and with B held, over 28,
+/// 33 and 9 changes of pose.
 pub const WALK_HOLD: u32 = 4;
 
 /// The tile ids of one of Mario's frames, in reading order: top left, top
 /// right, bottom left, bottom right.
 ///
 /// `block` indexes across a size's row of eight. [`WALK_BLOCKS`] are the three
-/// a walk cycles through and [`JUMP_BLOCK`] is the airborne pose; the other
-/// four have not been identified.
+/// a walk cycles through, [`JUMP_BLOCK`] is the airborne pose and
+/// [`SKID_BLOCK`] the reversing one. The last two blocks of each row hold
+/// other characters rather than Mario, and the third is a Mario pose nothing
+/// in the trace draws.
 pub fn mario_frame(size: Size, block: usize) -> [u8; 4] {
     let row = match size {
         Size::Small => 0,

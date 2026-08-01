@@ -943,10 +943,17 @@ impl Game {
                 let step = (self.frames / sprite::WALK_HOLD) as usize;
                 sprite::WALK_BLOCKS[step % sprite::WALK_BLOCKS.len()]
             }
+            AnimState::Skid => sprite::SKID_BLOCK,
             AnimState::Idle => sprite::WALK_BLOCKS[0],
         };
         let ids = sprite::mario_frame(size, block);
-        let flip = self.mario.facing == Facing::Left;
+        // A skid is drawn facing the way he is still moving, which is the
+        // opposite of what he is pressing. Every other pose follows the input.
+        let flip = if crate::core::animation::Animator::state(&self.mario) == AnimState::Skid {
+            self.mario.vx < 0
+        } else {
+            self.mario.facing == Facing::Left
+        };
         let (_, mh) = self.mario.size();
         let left = mx - MARIO_SPRITE_INSET;
         let top = my + mh - FRAME_SIZE as i32;

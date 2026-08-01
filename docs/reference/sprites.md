@@ -27,8 +27,8 @@ Reading the same bytes as four consecutive ids draws a scramble. That is how
 the arrangement was settled: only one of the two readings produces figures.
 
 Mario is at the start of the atlas. The first two rows are small Mario and the
-next two are big Mario, eight blocks across each. Four of the eight are
-identified:
+next two are big Mario, eight blocks across each. Six of the eight hold Mario
+at all, and five of those six are identified:
 
 | pose | small | big |
 |---|---|---|
@@ -36,6 +36,7 @@ identified:
 | walk 2 | 2, 3, 18, 19 | 34, 35, 50, 51 |
 | walk 3 | 4, 5, 20, 21 | 36, 37, 52, 53 |
 | jump | 8, 9, 24, 25 | 40, 41, 56, 57 |
+| skid | 10, 11, 26, 27 | 42, 43, 58, 59 |
 
 Which block plays when was traced on the running game
 (`tools/trace_mario_frames.py`), by reading the tile of the sprite the game
@@ -51,9 +52,29 @@ explain the choice:
   frame's 10, which is his arms.
 - Facing left draws the same blocks with the hardware's flip bit, which shows
   up in the trace as the top left sprite becoming the block's right tile.
+- Pressing the opposite direction while still moving draws the sixth block,
+  the skid. The trace caught it twice, at the two moments the input reversed
+  during a run, both times for exactly seven frames: once as tile `0x0A`
+  unflipped after pressing left while moving right, and once mirrored after
+  the opposite. It is drawn facing the way he is still travelling rather than
+  the way he is now pressing, which is the one pose whose flip does not follow
+  the input.
+- The rate does not change with his speed. Every stretch of the trace holds
+  each block for exactly four frames, walking and with B held, over 28, 33 and
+  9 changes of pose.
 
-What the remaining four blocks in each row are has not been settled, and
-whether the walk's rate changes with his speed is not measured.
+Two of the eight blocks in each row are not Mario. Rendering the atlas shows
+the seventh holding a figure with dark hair in a robe, and the eighth a black
+ball beside a partial shape in the small row and a side-view vehicle in the
+big one. They also turn up in the trace as tiles `0x0F` and `0x1F` drawn near
+Mario, which is what gave them away as separate objects sharing his rows.
+Which characters they are is a reading of a picture and nothing has confirmed
+it, so they are left unnamed.
+
+The third block is the one Mario pose still unaccounted for. Nothing in the
+trace draws it: standing, walking, running, jumping, skidding and dying all
+land elsewhere. Swimming is the obvious candidate, since World 2 is the only
+thing in the game that has never been played here, and that is a guess.
 
 ## Why these tiles are Mario
 

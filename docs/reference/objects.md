@@ -247,6 +247,32 @@ read from the bank the table sits in: `0x0529B`. It has 39 records, and bank
 1's six lists then run back to back with no bytes left over, from World 2-1's
 at `0x05179` through World 4-3's ending at `0x055B9`, two bytes before the bank's screen lists start.
 
+### Every list runs to the end of its own level
+
+The header pairs a screen list and an object list at the same index, and for
+worlds 3 and 4 nothing has played there to confirm the pairing. The records
+themselves do: across all twelve levels the last record sits between 96% and
+99% of the way along the level, and none lands past the end.
+
+| level | width | last record |
+|---|---|---|
+| 1-1 | 300 | 293 |
+| 1-2 | 280 | 272 |
+| 1-3 | 300 | 292 |
+| 2-1 | 320 | 313 |
+| 2-2 | 280 | 275 |
+| 2-3 | 360 | 352 |
+| 3-1 | 460 | 456 |
+| 3-2 | 320 | 316 |
+| 3-3 | 300 | 292 |
+| 4-1 | 460 | 445 |
+| 4-2 | 400 | 385 |
+| 4-3 | 480 | 473 |
+
+Of the 132 ways to pair a list with a level it does not belong to, 106 fall
+outside that band, so the twelve agreeing is not something any pairing would
+produce.
+
 ### World 2 puts objects on rows its records do not give
 
 The kind byte matched on every one of those spawns. The row did not. 23 of

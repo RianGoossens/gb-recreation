@@ -328,3 +328,31 @@ fn bank_1s_object_lists_run_back_to_back() {
         expected = end + 1;
     }
 }
+
+/// Each level's object list runs to the end of that level and no further.
+///
+/// This is what says the header pairs the right list with the right level for
+/// worlds 3 and 4, which nobody has played to. The last record of all twelve
+/// sits between 96% and 99% of the way along its level, and no record lands
+/// past the end. It is a real check rather than a coincidence: of the 132
+/// wrong pairings of a list with another level, 106 fall outside that band.
+#[test]
+fn every_object_list_runs_to_the_end_of_its_own_level() {
+    let Some(data) = rom() else { return };
+
+    for name in level::LEVEL_NAMES {
+        let list = level::level_list(&data, name).expect("header entry");
+        let width = level::decode_level(&data, list).len();
+        let start = level::level_objects(&data, name).expect("header entry");
+        let last = object::object_list(&data, start)
+            .iter()
+            .map(|r| r.column())
+            .max()
+            .expect("a list with records");
+        assert!(last < width, "World {name}'s last record is past the level's end");
+        assert!(
+            last * 10 >= width * 9,
+            "World {name}'s records stop at column {last} of {width}"
+        );
+    }
+}

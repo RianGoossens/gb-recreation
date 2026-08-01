@@ -10,11 +10,14 @@
 pub const COLUMNS: usize = 20;
 pub const ROWS: usize = 2;
 
-/// An empty cell.
-pub const BLANK: u8 = 0x6F;
-/// The game draws a zero with the same tile it draws the letter O with. Tile
-/// `0x00` is a narrower zero the status bar never uses.
-pub const ZERO: u8 = 0x18;
+/// An empty cell. Four ids in the font's block draw an empty tile, so the
+/// capture alone cannot say which one the bar uses; `0x2C` is the only one of
+/// them outside the range a world's tile overlay rewrites (`0x31` to `0x6F`),
+/// and it is the same filler the level format leaves uncovered columns as.
+pub const BLANK: u8 = 0x2C;
+/// Zero. The font draws it and the letter O identically, so the capture reads
+/// as either `0x00` or `0x18`; `0x00` is the one in the digits' own run.
+pub const ZERO: u8 = 0x00;
 pub const DASH: u8 = 0x29;
 /// The coin symbol in front of the coin count.
 pub const COIN: u8 = 0x2A;
@@ -87,7 +90,8 @@ mod tests {
     use super::*;
 
     /// The capture this layout was read from: World 1-1's opening, two lives
-    /// left, no coins, no score, 393 on the clock.
+    /// left, no coins, no score, 393 on the clock. The ids are the capture's
+    /// own, with the two ambiguous glyphs resolved as documented above.
     #[test]
     fn reproduces_the_captured_status_bar() {
         let bar = status_bar(0, 0, 2, (1, 1), 393);
@@ -95,11 +99,11 @@ mod tests {
         let bottom: Vec<String> = bar[1].iter().map(|b| format!("{b:02X}")).collect();
         assert_eq!(
             top.join(" "),
-            "16 0A 1B 12 18 2B 18 02 6F 6F 20 18 1B 15 0D 6F 1D 12 16 0E"
+            "16 0A 1B 12 18 2B 00 02 2C 2C 20 18 1B 15 0D 2C 1D 12 16 0E"
         );
         assert_eq!(
             bottom.join(" "),
-            "6F 6F 6F 6F 6F 18 6F 2A 2B 18 18 6F 01 29 01 6F 6F 03 09 03"
+            "2C 2C 2C 2C 2C 00 2C 2A 2B 00 00 2C 01 29 01 2C 2C 03 09 03"
         );
     }
 

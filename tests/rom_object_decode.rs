@@ -356,3 +356,42 @@ fn every_object_list_runs_to_the_end_of_its_own_level() {
         );
     }
 }
+
+/// The whole cartridge's object roster, so a decode change that quietly adds
+/// or drops kinds shows up. 41 distinct kind bytes across the twelve lists, 40
+/// of them in normal play, and the seven measured kinds account for 171 of the
+/// 481 normal-play records (docs/reference/objects.md).
+#[test]
+fn the_cartridge_uses_forty_one_object_kinds() {
+    let Some(data) = rom() else { return };
+
+    let mut all = std::collections::BTreeSet::new();
+    let mut normal = std::collections::BTreeSet::new();
+    let mut records = 0;
+    let mut implemented = 0;
+    let measured = [
+        object::WALKER,
+        0x02,
+        object::LEDGE_TURNER,
+        object::LIFT_VERTICAL,
+        object::LIFT_HORIZONTAL,
+        object::FALLER,
+        object::HOPPER,
+    ];
+    for name in level::LEVEL_NAMES {
+        let start = level::level_objects(&data, name).expect("header entry");
+        for r in object::object_list(&data, start) {
+            all.insert(r.kind_id());
+            if !r.expert_only() {
+                normal.insert(r.kind_id());
+                records += 1;
+                if measured.contains(&r.kind_id()) {
+                    implemented += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(all.len(), 41);
+    assert_eq!(normal.len(), 40);
+    assert_eq!((implemented, records), (171, 481));
+}

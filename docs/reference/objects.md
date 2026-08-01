@@ -247,6 +247,64 @@ read from the bank the table sits in: `0x0529B`. It has 39 records, and bank
 1's six lists then run back to back with no bytes left over, from World 2-1's
 at `0x05179` through World 4-3's ending at `0x055B9`, two bytes before the bank's screen lists start.
 
+### What the twelve levels actually use
+
+Naming every level lets the whole roster be counted rather than guessed at.
+Across all twelve object lists there are 41 distinct kind bytes, 40 of them in
+normal play. Seven have been measured on the running cartridge, and those seven
+account for 171 of the 481 normal-play records.
+
+| kind | records | levels | what it is |
+|---|---|---|---|
+| `0x00` | 32 | 1-1 1-2 2-1 2-2 4-1 4-2 | ground walker |
+| `0x02` | 29 | 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | harmless oscillator (left out) |
+| `0x03` | 8 | 3-1 3-2 |  |
+| `0x04` | 54 | 1-1 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 | ledge turner |
+| `0x06` | 2 | 4-3 |  |
+| `0x08` | 1 | 1-3 |  |
+| `0x09` | 3 | 4-2 |  |
+| `0x0A` | 16 | 1-1 1-2 2-1 2-2 3-1 3-2 4-1 | vertical lift |
+| `0x0B` | 21 | 1-1 1-2 2-1 2-2 3-1 3-3 4-1 4-2 | horizontal lift |
+| `0x0C` | 9 | 1-3 4-1 | faller |
+| `0x0E` | 10 | 1-1 3-2 3-3 | jumper |
+| `0x10` | 24 | 2-1 2-3 |  |
+| `0x16` | 5 | 2-2 |  |
+| `0x1A` | 1 | 2-3 |  |
+| `0x1D` | 9 | 2-3 |  |
+| `0x20` | 6 | 2-3 |  |
+| `0x24` | 7 | 2-1 2-2 2-3 |  |
+| `0x25` | 11 | 3-2 |  |
+| `0x2F` | 5 | 2-3 |  |
+| `0x31` | 7 | 3-1 3-3 |  |
+| `0x32` | 1 | 3-3 |  |
+| `0x35` | 1 | 3-2 |  |
+| `0x36` | 50 | 1-2 1-3 2-1 2-2 3-1 3-2 3-3 4-1 4-2 |  |
+| `0x38` | 5 | 3-3 4-1 |  |
+| `0x39` | 4 | 3-3 4-1 |  |
+| `0x3A` | 6 | 3-1 3-2 3-3 4-2 |  |
+| `0x3B` | 4 | 3-1 3-3 |  |
+| `0x3C` | 8 | 3-1 3-3 |  |
+| `0x3F` | 6 | 1-3 4-2 |  |
+| `0x42` | 9 | 1-2 |  |
+| `0x47` | 2 | 3-3 |  |
+| `0x48` | 1 | 2-3 |  |
+| `0x49` | 21 | 3-1 3-2 4-1 4-2 |  |
+| `0x52` | 18 | 4-3 |  |
+| `0x53` | 28 | 4-3 |  |
+| `0x54` | 17 | 4-2 4-3 |  |
+| `0x55` | 14 | 4-1 4-2 |  |
+| `0x56` | 13 | 4-1 |  |
+| `0x59` | 12 | 4-3 |  |
+| `0x61` | 1 | 4-3 |  |
+
+A blank in the last column means the byte has never been watched on the
+cartridge. Two are worth measuring before the others on volume alone: `0x36`
+turns up in nine of the twelve levels, and `0x04`, already measured, is the
+most common thing in the game.
+
+Nothing here says what any of them is called. That is a separate question and
+a guess would put an invented enemy into the game through the back door.
+
 ### Every list runs to the end of its own level
 
 The header pairs a screen list and an object list at the same index, and for

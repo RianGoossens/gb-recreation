@@ -680,7 +680,12 @@ the first and `docs/reference/sprites.md` for the second.
   times), `0x0E` (three), `0x04`, `0x0A`, `0x0B` (once each). `0x0A` and `0x0B`
   appear only in the last two records of the level, at columns 284 and 292.
   All five now have their movement measured; only the names are missing.
-- What `0x02` is for, given it neither hurts Mario nor holds him up.
+- What `0x02` is for, given it neither hurts Mario nor holds him up. Its
+  drawing is now known and narrows the question rather than answering it: the
+  game draws it with the hardware's priority bit set, so background pixels
+  cover it, which is what a plant that hides in a pipe needs and matches its
+  borrowed name. Only `0x02` and `0x10` carry that bit of the sixteen kinds
+  measured (`docs/reference/sprites.md`). Why it is harmless is still open.
 - Whether the faller stops on a floor or passes through it. Ours lands, like
   every other enemy; the one traced fell out of the level, which does not
   distinguish the two.

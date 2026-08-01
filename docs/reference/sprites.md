@@ -102,6 +102,26 @@ The anchor is the same for every kind measured. The lowest row of the drawing
 sits at the slot's y, and the left column one pixel right of its x. So an
 object's position is the bottom left corner of what it draws.
 
+### Two kinds are drawn behind the background
+
+The OAM attribute byte came back as `0x80` for exactly two of the sixteen
+kinds measured, `0x02` and `0x10`, and clear for every other one. Bit 7 is the
+hardware's priority bit: a sprite with it set is covered by any background
+pixel that is not colour 0, so the object is hidden wherever the level's own
+tiles are drawn and visible only where they are empty.
+
+That is a partial answer to two questions the roster had left open. `0x02` is
+named Pakkun Flower, a plant that lives in a pipe, and it moves 16 pixels down,
+waits, and 16 back up on a 200 frame cycle: the priority bit is what lets it
+disappear into the pipe rather than slide across the front of it. And `0x10`
+is Honen, one of the two kinds that place themselves below the screen and swim
+up in World 2.
+
+It does not explain why `0x02` never cost Mario a life at any overlap through
+two full cycles, which is still open. The other attribute bits set in the
+capture (`0x02`, `0x04`) are the Game Boy Color palette and bank bits, which a
+DMG ignores, so they carry nothing here.
+
 Two things the measurement settled beyond the tiles. `OBP0`, the palette
 register objects are drawn through, holds `0xE4`, which is the value the
 renderer had been using as a default, so it stops being a guess.

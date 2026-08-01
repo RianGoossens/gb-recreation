@@ -105,3 +105,80 @@ fn a_world_replaces_only_the_enemy_tiles() {
         }
     }
 }
+
+/// The object sprite tables were transcribed by hand from the measurement
+/// tool's output, so nothing but a typo stands between a correct table and a
+/// wrong one. Every tile a table names has to be a drawing in the atlas.
+///
+/// The control is that a blank tile exists to be caught: the atlas has plenty,
+/// and the test asserts one so a change that makes everything look non-blank
+/// cannot pass silently.
+#[test]
+fn every_object_sprite_names_a_tile_that_draws_something() {
+    use sml::assets::sprite::Piece;
+
+    let Some(sheet) = sheet() else { return };
+    let ink = |id: u8| -> usize {
+        sheet[id as usize]
+            .pixels
+            .iter()
+            .flatten()
+            .filter(|&&p| p != 0)
+            .count()
+    };
+
+    let tables: [(&str, &[Piece]); 5] = [
+        ("Chibibo", sprite::CHIBIBO),
+        ("Nokobon", sprite::NOKOBON),
+        ("Fly", sprite::FLY),
+        ("Falling Slab", sprite::FALLING_SLAB),
+        ("lift", sprite::LIFT),
+    ];
+    for (name, pieces) in tables {
+        assert!(!pieces.is_empty(), "{name} has no tiles");
+        for piece in pieces {
+            assert!(
+                ink(piece.tile) > 0,
+                "{name}'s tile {:#04X} is blank in the atlas",
+                piece.tile
+            );
+        }
+        // A 2x2 block reads left to right, top to bottom, so no two pieces may
+        // land on the same spot.
+        for (i, a) in pieces.iter().enumerate() {
+            for b in &pieces[i + 1..] {
+                assert!(
+                    (a.dx, a.dy) != (b.dx, b.dy),
+                    "{name} puts two tiles at the same offset"
+                );
+            }
+        }
+    }
+
+    // Control: `ink` has to be able to return zero, or the checks above pass
+    // for any tile id at all.
+    assert!(
+        (0..=255u8).any(|id| ink(id) == 0),
+        "control: no tile in the atlas is blank, so a blank one cannot be caught"
+    );
+}
+
+/// The Fly is drawn from the per-world band, so it looks different in each
+/// world, while the Chibibo is drawn from the shared part and does not. That
+/// is what the band means, checked against the tables actually in use rather
+/// than against the range constant.
+#[test]
+fn only_the_per_world_kinds_change_between_worlds() {
+    let sheets: Vec<_> = (1..=4).filter_map(world_sheet).collect();
+    if sheets.len() != 4 {
+        return;
+    }
+    let differs = |id: u8| sheets.iter().any(|s| s[id as usize] != sheets[0][id as usize]);
+
+    for piece in sprite::FLY {
+        assert!(differs(piece.tile), "the Fly's {:#04X} should be per world", piece.tile);
+    }
+    for piece in sprite::CHIBIBO {
+        assert!(!differs(piece.tile), "the Chibibo's {:#04X} should be shared", piece.tile);
+    }
+}

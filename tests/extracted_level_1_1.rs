@@ -1137,87 +1137,149 @@ fn a_hand_written_level_keeps_the_placeholder_enemy() {
     assert!(game.render().to_gray().iter().any(|&p| p != 0xFF));
 }
 
+
 /// World 1 played end to end, through the session rather than a level at a
-/// time. The three levels are the default campaign, and until now nothing
-/// walked them in one run: the flood fill proves a trigger is reachable, and
-/// a reachable trigger is not the same as a game that gets to it.
+/// time. These three levels are the default campaign, and until now nothing
+/// walked them in one run: a flood fill proves an end trigger is reachable,
+/// and a reachable trigger is not the same as a game that gets to it.
+///
+/// The walker runs right and jumps when it stalls or runs out of ground, with
+/// one addition. Where a gap has a lift in it the crossing is a timing rather
+/// than a reflex, so those edges take a wait from a plan, and the plan is
+/// searched for: 240 candidates per decision, which is a whole lift cycle
+/// there and back, keeping whichever wait carried him furthest. Half a cycle
+/// is not enough, and 1-2's second gap is what showed it: its lifts only come
+/// down to his level on the return leg. World 1-2's pit needs it,
+/// where columns 100 to 116 hold nothing solid and two vertical lifts are the
+/// only way across.
 ///
 /// Enemies are cleared, the same as the single-level walkthrough. What is
-/// being checked is the geometry, the transitions between levels, and that
-/// nothing added since (the drop blocks, most recently) seals a route that
-/// used to be open.
+/// checked is the geometry, the transitions, and that nothing added since
+/// seals a route that used to be open.
 #[test]
 fn world_1_can_be_walked_from_its_first_level_to_its_last() {
-    use sml::session::Session;
-    let Some(mut levels) = sml::session::world_levels(1) else { return };
-    for level in &mut levels {
-        level.enemy_spawns.clear();
-    }
-    let mut session = Session::new(levels);
+    use sml::session::{Phase, Session};
+    let Some(levels) = sml::session::world_levels(1) else { return };
 
-    // Start exactly once. A second press pauses, which is what the session
-    // does with it while playing.
-    let mut start = Buttons::default();
-    start.set(Button::Start, true);
-    session.step(start);
-    session.step(Buttons::default());
-    assert_eq!(session.phase(), sml::session::Phase::Playing);
+    // One run of the whole world with a given plan. Returns how many levels
+    // finished and how far he got in the one he stopped in.
+    let attempt = |waits: &[u32]| -> (usize, i32) {
+        let mut levels = levels.clone();
+        for level in &mut levels {
+            level.enemy_spawns.clear();
+        }
+        let mut session = Session::new(levels);
+        let mut start = Buttons::default();
+        start.set(Button::Start, true);
+        session.step(start);
+        session.step(Buttons::default());
 
-    let mut finished = 0;
-    let mut stalled = 0;
-    let mut furthest = i32::MIN;
-    let mut hold_jump = 0;
-    let mut on_level = 0;
-    for _ in 0..60_000 {
-        if session.current_level() != on_level {
-            on_level = session.current_level();
-            finished += 1;
-            furthest = i32::MIN;
-            stalled = 0;
+        let (mut finished, mut on_level) = (0usize, 0usize);
+        let (mut furthest, mut stalled, mut hold_jump) = (0, 0, 0);
+        let (mut decisions, mut waited) = (0usize, 0u32);
+        for _ in 0..24_000 {
+            if session.current_level() != on_level {
+                on_level = session.current_level();
+                finished += 1;
+                furthest = 0;
+                stalled = 0;
+            }
+            if session.phase() == Phase::Win {
+                finished += 1;
+                break;
+            }
+            // A crossing that costs a life is not a crossing, and ending the
+            // attempt there keeps the search from replaying every failure to
+            // the frame budget.
+            if session.game.deaths > 0 {
+                break;
+            }
+            let game = &session.game;
+            let x = game.mario.pixel_x();
+            if game.mario.on_ground {
+                if x <= furthest {
+                    stalled += 1;
+                } else {
+                    stalled = 0;
+                    furthest = x;
+                }
+            }
+            // Two look-aheads, and they are for different questions. One
+            // column says when to jump, which is at the edge. Two columns say
+            // when to think about waiting, because by the time the nearer one
+            // is empty he is already airborne with no decision left to make,
+            // and jumping on the further one alone falls short of an ordinary
+            // pit.
+            let solid_at = |c: i32| (0..16).any(|row| game.level.solids.is_solid(c, row));
+            let ground_ahead = solid_at((x + 12) / 8);
+            let ground_soon = solid_at((x + 20) / 8);
+            let mut buttons = Buttons::default();
+            if game.mario.on_ground && !ground_soon && hold_jump == 0 {
+                let lift_in_gap = game.lifts.iter().any(|l| l.x > x && l.x < x + 160);
+                if lift_in_gap {
+                    let want = waits.get(decisions).copied().unwrap_or(0);
+                    if waited < want {
+                        waited += 1;
+                        // The wait doubles as a run-up on terrain. On a lift
+                        // there is nothing behind him but the gap, so backing
+                        // up there would walk him off it.
+                        let feet = game.mario.pixel_y() + 12;
+                        let on_lift = game.lifts.iter().any(|l| {
+                            (l.y - feet).abs() <= 2 && x + 11 >= l.x && x <= l.x + l.width()
+                        });
+                        buttons.set(Button::Left, !on_lift);
+                        session.step(buttons);
+                        continue;
+                    }
+                    waited = 0;
+                    decisions += 1;
+                    hold_jump = 14;
+                }
+            }
+            if (stalled > 6 || !ground_ahead) && game.mario.on_ground && hold_jump == 0 {
+                hold_jump = 12;
+            }
+            buttons.set(Button::Right, true);
+            if hold_jump > 0 {
+                buttons.set(Button::A, true);
+                hold_jump -= 1;
+            }
+            session.step(buttons);
         }
-        let game = &session.game;
-        let x = game.mario.pixel_x();
-        if x <= furthest {
-            stalled += 1;
-        } else {
-            stalled = 0;
-            furthest = x;
-        }
-        let column = (x + 12) / 8;
-        let ground_ahead =
-            (game.mario.pixel_y() / 8..16).any(|row| game.level.solids.is_solid(column, row));
-        if (stalled > 6 || !ground_ahead) && game.mario.on_ground {
-            hold_jump = 12;
-        }
-        let mut buttons = Buttons::default();
-        buttons.set(Button::Right, true);
-        if hold_jump > 0 {
-            buttons.set(Button::A, true);
-            hold_jump -= 1;
-        }
-        session.step(buttons);
-        if session.phase() == sml::session::Phase::Win {
-            finished = 3;
+        (finished, furthest)
+    };
+
+    let mut plan: Vec<u32> = Vec::new();
+    let mut best = attempt(&plan);
+    for _round in 0..4 {
+        if best.0 >= 3 {
             break;
         }
+        let mut improved = (best, None);
+        for w in 0..240 {
+            plan.push(w);
+            let got = attempt(&plan);
+            plan.pop();
+            if got > improved.0 {
+                improved = (got, Some(w));
+            }
+        }
+        // A flat round still moves on: the decision that matters may be the
+        // next one.
+        plan.push(improved.1.unwrap_or(0));
+        best = improved.0;
     }
-    // World 1-1 is walkable end to end and the transition into 1-2 works.
-    // 1-2 then stops this walker, and where it stops is not a decode problem:
-    // columns 100 to 116 have nothing solid in them at all, and the crossing
-    // is two vertical lifts, at columns 105 and 111, each moving 60 pixels up
-    // and down on a 120 frame cycle. Getting across is two timed jumps onto
-    // moving platforms. The walker runs off the ledge instead and spends every
-    // life in the pit.
-    //
-    // So this pins what is true today rather than what should be: 1-1
-    // finishes, and 1-2 ends the run in the pit. A change that seals 1-1 or
-    // moves the pit shows up here.
-    assert_eq!(finished, 1, "World 1-1 has to finish and hand over to 1-2");
-    assert_eq!(session.current_level(), 1);
-    assert_eq!(session.game.lives, 0, "and the pit at 1-2 takes every life");
+    // Where this gets to today. World 1-1 finishes and hands over, and 1-2's
+    // first pit (columns 100 to 116, crossed on two vertical lifts) is behind
+    // him, which no walker managed before the search went in: it used to take
+    // every life there. He stops at 1-2's second gap, columns 187 to 202,
+    // which is three vertical lifts and needs the search to get several
+    // decisions right at once rather than one at a time.
+    assert_eq!(best.0, 1, "World 1-1 has to finish and hand over to 1-2");
     assert!(
-        (100..=120).contains(&(furthest / 8)),
-        "the walker gave out at column {}, not in 1-2's pit",
-        furthest / 8
+        best.1 / 8 > 180,
+        "with plan {plan:?} he only reached column {} of 1-2, so the first \
+pit is no longer being crossed",
+        best.1 / 8
     );
 }

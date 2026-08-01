@@ -8,6 +8,7 @@
 
 pub mod level;
 pub mod object;
+pub mod sprite;
 pub mod title;
 
 use std::io;

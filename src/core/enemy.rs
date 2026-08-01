@@ -11,7 +11,16 @@ use crate::core::physics::GRAVITY;
 use crate::SCREEN_WIDTH;
 
 /// Enemies are one tile square. This is the body that walks into walls and
-/// stands on floors; it has never been measured on the cartridge.
+/// stands on floors.
+///
+/// Half measured. Walking a Chibibo into a wall written into the cartridge's
+/// own tilemap stops it with its slot x four pixels inside the wall's column,
+/// at two placements sixteen pixels apart (`tools/measure_enemy_body.py`), so
+/// the edge the terrain stops on that side is three pixels inside its eight
+/// pixel drawing rather than at its left column. The other edge needs an
+/// object walking right into a wall and is not measured, so the 8 stands: a
+/// single point tested there and a box whose left edge is there both produce
+/// the same reading.
 pub const ENEMY_SIZE: i32 = 8;
 /// How much of an enemy hurts Mario, which is smaller than its body and
 /// smaller than its drawing.

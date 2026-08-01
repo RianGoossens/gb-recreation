@@ -236,10 +236,16 @@ expert-only records without creating anything.
 
 So World 2-1's list is at `0x05179` and 2-2's at `0x05222`, in bank 1
 alongside World 2's terrain. 2-3's pointer reads `0x529B` when the level
-opens; its bank is not measured, because three attempts at the run killed the
-machine before it started. Bank 1 is where its two siblings are and the only
-bank where `0x529B` decodes to a sorted list, which is a structural fit rather
-than a measurement.
+opens, and its bank went unmeasured for a while: three attempts at the run
+killed the machine before it started.
+
+The cartridge answers it without the run. Every bank holding level data opens
+with a table of object list pointers indexed by `world * 3 + level` (see
+`level-format.md`), and bank 1's holds `0x529B` at index 5, World 2-3's slot.
+The same table gives every measured list at its own index, so the pointer is
+read from the bank the table sits in: `0x0529B`. It has 39 records, and bank
+1's six lists then run back to back with no bytes left over, from World 2-1's
+at `0x05179` through World 4-3's ending at `0x055B9`, two bytes before the bank's screen lists start.
 
 ### World 2 puts objects on rows its records do not give
 

@@ -239,6 +239,7 @@ fn world_2s_pinned_lists_are_sorted_and_terminated() {
     for (name, start, count) in [
         ("2-1", object::LEVEL_2_1_OBJECTS, 56),
         ("2-2", object::LEVEL_2_2_OBJECTS, 40),
+        ("2-3", object::LEVEL_2_3_OBJECTS, 39),
     ] {
         let records = object::object_list(&data, start);
         assert_eq!(records.len(), count, "World {name}");
@@ -306,5 +307,24 @@ fn every_object_list_the_headers_name_is_sorted_and_terminated() {
         let mut sorted = xs.clone();
         sorted.sort_unstable();
         assert_eq!(xs, sorted, "{name} is not sorted by x");
+    }
+}
+
+/// Bank 1's six object lists sit back to back in index order, each ending on
+/// the 0xFF the next one starts after. World 2-3's list was the one the spawn
+/// probe never got to measure, and this is the corroboration for taking it
+/// from the header: it fills exactly the gap between 2-2's end and World 4-1's
+/// start, with no bytes left over.
+#[test]
+fn bank_1s_object_lists_run_back_to_back() {
+    let Some(data) = rom() else { return };
+
+    let mut expected = object::LEVEL_2_1_OBJECTS;
+    for name in ["2-1", "2-2", "2-3", "4-1", "4-2", "4-3"] {
+        let start = level::level_objects(&data, name).expect("header entry");
+        assert_eq!(start, expected, "World {name} does not follow its neighbour");
+        let end = start + 3 * object::object_list(&data, start).len();
+        assert_eq!(data[end], 0xFF);
+        expected = end + 1;
     }
 }

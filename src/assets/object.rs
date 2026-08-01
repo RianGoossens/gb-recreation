@@ -89,11 +89,22 @@ pub const WORLD_1_OBJECTS: [(&str, usize); 3] = [
 pub const LEVEL_2_1_OBJECTS: usize = 0x05179;
 pub const LEVEL_2_2_OBJECTS: usize = 0x05222;
 
-/// World 2-3's list start, `0xD010` reading `0x529B` the moment the level
-/// opens. The bank is untested: three attempts at the measurement killed the
-/// machine before it got going, and bank 1 is only where the other two are.
-/// Left out of the pinned constants until it is measured like they were.
-pub const LEVEL_2_3_OBJECT_POINTER: u16 = 0x529B;
+/// World 2-3's list, `0xD010` reading `0x529B` the moment the level opens.
+///
+/// Its bank went unmeasured for a while: three attempts at the spawn probe
+/// killed the machine before the run got going, and bank 1 was only where its
+/// two siblings are. The cartridge answers it directly instead. Bank 1's own
+/// object table holds `0x529B` at index 5, which is World 2-3's slot, and the
+/// same table reproduces every other measured list at its own index, so the
+/// pointer is read from the bank the table sits in.
+pub const LEVEL_2_3_OBJECTS: usize = 0x0529B;
+
+/// World 2's three object lists, in order.
+pub const WORLD_2_OBJECTS: [(&str, usize); 3] = [
+    ("2-1", LEVEL_2_1_OBJECTS),
+    ("2-2", LEVEL_2_2_OBJECTS),
+    ("2-3", LEVEL_2_3_OBJECTS),
+];
 
 const RECORD: usize = 3;
 const LIST_END: u8 = 0xFF;

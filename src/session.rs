@@ -15,23 +15,28 @@ use crate::tuning::Tuning;
 /// cartridge's real levels are extracted. These are not end-goal content; the
 /// shipped game is meant to be the original's levels. Each is a rectangle of the
 /// level-format markers (see docs/reference/level-format.md).
-/// The three levels of World 1, decoded from the cartridge.
+/// One world's three levels, decoded from the cartridge.
 ///
 /// The files are written by `sml extract-level` and are gitignored, so this
 /// returns `None` on a checkout without the ROM and callers fall back to the
 /// placeholder campaign.
-pub fn world_1_levels() -> Option<Vec<Level>> {
-    WORLD_1_FILES
-        .iter()
-        .map(|path| Level::from_file(path).ok())
+///
+/// Only World 1 can be finished. Worlds 2 to 4 load and are walkable as far as
+/// their geometry allows, which is not far: World 2 needs swimming, and none of
+/// the three has its enemies (docs/reference/faithfulness.md).
+pub fn world_levels(world: usize) -> Option<Vec<Level>> {
+    if !(1..=4).contains(&world) {
+        return None;
+    }
+    (1..=3)
+        .map(|level| Level::from_file(format!("assets/extracted/level_{world}_{level}.txt")).ok())
         .collect()
 }
 
-const WORLD_1_FILES: &[&str] = &[
-    "assets/extracted/level_1_1.txt",
-    "assets/extracted/level_1_2.txt",
-    "assets/extracted/level_1_3.txt",
-];
+/// The three levels of World 1, decoded from the cartridge.
+pub fn world_1_levels() -> Option<Vec<Level>> {
+    world_levels(1)
+}
 
 /// World 1 if it has been extracted, the placeholder campaign otherwise.
 pub fn default_levels() -> Vec<Level> {

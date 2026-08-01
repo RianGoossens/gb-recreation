@@ -161,6 +161,27 @@ fn rom_and_list(name: &str) -> Option<(Vec<u8>, usize)> {
     }
 }
 
+/// A level argument is either a path to a level file or the name of one of the
+/// cartridge's twelve levels ("3-1"), which loads what `sml extract-level`
+/// wrote for it.
+fn load_level_arg(arg: &str) -> Result<sml::core::level::Level, String> {
+    use sml::core::level::Level;
+
+    let cartridge = sml::assets::level::LEVEL_NAMES.contains(&arg);
+    let path = if cartridge {
+        format!("assets/extracted/level_{}.txt", arg.replace('-', "_"))
+    } else {
+        arg.to_string()
+    };
+    Level::from_file(&path).map_err(|e| {
+        if cartridge {
+            format!("World {arg} has not been extracted yet: run `sml extract-level {arg}` ({e})")
+        } else {
+            format!("could not load level {path}: {e}")
+        }
+    })
+}
+
 fn parse_number(s: &str) -> Option<usize> {
     if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
         usize::from_str_radix(hex, 16).ok()
@@ -533,7 +554,6 @@ fn render_title(args: &[String]) -> ExitCode {
 /// are plus-separated: left,right,up,down,a,b,start,select (e.g. right+a). This
 /// is how gameplay gets inspected and captured without ever opening a window.
 fn play(args: &[String]) -> ExitCode {
-    use sml::core::level::Level;
     use sml::game::Game;
     use sml::input::{Button, Buttons};
     use sml::tuning::Tuning;
@@ -597,10 +617,10 @@ fn play(args: &[String]) -> ExitCode {
     }
 
     let level = match level {
-        Some(path) => match Level::from_file(path) {
+        Some(arg) => match load_level_arg(arg) {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("could not load level {path}: {e}");
+                eprintln!("{e}");
                 return ExitCode::FAILURE;
             }
         },
@@ -696,10 +716,10 @@ fn run_game(args: &[String]) -> ExitCode {
         }
     };
     let mut session = match level_path {
-        Some(path) => match Level::from_file(path) {
+        Some(arg) => match load_level_arg(arg) {
             Ok(level) => Session::with_tuning(faithful(vec![level]), tuning),
             Err(e) => {
-                eprintln!("could not load level {path}: {e}");
+                eprintln!("{e}");
                 return ExitCode::FAILURE;
             }
         },

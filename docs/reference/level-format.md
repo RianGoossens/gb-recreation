@@ -117,6 +117,16 @@ cargo run --features gui -- run levels/example.txt [tuning.txt]
 cargo run -- play shot.png 1 "" levels/example.txt [tuning.txt]
 ```
 
+Where a level file goes, the name of one of the cartridge's twelve levels
+works too, and loads what `sml extract-level` wrote for it:
+
+```sh
+cargo run -- play shot.png 400 right 3-1
+```
+
+Only World 1 can be finished. See `docs/reference/faithfulness.md` for what
+the other three worlds are missing.
+
 ## The table at the start of a bank
 
 Every ROM bank that holds level data opens with a 0x32-byte header, and the

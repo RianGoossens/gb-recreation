@@ -507,3 +507,26 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     }
 }
 
+
+/// The loader takes any of the cartridge's four worlds, not just World 1.
+/// Only World 1 is finishable, and only World 1 is what `default_levels`
+/// returns; this is about the files loading and carrying their geometry.
+#[test]
+fn every_extracted_world_loads_as_three_levels() {
+    for world in 1..=4 {
+        let Some(levels) = sml::session::world_levels(world) else {
+            continue;
+        };
+        assert_eq!(levels.len(), 3, "World {world} should load three levels");
+        for (i, level) in levels.iter().enumerate() {
+            assert!(
+                level.solids.width >= 240,
+                "World {world}-{} loaded {} columns",
+                i + 1,
+                level.solids.width
+            );
+        }
+    }
+    assert!(sml::session::world_levels(0).is_none());
+    assert!(sml::session::world_levels(5).is_none());
+}

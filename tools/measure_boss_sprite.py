@@ -15,11 +15,12 @@ then reads OAM (the hardware's table of 40 sprite entries: y, x, tile, flags)
 around the slot for a whole leap cycle. The window is wider than the survey's,
 since a boss is bigger than a walker.
 
-The control is Gao, whose tiles are already measured in this same level by the
-survey. If this tool cannot reproduce those, its answer for the boss is worth
-nothing.
+The control is a kind in the same level whose tiles the survey already has. If
+this tool cannot reproduce those, its answer for the kind asked about is worth
+nothing. It defaults to Gao, which is what World 1-3 has; a level without one
+has to name its own (World 2-3 uses Yurarin Boo, `0x24`).
 
-Usage: uv run tools/measure_boss_sprite.py [kind] [level]
+Usage: uv run tools/measure_boss_sprite.py [kind] [level] [control kind]
 """
 
 import sys
@@ -92,10 +93,11 @@ def report(label, kind, poses, seen):
 def main():
     kind = int(sys.argv[1], 0) if len(sys.argv) > 1 else 0x08
     level = sys.argv[2] if len(sys.argv) > 2 else "1-3"
+    control_kind = int(sys.argv[3], 0) if len(sys.argv) > 3 else 0x3F
 
-    control, control_seen = measure(0x3F, level) or (None, None)
-    report("control, Gao, already measured by the survey", 0x3F,
-           control or {}, control_seen or {})
+    control, control_seen = measure(control_kind, level) or (None, None)
+    report(f"control, kind 0x{control_kind:02X}, already measured by the survey",
+           control_kind, control or {}, control_seen or {})
     if not control:
         print("\nthe control drew nothing, so the result below means nothing")
         return 1

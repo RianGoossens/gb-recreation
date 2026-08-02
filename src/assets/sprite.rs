@@ -260,6 +260,22 @@ pub const FIREBALL: &[Piece] = &[piece(0, -8, 0xE2)];
 /// clock to hang the swap on (`docs/reference/faithfulness.md`).
 pub const BOSS_FIRE: &[Piece] = &[piece(0, -8, 0xC4), piece(8, -8, 0xC5)];
 
+/// Yurarin (kind `0x1D`), a 2x2 block, measured in World 2-3 with Yurarin Boo
+/// (`0x24`) as the control in the same run (`tools/measure_boss_sprite.py 0x1D
+/// 2-3 0x24`).
+///
+/// It swaps with `0xA6` `0xA7` / `0xB6` `0xB7` about every other 45 frames, and
+/// rendering both shows one seahorse in two poses. The survey's table already
+/// had that second pair, listed under Yurarin Boo, which is the same
+/// sampling-a-flicker reading the fire breath's row had
+/// (`docs/reference/sprites.md`). Ours draws the first pose and holds it.
+pub const YURARIN: &[Piece] = &[
+    piece(0, -16, 0xA4),
+    piece(8, -16, 0xA5),
+    piece(0, -8, 0xB4),
+    piece(8, -8, 0xB5),
+];
+
 /// Honen (kind `0x10`), one tile over another, measured by the whole-run
 /// survey (`tools/measure_object_sprites.py`). The survey also read its
 /// priority bit set, so the cartridge draws it behind the level's own tiles;

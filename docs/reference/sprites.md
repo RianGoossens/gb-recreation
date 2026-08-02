@@ -112,9 +112,10 @@ The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id directly.
 | `0x0C` | Falling Slab | `0xDD` `0xDE` | 16x8 |
 | `0x0E` | Fly | `0xA0` `0xA1` / `0xB0` `0xB1` | 16x16 |
 | `0x10` | Honen | `0xC1` over `0xD1` | 8x16 |
+| `0x1D` | Yurarin | `0xA4` `0xA5` / `0xB4` `0xB5`, swapping to `0xA6` `0xA7` / `0xB6` `0xB7` | 16x16 |
 | `0x1E` | fire breath | `0xC4` `0xC5`, swapping to `0xD4` `0xD5` | 16x8 |
 | `0x23` | fireball | `0xE2` | 8x8 |
-| `0x24` | Yurarin Boo | `0xA6` `0xA7` / `0xB6` `0xB7` | 16x16 |
+| `0x24` | Yurarin Boo | `0xA6` `0xA7` / `0xB6` `0xB7`, one pose of the pair above | 16x16 |
 | `0x27` | explosion | `0xCD` `0xCE` / `0xCA` `0xCB` `0xCC` / `0xDA` `0xDB` `0xDC` | 24x24 |
 | `0x36` | drop block | `0xEE` | 8x8 |
 | `0x3F` | Gao | `0xA4` `0xA5` / `0xB4` `0xB5` | 16x16 |
@@ -129,6 +130,16 @@ with `0xFE` standing in for the left half on the frame it appears. The survey
 samples a kind rather than following it, so it caught one pose of a two-pose
 flicker and nothing said so. The engine draws the first pair and holds it
 (`docs/reference/faithfulness.md`).
+
+World 2-3's two seahorses are the second row with two entries, and finding it
+was the same correction twice. Following kind `0x1D` through a run
+(`tools/measure_boss_sprite.py 0x1D 2-3 0x24`) gives `A4 A5 / B4 B5` on 48
+frames and `A6 A7 / B6 B7` on 44, both drawn exactly on the object rather than
+beside it, so neither is a neighbour leaking in. Rendering the two blocks side
+by side shows one seahorse with its tail in two positions. The control in that
+run, Yurarin Boo, reproduced the survey's tiles for itself and then showed the
+other pose too, so both kinds animate through the same pair and the survey's
+row for `0x24` was one frame of it.
 
 Every kind the table gives at 16x16 uses the same four ids relative to its
 first: `n`, `n + 1`, `n + 16`, `n + 17`. The Fly is `0xA0`, Yurarin Boo `0xA6`,

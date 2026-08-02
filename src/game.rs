@@ -255,8 +255,7 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::KingTotomesu => sprite::KING_TOTOMESU,
         EnemyKind::BossFire => sprite::BOSS_FIRE,
         EnemyKind::Honen => sprite::HONEN,
-        // Yurarin's tiles have never been measured, so it draws the placeholder.
-        EnemyKind::Yurarin => return None,
+        EnemyKind::Yurarin => sprite::YURARIN,
     })
 }
 

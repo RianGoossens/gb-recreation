@@ -234,9 +234,27 @@ fn edges(mario: &Mario) -> (i32, i32, i32, i32) {
     (left, top, left + w - 1, top + h - 1)
 }
 
+/// How much of Mario the terrain stops when he walks into it, measured up
+/// from his feet.
+///
+/// Not his whole height. Writing a ceiling into World 1-1's own tilemap and
+/// walking him at it (`tools/probe_corridor_height.py`) puts the boundary
+/// exactly one tile up: a slab in the 8 pixels directly above the floor stops
+/// him dead at the column it starts in, and the same slab one row higher, in
+/// the 8 pixels his head occupies, does not slow him at all. The control is a
+/// full-height wall in the same place, which stops him, so a run where the
+/// tilemap writes never landed would not read as "nothing blocks him".
+///
+/// This is what World 1-3's corridor at columns 185 to 192 is: one free row
+/// under a slab, which a 12 pixel Mario cannot enter and an 8 pixel one walks
+/// straight down. His height is still 12 for standing on things and for
+/// ceilings overhead, both measured separately.
+pub const WALK_HEIGHT: i32 = 8;
+
 fn resolve_horizontal(mario: &mut Mario, solids: &Solids) {
     let (w, _h) = mario.size();
-    let (left, top, right, bottom) = edges(mario);
+    let (left, _full_top, right, bottom) = edges(mario);
+    let top = bottom - (WALK_HEIGHT - 1);
     if mario.vx > 0 && solids.rect_hits_solid(right, top, right, bottom) {
         let wall_left = right.div_euclid(TILE) * TILE;
         mario.x = pixels(wall_left - w);

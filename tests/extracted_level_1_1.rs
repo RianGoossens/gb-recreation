@@ -567,16 +567,23 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // because the glide that replaced the old cliff-edge cap climbs a step it
     // could not.
     //
-    // Two later fixes moved three more. Releasing the jump button between
+    // Measuring the walking box moved three again. The terrain only stops the
+    // bottom 8 pixels of Mario when he moves sideways, not his whole 12
+    // (`tools/probe_corridor_height.py`), so a corridor with one free row is
+    // somewhere he can walk. World 2-1 went 19 to 68 on that alone, World 3-2
+    // gained one, and World 4-1 lost five, which is the bot taking a different
+    // turn rather than the level closing.
+    //
+    // Two earlier fixes moved three more. Releasing the jump button between
     // jumps took 2-2 from 52 to 63, since a walker that holds A forever gets
     // one jump and then none. Climbing onto ground ahead and above him took
     // 3-2 from 34 to 121 and 4-1 from 65 to 70: both put the route on a raised
     // block with open floor running underneath, and a walker that only jumps
     // at gaps and walls takes the low road every time.
     for (name, expected) in [
-        ("2_1", 19), ("2_2", 63), ("2_3", 178),
-        ("3_1", 110), ("3_2", 121), ("3_3", 26),
-        ("4_1", 70), ("4_2", 106), ("4_3", 7),
+        ("2_1", 68), ("2_2", 63), ("2_3", 178),
+        ("3_1", 110), ("3_2", 122), ("3_3", 26),
+        ("4_1", 65), ("4_2", 106), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
         if !std::path::Path::new(&path).exists() {

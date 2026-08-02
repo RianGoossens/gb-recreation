@@ -123,12 +123,24 @@ playing it faithfully.
   three heights (`tools/measure_mario_box.py`). Every trial agrees. The
   cartridge draws him 16 px across from two sprites, so the box sits inside
   what is on screen. This replaced an 8 x 8 box that was never measured.
+- **What the terrain stops when he walks**: canonical, measured. Only the
+  bottom 8 pixels of him, not the 12 he stands and jumps with. Writing a slab
+  into World 1-1's own tilemap and walking him at it
+  (`tools/probe_corridor_height.py`) puts the boundary exactly one tile up: in
+  the 8 pixels above the floor it stops him at the column it starts in, and one
+  row higher, where his head is, it does not slow him at all. A full-height
+  wall in the same place is the control that says the writes landed. World
+  1-3's corridor at columns 185 to 192 is one free row under a slab, which is
+  why this matters: the walk through that level stopped dead at it.
 - **World 1 geometry**: canonical, and verified end to end. Every column of
   all three levels (300, 280, 300) matches the running cartridge exactly.
 - **Lifts**: canonical, measured. World 1-1's kinds `0x0A` and `0x0B` carry
   Mario (`tools/probe_lift.py`) and run one pixel every two frames on a single
   axis, reversing every 120 frames over 60 pixels and every 106 over 53
-  (`tools/measure_enemy_walk.py`). `src/core/lift.rs` implements that, and
+  (`tools/measure_enemy_walk.py`). Which way each sets off from its record's
+  position is measured too (`tools/measure_lift_phase.py`): the vertical one
+  down, the horizontal one left, each a full half cycle before reversing, read
+  in two levels. `src/core/lift.rs` implements that, and
   `sml extract-level` writes them into the level file as `V` and `H`: 2 in
   World 1-1, 7 in 1-2, none in 1-3. One inference is stated rather than
   measured: 1-2's `0x0A` and `0x0B` records are assumed to be the same objects

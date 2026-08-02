@@ -20,6 +20,10 @@ const ROWS: i32 = 16;
 /// 78 and 79 is 32px above the ground and needs the glide.
 const FULL_JUMP: u32 =
     (sml::core::physics::MAX_RISE_FRAMES + sml::core::physics::GLIDE_FRAMES) as u32;
+/// The row Mario's feet are in, given his top edge. Small Mario is 12 tall.
+fn feet_row(y: i32) -> i32 {
+    (y + 11) / 8
+}
 
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
@@ -148,7 +152,10 @@ fn extracted_level_can_be_walked_from_spawn_to_the_end() {
     let mut game = Game::new(level);
     let ground_ahead = |game: &Game, x: i32, y: i32| {
         let column = (x + 12) / 8;
-        (y / 8..ROWS).any(|row| game.level.solids.is_solid(column, row))
+        // From his feet, not his head. A platform level with his chest is 16
+        // pixels above the surface he is on, so counting it walks him off the
+        // step at column 29 of World 1-2 instead of jumping up it.
+        (feet_row(y)..ROWS).any(|row| game.level.solids.is_standable(column, row))
     };
 
     let mut stalled = 0;
@@ -493,7 +500,7 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // because the glide that replaced the old cliff-edge cap climbs a step it
     // could not.
     for (name, expected) in [
-        ("2_1", 19), ("2_2", 38), ("2_3", 178),
+        ("2_1", 19), ("2_2", 52), ("2_3", 178),
         ("3_1", 90), ("3_2", 34), ("3_3", 23),
         ("4_1", 65), ("4_2", 106), ("4_3", 7),
     ] {
@@ -506,7 +513,7 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
         let mut game = Game::new(level);
         let ground_ahead = |game: &Game, x: i32, y: i32| {
             let column = (x + 12) / 8;
-            (y / 8..ROWS).any(|row| game.level.solids.is_solid(column, row))
+            (feet_row(y)..ROWS).any(|row| game.level.solids.is_standable(column, row))
         };
 
         let mut stalled = 0;
@@ -1221,7 +1228,13 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
             // is empty he is already airborne with no decision left to make,
             // and jumping on the further one alone falls short of an ordinary
             // pit.
-            let solid_at = |c: i32| (0..16).any(|row| game.level.solids.is_solid(c, row));
+            // From his own row downwards. A platform above him is not somewhere
+            // he can fall onto, and counting it walks him off column 15 of 1-2,
+            // where one hangs well below the ledge he is standing on.
+            let solid_at = |c: i32| {
+                (feet_row(game.mario.pixel_y())..16)
+                    .any(|row| game.level.solids.is_standable(c, row))
+            };
             let ground_ahead = solid_at((x + 12) / 8);
             let ground_soon = solid_at((x + 20) / 8);
             let mut buttons = Buttons::default();
@@ -1283,12 +1296,17 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
     // Where this gets to today. World 1-1 finishes and hands over, and 1-2's
     // first pit (columns 100 to 116, crossed on two vertical lifts) is behind
     // him, which no walker managed before the search went in: it used to take
-    // every life there. He stops at 1-2's second gap, columns 187 to 202,
-    // which is three vertical lifts and needs the search to get several
-    // decisions right at once rather than one at a time.
+    // every life there.
+    //
+    // He used to get to column 180 from here, and that was an accident of the
+    // look-ahead reading rows from his head down: a platform level with his
+    // chest counted as ground he could walk onto, which is wrong and is what
+    // let him blunder up several steps. Reading from his feet he stops at the
+    // 8 pixel step into column 120, which he should be able to jump and does
+    // not. That is a bot problem with its own entry on the plan.
     assert_eq!(best.0, 1, "World 1-1 has to finish and hand over to 1-2");
     assert!(
-        best.1 / 8 > 180,
+        best.1 / 8 >= 117,
         "with plan {plan:?} he only reached column {} of 1-2, so the first \
 pit is no longer being crossed",
         best.1 / 8

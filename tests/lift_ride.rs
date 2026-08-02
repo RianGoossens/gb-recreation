@@ -250,8 +250,12 @@ fn run_plan(level: &Level, first_edge: i32, target: i32, waits: &[u32]) -> i32 {
         // From his own row downwards. Anything above him he cannot fall onto,
         // and counting it walks him off the edge at column 15 of this level,
         // where a platform hangs well below the ledge he is on.
+        // From his feet, not his head. A platform level with his chest sits 16
+        // pixels above the surface he is standing on, so counting it walks him
+        // off the step at column 29 rather than jumping up it.
+        let feet_row = (game.mario.pixel_y() + 11) / 8;
         let ground_ahead =
-            (game.mario.pixel_y() / 8..16).any(|row| game.level.solids.is_standable(column, row));
+            (feet_row..16).any(|row| game.level.solids.is_standable(column, row));
         let mut buttons = Buttons::default();
         if game.mario.on_ground && !ground_ahead && hold_jump == 0 {
             // Only this crossing's own edges are decisions. 1-2 has small

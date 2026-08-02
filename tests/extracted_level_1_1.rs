@@ -95,20 +95,22 @@ fn step_up_ahead(game: &Game, x: i32, y: i32) -> bool {
 const RUNUP: u32 = 32;
 const RUNUP_TRIES: u32 = 4;
 
-/// What the searched walk gets out of World 2 today: column 16 of 2-1, with
-/// no level finished and no life lost.
+/// What the searched walk gets out of World 2 today: column 255 of 2-1's 320,
+/// with no level finished and no life lost.
 ///
 /// The reflex walker in `the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_
 /// it_is_recorded` reaches 68 in the same level, and the two numbers measure
 /// different things. That walk keeps going after a death, since the game puts
 /// Mario back and it is only asking whether the geometry is open; this one
 /// ends at the first death, because a crossing that costs a life is not one.
-/// 16 is where the floor at row 14 has run out and the route goes up: a step
-/// to the platform at row 12, then 32 pixels to the one at row 8, which is a
-/// whole moving jump and wants the takeoff searched for the way a lift
-/// crossing is.
+///
+/// It reached 16 until the takeoff for a high step became a searched decision
+/// rather than a fixed escalation. Column 16 is where 2-1's floor runs out and
+/// the route goes up: a step to the platform at row 12, then 32 pixels to the
+/// one at row 8, which is a whole moving jump, so where he leaves the ground
+/// decides whether he lands on it.
 const WORLD_2_LEVELS_FINISHED: usize = 0;
-const WORLD_2_COLUMN: i32 = 16;
+const WORLD_2_COLUMN: i32 = 250;
 
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
@@ -1451,6 +1453,43 @@ fn search_a_world(world: usize) -> Option<(usize, i32, Vec<u32>)> {
             // with a dead-end pocket underneath it, and this is the only way
             // past that opening.
             let climb = step_up_ahead(game, x, game.mario.pixel_y());
+            // A step of three or four rows is 24 to 32 pixels, which is most
+            // or all of a moving jump, so where he leaves the ground decides
+            // whether he lands on it. That makes it the same kind of decision
+            // a lift crossing is, and it takes a run-up from the plan. Lower
+            // steps keep the reflex jump: making every one of them a decision
+            // spends the plan on World 1-1's staircases.
+            // Only where the step is the only way on. If the ground he is
+            // standing on carries on past it, a reflex jump handles the step
+            // and making it a decision spends the plan on World 1-1's
+            // staircases; where the floor runs out just after it, as at
+            // column 16 of World 2-1, getting up it is the whole crossing.
+            let high = !solid_at((x + 28) / 8)
+                && game.mario.on_ground
+                && jump.ready()
+                && (3..=4).any(|up| {
+                    let row = feet_row(game.mario.pixel_y()) - up;
+                    let column = (x + 12) / 8;
+                    row >= 0
+                        && (1..=2)
+                            .any(|a| game.level.solids.is_standable(column + a, row))
+                });
+            if high {
+                if armed {
+                    armed = false;
+                } else {
+                    let want = waits.get(decisions).copied().unwrap_or(0);
+                    decisions += 1;
+                    if want > 0 {
+                        retreat = want;
+                        armed = true;
+                        stalled = 0;
+                        buttons.set(Button::Left, room_behind);
+                        session.step(buttons);
+                        continue;
+                    }
+                }
+            }
             if stalled > 40 && climb && game.mario.on_ground {
                 retreat = RUNUP * tries;
                 tries = if tries >= RUNUP_TRIES { 1 } else { tries + 1 };
@@ -1472,7 +1511,7 @@ fn search_a_world(world: usize) -> Option<(usize, i32, Vec<u32>)> {
 
     let mut plan: Vec<u32> = Vec::new();
     let mut best = attempt(&plan);
-    for _round in 0..8 {
+    for _round in 0..16 {
         if best.0 >= 3 {
             break;
         }

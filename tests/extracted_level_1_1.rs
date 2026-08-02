@@ -70,13 +70,30 @@ impl Jump {
 /// running underneath it. World 3-2's walker spent every run on that floor,
 /// and World 1-3's opening is the same shape with a dead end at the end of it.
 /// Four rows is the most a jump climbs.
+///
+/// Two columns of look-ahead rather than three, which decides where he takes
+/// off. World 1-3's block is 32 pixels up, the whole of a moving jump, so he
+/// has to leave the ground at the one place whose arc peaks over its edge; a
+/// column earlier and he clips it. Three columns costs World 3-1 twenty.
 fn step_up_ahead(game: &Game, x: i32, y: i32) -> bool {
     let column = (x + 12) / 8;
     (1..=4).any(|up| {
         let row = feet_row(y) - up;
-        row >= 0 && (1..=3).any(|ahead| game.level.solids.is_standable(column + ahead, row))
+        row >= 0 && (1..=2).any(|ahead| game.level.solids.is_standable(column + ahead, row))
     })
 }
+
+/// Frames spent walking back before another go at a high step.
+///
+/// World 1-3 spawns Mario six columns from a block he has to land on top of,
+/// which is closer than the jump can be started from, so he needs to give
+/// himself room. The run-up grows with each failed attempt, because how far
+/// back the takeoff has to be is a fact about the step and there is no reading
+/// it off the geometry: arriving at that block from the pocket, 32 frames put
+/// him back under it and 64 put him where the jump lands. Four lengths and
+/// then round again. It takes the World 1 walk from column 11 of 1-3 to 183.
+const RUNUP: u32 = 32;
+const RUNUP_TRIES: u32 = 4;
 
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
@@ -558,7 +575,7 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // at gaps and walls takes the low road every time.
     for (name, expected) in [
         ("2_1", 19), ("2_2", 63), ("2_3", 178),
-        ("3_1", 90), ("3_2", 121), ("3_3", 23),
+        ("3_1", 110), ("3_2", 121), ("3_3", 26),
         ("4_1", 70), ("4_2", 106), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
@@ -577,6 +594,8 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
         let mut furthest = i32::MIN;
         let mut jump = Jump::new();
         let mut reached = 0;
+        let mut back = 0u32;
+        let mut tries = 1u32;
         for _ in 0..20_000 {
             let x = game.mario.pixel_x();
             if x <= furthest {
@@ -584,15 +603,30 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
             } else {
                 stalled = 0;
                 furthest = x;
+                tries = 1;
             }
             reached = reached.max(furthest / 8);
             let y = game.mario.pixel_y();
             let gap = !ground_ahead(&game, x, y);
             let climb = step_up_ahead(&game, x, y);
+            let mut buttons = Buttons::default();
+            if back > 0 {
+                back -= 1;
+                buttons.set(Button::Left, true);
+                game.step(buttons);
+                continue;
+            }
+            // Stuck for a while with higher ground ahead: back off and take a
+            // run-up at it rather than jumping into the same wall forever.
+            if stalled > 40 && climb && game.mario.on_ground {
+                back = RUNUP * tries;
+                tries = if tries >= RUNUP_TRIES { 1 } else { tries + 1 };
+                stalled = 0;
+                continue;
+            }
             if (stalled > 6 || gap || climb) && game.mario.on_ground && jump.ready() {
                 jump.start();
             }
-            let mut buttons = Buttons::default();
             buttons.set(Button::Right, true);
             jump.press(&mut buttons);
             game.step(buttons);
@@ -1252,6 +1286,7 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
         let (mut furthest, mut stalled) = (0, 0);
         let mut jump = Jump::new();
         let (mut decisions, mut retreat, mut armed) = (0usize, 0u32, false);
+        let mut tries = 1u32;
         for _ in 0..24_000 {
             if session.current_level() != on_level {
                 on_level = session.current_level();
@@ -1277,6 +1312,7 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
                 } else {
                     stalled = 0;
                     furthest = x;
+                    tries = 1;
                 }
             }
             // Two look-aheads, and they are for different questions. One
@@ -1345,7 +1381,21 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
                     jump.start();
                 }
             }
-            if (stalled > 6 || !ground_ahead) && game.mario.on_ground && jump.ready() {
+            // Higher ground ahead, and a run-up at it when jumping from here
+            // has stopped working. World 1-3 opens on a block 32 pixels up
+            // with a dead-end pocket underneath it, and this is the only way
+            // past that opening.
+            let climb = step_up_ahead(game, x, game.mario.pixel_y());
+            if stalled > 40 && climb && game.mario.on_ground {
+                retreat = RUNUP * tries;
+                tries = if tries >= RUNUP_TRIES { 1 } else { tries + 1 };
+                stalled = 0;
+                continue;
+            }
+            if (stalled > 6 || !ground_ahead || climb)
+                && game.mario.on_ground
+                && jump.ready()
+            {
                 jump.start();
             }
             buttons.set(Button::Right, true);
@@ -1383,12 +1433,16 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
     // nobody had looked, and the cartridge sends the horizontal one left
     // (`tools/measure_lift_phase.py`). Going right it never comes within 72
     // pixels of the ledge at column 222, so no plan could have crossed it.
-    // He then walks into World 1-3's pocket at column 11 and stops there. That
-    // is geometry rather than a plan: see
-    // `world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model`.
+    // World 1-3 then takes him to column 183 of 300. Getting out of its
+    // opening pocket is the run-up: the block he has to land on is 32 pixels
+    // up, the whole of a moving jump, and arriving from under it he has to
+    // walk back far enough to take off from the one place whose arc peaks over
+    // its edge. See
+    // `world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model`
+    // for what a walker without that rule does there.
     assert_eq!(best.0, 2, "1-1 and 1-2 both have to finish");
     assert!(
-        best.1 / 8 >= 10,
+        best.1 / 8 >= 180,
         "with plan {plan:?} he only reached column {} of World 1-3",
         best.1 / 8
     );

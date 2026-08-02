@@ -247,6 +247,7 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::Fly => sprite::FLY,
         EnemyKind::Faller => sprite::FALLING_SLAB,
         EnemyKind::Bunbun => sprite::BUNBUN,
+        EnemyKind::Gao => sprite::GAO,
         EnemyKind::Bouncer => return None,
     })
 }
@@ -260,6 +261,7 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
         EnemyKind::Fly => Enemy::fly(px, py, true),
         EnemyKind::Faller => Enemy::faller(px, py),
         EnemyKind::Bunbun => Enemy::bunbun(px, py),
+        EnemyKind::Gao => Enemy::gao(px, py),
     }
 }
 

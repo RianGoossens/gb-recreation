@@ -185,7 +185,8 @@ impl Level {
     /// platform, `M` marks Mario's spawn, `G` a Goomba, `F` a Bouncer, `C` a coin,
     /// `T` a walker that turns at ledges,
     /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
-    /// `N` a Bunbun, the flyer that crosses leftwards,
+    /// `N` a Bunbun, the flyer that crosses leftwards, `A` a Gao, which
+    /// stands still,
     /// `E` the level-end trigger, `V` and `H` a lift running up and down or
     /// side to side, `X` a drop block that gives way when stood on.
     /// The block markers are also solid; `E`, `S`, and coins are not. Anything
@@ -211,6 +212,7 @@ impl Level {
                     'J' => enemy_spawns.push((px, py, EnemyKind::Fly)),
                     'D' => enemy_spawns.push((px, py, EnemyKind::Faller)),
                     'N' => enemy_spawns.push((px, py, EnemyKind::Bunbun)),
+                    'A' => enemy_spawns.push((px, py, EnemyKind::Gao)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),

@@ -146,6 +146,17 @@ pub enum EnemyKind {
     ///
     /// World 1-2 carries 19, more of one kind than any other World 1 level.
     Bunbun,
+    /// Gao: stands still and spits.
+    ///
+    /// 700 frames with the camera held still and it does not move a pixel on
+    /// either axis (`tools/measure_level_kind.py`). It is not inert: a kind
+    /// `0x23` fireball appears 4 pixels to its left every 137 frames and
+    /// flies up and to the left (`tools/watch_kind_neighbours.py`). The
+    /// fireball is measured and not implemented yet, so ours only stands
+    /// there (`docs/reference/faithfulness.md`).
+    ///
+    /// World 1-3 carries nine, three of which spawn in normal play.
+    Gao,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,6 +226,11 @@ impl Enemy {
     /// Bunbun, at the start of a burst. Every one traced set off left.
     pub fn bunbun(pixel_x: i32, pixel_y: i32) -> Self {
         Self::new(pixel_x, pixel_y, true, EnemyKind::Bunbun)
+    }
+
+    /// Gao, which stays exactly where the level put it.
+    pub fn gao(pixel_x: i32, pixel_y: i32) -> Self {
+        Self::new(pixel_x, pixel_y, true, EnemyKind::Gao)
     }
 
     pub fn pixel_x(&self) -> i32 {
@@ -308,6 +324,12 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
             enemy.x -= crate::core::entity::SUBPIXEL;
         }
         enemy.phase = (enemy.phase + 1) % FLIGHT_CYCLE;
+        return;
+    }
+    // Gao does not move on either axis in 700 frames, so it neither walks nor
+    // falls. The one traced was standing on the floor, so whether it would
+    // fall off a ledge is not something the trace can say.
+    if enemy.kind == EnemyKind::Gao {
         return;
     }
     // The faller holds still, then drops. Once the wait is over the shared
@@ -701,6 +723,35 @@ mod tests {
         }
         assert_eq!(f.pixel_y(), 16, "floor top is y=24 and it is 8 tall");
         assert!(f.on_ground);
+    }
+
+    /// 700 frames with the camera held still and not a pixel on either axis.
+    /// The trace is longer than this, but a kind that moves at all moves
+    /// inside 700 frames: the slowest thing measured on the cartridge is the
+    /// Pakkun Flower's 200 frame cycle.
+    #[test]
+    fn a_gao_never_moves() {
+        let solids = floor();
+        let mut g = Enemy::gao(120, 40);
+        let start = (g.pixel_x(), g.pixel_y());
+        for _ in 0..700 {
+            update_enemy(&mut g, &solids);
+            assert_eq!((g.pixel_x(), g.pixel_y()), start);
+        }
+    }
+
+    /// And it does not fall, which is the half of that a floor test would
+    /// hide: the one traced was standing on the floor, so the trace cannot
+    /// say what it would do off a ledge, and standing still is what it does
+    /// say.
+    #[test]
+    fn a_gao_hangs_where_it_was_put() {
+        let solids = floor();
+        let mut g = Enemy::gao(120, 0);
+        for _ in 0..300 {
+            update_enemy(&mut g, &solids);
+        }
+        assert_eq!(g.pixel_y(), 0);
     }
 
     #[test]

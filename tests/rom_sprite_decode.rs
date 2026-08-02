@@ -127,8 +127,9 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
             .count()
     };
 
-    let tables: [(&str, &[Piece]); 7] = [
+    let tables: [(&str, &[Piece]); 8] = [
         ("Chibibo", sprite::CHIBIBO),
+        ("Gao", sprite::GAO),
         ("Bunbun", sprite::BUNBUN),
         ("Nokobon", sprite::NOKOBON),
         ("Fly", sprite::FLY),
@@ -170,7 +171,11 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
 /// what makes the arithmetic worth pinning rather than the ids alone.
 #[test]
 fn the_sixteen_by_sixteen_kinds_are_all_one_block() {
-    for (name, pieces) in [("Fly", sprite::FLY), ("Bunbun", sprite::BUNBUN)] {
+    for (name, pieces) in [
+        ("Fly", sprite::FLY),
+        ("Bunbun", sprite::BUNBUN),
+        ("Gao", sprite::GAO),
+    ] {
         let ids: Vec<u8> = pieces.iter().map(|p| p.tile).collect();
         let n = ids[0];
         assert_eq!(ids, vec![n, n + 1, n + 16, n + 17], "{name}");
@@ -191,8 +196,8 @@ fn only_the_per_world_kinds_change_between_worlds() {
     }
     let differs = |id: u8| sheets.iter().any(|s| s[id as usize] != sheets[0][id as usize]);
 
-    for piece in sprite::FLY {
-        assert!(differs(piece.tile), "the Fly's {:#04X} should be per world", piece.tile);
+    for piece in sprite::FLY.iter().chain(sprite::GAO) {
+        assert!(differs(piece.tile), "{:#04X} should be per world", piece.tile);
     }
     for piece in sprite::CHIBIBO {
         assert!(!differs(piece.tile), "the Chibibo's {:#04X} should be shared", piece.tile);

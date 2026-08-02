@@ -18,6 +18,7 @@ code with `Level::from_file` / `Level::from_text`.
 | `J` | the cartridge's Fly (kind `0x0E`): still for 54 frames, then a 32 px hop 15 px high |
 | `D` | a faller: holds position for 175 frames, then drops a pixel a frame |
 | `N` | a Bunbun (kind `0x42`): flies left through everything, 41 px in bursts of 41 frames with 33 still between them |
+| `A` | a Gao (kind `0x3F`): stands still and never moves |
 | `F` | a Bouncer (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility), see the note on non-cartridge content |

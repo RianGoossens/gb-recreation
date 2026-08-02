@@ -475,15 +475,15 @@ fn world_1_3_carries_its_fallers() {
         .filter(|&&(_, _, kind)| kind == EnemyKind::Faller)
         .count();
     assert_eq!(fallers, 6);
-    // Its one ground walker starts inside terrain too, so the fallers are all
-    // the level ends up with.
-    assert_eq!(level.enemy_spawns.len(), 6);
+    // Its one ground walker starts inside terrain, so the six fallers and the
+    // three Gaos are all the level ends up with.
+    assert_eq!(level.enemy_spawns.len(), 9);
 
     // They arrive with the camera, so a fresh Game has none of them live yet:
-    // the nearest is well past the first screen. All six are waiting.
+    // the nearest is well past the first screen. All nine are waiting.
     let game = Game::new(level);
     assert!(game.enemies.is_empty());
-    assert_eq!(game.pending_enemy_count(), 6);
+    assert_eq!(game.pending_enemy_count(), 9);
 }
 
 /// World 1-2's nine Bunbuns, the kind it has more of than any other.
@@ -1621,4 +1621,33 @@ fn world_1_3s_opening_pocket_can_be_jumped_out_of() {
         "he is still in the pocket, reaching only column {}",
         furthest / 8
     );
+}
+
+/// World 1-3 carries three Gaos in normal play. They stand where the level
+/// puts them, which is the whole of what was measured, so this checks that
+/// they arrive and then do nothing.
+#[test]
+fn world_1_3_carries_its_gaos() {
+    let path = "assets/extracted/level_1_3.txt";
+    if !std::path::Path::new(path).exists() {
+        return;
+    }
+    let level = Level::from_file(path).expect("extracted level parses");
+    let gaos: Vec<(i32, i32)> = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Gao)
+        .map(|&(x, y, _)| (x, y))
+        .collect();
+    assert_eq!(gaos.len(), 3);
+
+    let mut game = Game::new(level);
+    let (x, y) = gaos[0];
+    game.enemies.push(sml::core::enemy::Enemy::gao(120, y));
+    let i = game.enemies.len() - 1;
+    for _ in 0..300 {
+        game.step(Buttons::default());
+    }
+    assert_eq!((game.enemies[i].pixel_x(), game.enemies[i].pixel_y()), (120, y));
+    assert!(x > 0, "and the level's own one is somewhere in it");
 }

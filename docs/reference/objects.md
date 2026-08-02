@@ -767,6 +767,41 @@ feet on top and the object gone, a life lost at every other offset. So it hurts
 from the side and from below, and a stomp kills it, which is what the roster's
 separate `0x43` "Bunbun, stomped" already suggested and did not establish.
 
+### Kind 0x3F, Gao, stands still and spits
+
+World 1-3 carries nine records of it, three of which spawn in normal play, and
+World 4-2 three more. Traced with the camera frozen
+(`uv run tools/measure_level_kind.py 1-3 0x3F 700`) it does not move a pixel
+on either axis in 700 frames, which is longer than any cycle measured on the
+cartridge (the Pakkun Flower's 200 frames is the slowest).
+
+A kind that never moves is worth one more question, since the thing it does
+may not be its own movement. `tools/watch_kind_neighbours.py` watches every
+*other* slot while it sits there, and it is not idle:
+
+```
+frame  12: slot 1 filled with 0x23 at -4, +0 from it
+frame 129: slot 1 emptied
+frame 149: slot 1 filled with 0x23 at -4, +0 from it
+frame 266: slot 1 emptied
+...
+```
+
+Seven times in 900 frames, on the dot: a kind `0x23` fireball appears 4 pixels
+to its left, lives 117 frames, and 20 frames later the next one appears, so
+the cycle is 137 frames.
+
+The fireball's own trace (`tools/measure_flyer.py 1-3 0x23`) is a straight
+diagonal, up and to the left, until it leaves the screen: 103 pixels left and
+50 up in 102 frames, so a pixel a frame across and a pixel every two frames
+up. The position updates on alternate frames in steps of 2 and 3, which is
+what a subpixel speed looks like read off a whole-pixel byte. The same shape
+comes back from all three controls and from a second Gao on a different row.
+
+The engine has the Gao standing still (`A` in the level format). The fireball
+is measured and not implemented, and neither one's contact is: World 1-3
+cannot host a contact probe, for reasons above.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine

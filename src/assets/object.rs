@@ -280,6 +280,23 @@ pub fn bunbun_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)
         .collect()
 }
 
+/// Gao. Never moves: 700 frames with the camera held still and not a pixel
+/// on either axis (`tools/measure_level_kind.py`). What it does instead is
+/// spit: a kind `0x23` fireball appears 4 pixels to its left every 137
+/// frames, lives 117 of them, and travels up and to the left
+/// (`tools/watch_kind_neighbours.py`). The fireball is measured and not yet
+/// implemented (`docs/reference/objects.md`).
+pub const GAO: u8 = 0x3F;
+
+/// Where a level puts its Gaos, as (column, row).
+pub fn gao_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == GAO)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// Where a level puts its jumpers, as (column, row).
 pub fn fly_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
     spawning_in(records, mode)

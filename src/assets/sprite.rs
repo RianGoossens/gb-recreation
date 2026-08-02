@@ -206,6 +206,15 @@ pub const BUNBUN: &[Piece] = &[
     piece(8, -8, 0xD3),
 ];
 
+/// Gao (kind `0x3F`), a 2x2 block from the per-world band, measured in
+/// World 1-3 (`tools/measure_object_sprites.py`).
+pub const GAO: &[Piece] = &[
+    piece(0, -16, 0xA4),
+    piece(8, -16, 0xA5),
+    piece(0, -8, 0xB4),
+    piece(8, -8, 0xB5),
+];
+
 /// The Falling Slab (kind `0x0C`), two tiles side by side.
 pub const FALLING_SLAB: &[Piece] = &[piece(0, -8, 0xDD), piece(8, -8, 0xDE)];
 

@@ -1198,7 +1198,7 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
 
         let (mut finished, mut on_level) = (0usize, 0usize);
         let (mut furthest, mut stalled, mut hold_jump) = (0, 0, 0);
-        let (mut decisions, mut waited) = (0usize, 0u32);
+        let (mut decisions, mut retreat, mut armed) = (0usize, 0u32, false);
         for _ in 0..24_000 {
             if session.current_level() != on_level {
                 on_level = session.current_level();
@@ -1242,25 +1242,53 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
             let ground_ahead = solid_at((x + 12) / 8);
             let ground_soon = solid_at((x + 20) / 8);
             let mut buttons = Buttons::default();
+            let feet = game.mario.pixel_y() + 12;
+            let on_lift = game.lifts.iter().any(|l| {
+                (l.y - feet).abs() <= 2 && x + 11 >= l.x && x <= l.x + l.width()
+            });
+            // Back up only where there is ground behind him. The wait doubles
+            // as a run-up on open terrain, and there are two places it must
+            // not: on a lift, where behind him is the gap, and on the three
+            // columns before 1-2's third crossing, where the ledge has a
+            // one-column hole he reversed straight into.
+            let room_behind = solid_at((x - 4) / 8) && solid_at((x - 12) / 8);
+            // The wait runs to completion once started, rather than a frame
+            // per decision. Both are the same on flat ground and they are not
+            // on a ledge: backing up puts ground ahead again, which stops the
+            // decision firing, so the wait only advanced on the frames he was
+            // back at the edge. What that produced was a delay quantised to
+            // the length of that oscillation instead of a wait that sweeps the
+            // lift's whole cycle, which is what a timed crossing needs.
+            if retreat > 0 {
+                retreat -= 1;
+                buttons.set(Button::Left, !on_lift && room_behind);
+                session.step(buttons);
+                continue;
+            }
             if game.mario.on_ground && !ground_soon && hold_jump == 0 {
-                let lift_in_gap = game.lifts.iter().any(|l| l.x > x && l.x < x + 160);
-                if lift_in_gap {
-                    let want = waits.get(decisions).copied().unwrap_or(0);
-                    if waited < want {
-                        waited += 1;
-                        // The wait doubles as a run-up on terrain. On a lift
-                        // there is nothing behind him but the gap, so backing
-                        // up there would walk him off it.
-                        let feet = game.mario.pixel_y() + 12;
-                        let on_lift = game.lifts.iter().any(|l| {
-                            (l.y - feet).abs() <= 2 && x + 11 >= l.x && x <= l.x + l.width()
-                        });
-                        buttons.set(Button::Left, !on_lift);
-                        session.step(buttons);
-                        continue;
+                // The lift he is standing on counts. Riding one to the far end
+                // of its travel and jumping from there is how 1-2's third gap
+                // is crossed, and a test for a lift strictly ahead of him made
+                // that not a decision at all: he jumped off the near end the
+                // frame he landed, every time.
+                let lift_near = game
+                    .lifts
+                    .iter()
+                    .any(|l| l.x + l.width() > x && l.x < x + 160);
+                if lift_near {
+                    if armed {
+                        armed = false;
+                    } else {
+                        let want = waits.get(decisions).copied().unwrap_or(0);
+                        decisions += 1;
+                        if want > 0 {
+                            retreat = want;
+                            armed = true;
+                            buttons.set(Button::Left, !on_lift && room_behind);
+                            session.step(buttons);
+                            continue;
+                        }
                     }
-                    waited = 0;
-                    decisions += 1;
                     hold_jump = FULL_JUMP;
                 }
             }
@@ -1279,7 +1307,7 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
 
     let mut plan: Vec<u32> = Vec::new();
     let mut best = attempt(&plan);
-    for _round in 0..4 {
+    for _round in 0..8 {
         if best.0 >= 3 {
             break;
         }
@@ -1297,26 +1325,18 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
         plan.push(improved.1.unwrap_or(0));
         best = improved.0;
     }
-    // Where this gets to today. World 1-1 finishes and hands over, and 1-2's
-    // first pit (columns 100 to 116, crossed on two vertical lifts) is behind
-    // him, which no walker managed before the search went in: it used to take
-    // every life there.
+    // Where this gets to today: World 1-1 and World 1-2 both finish, all three
+    // of 1-2's lift crossings included, and he stops early in 1-3.
     //
-    // 1-2's second gap (columns 187 to 202, three vertical lifts) is behind
-    // him too. He stops at column 220, on the near side of the gap at 223 to
-    // 236, which is crossed on the horizontal lift at column 232.
-    //
-    // Two readings of "is there ground ahead" had to be fixed to get here and
-    // both were off in the same direction. A one-way platform is standable and
-    // was not being counted, and the row to start counting from is the first
-    // whose *surface* is at or below his feet: using his lowest pixel is a row
-    // out, so the ledge he was standing on top of counted as somewhere ahead
-    // he could walk to, and he stepped off it at column 120 every time.
-    assert_eq!(best.0, 1, "World 1-1 has to finish and hand over to 1-2");
+    // The last of those crossings took a measurement rather than a better
+    // search. Every lift in the engine set off in the +1 direction because
+    // nobody had looked, and the cartridge sends the horizontal one left
+    // (`tools/measure_lift_phase.py`). Going right it never comes within 72
+    // pixels of the ledge at column 222, so no plan could have crossed it.
+    assert_eq!(best.0, 2, "1-1 and 1-2 both have to finish");
     assert!(
-        best.1 / 8 >= 210,
-        "with plan {plan:?} he only reached column {} of 1-2, so one of its \
-two lift crossings is no longer being made",
+        best.1 / 8 >= 10,
+        "with plan {plan:?} he only reached column {} of World 1-3",
         best.1 / 8
     );
 }

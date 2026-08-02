@@ -700,6 +700,39 @@ holds him at. Every offset has to run inside the same continuous approach.
 These have names now, and drawings: see "Where the names come from" above for
 the first and `docs/reference/sprites.md` for the second.
 
+### Which way a lift sets off
+
+The cadence and the half cycles came from watching a lift that had already
+been running for a while, which cannot say which way it left the position its
+record decodes to. The engine assumed +1 on both axes for a long time, and
+half of that was wrong.
+
+`tools/measure_lift_phase.py` catches the slot on the frame the game fills it
+rather than once the object has drifted somewhere readable, then releases
+right so the camera stops: every pixel the slot's coordinates change after
+that is the object's own. The vertical lift (`0x0A`) sets off **down** and the
+horizontal one (`0x0B`) sets off **left**, in World 1-1 and again in World
+1-2. Each ran 119 and 105 frames before reversing, against half cycles of 120
+and 106, so a lift is created at one end of its travel rather than partway
+along it: phase 0, and the one frame is the trace starting after a tick.
+
+World 1-2's third gap is what made this worth measuring. The ledge ends at
+column 222 and the level's one horizontal lift starts at column 232. Setting
+off right it travels to 238 and never comes within 72 pixels of the ledge,
+which no jump in the engine covers, so the gap read as uncrossable. Setting
+off left it comes back to column 225 and the crossing is one jump, a ride to
+the far end of the lift's travel, and a second jump. The walker in
+`tests/extracted_level_1_1.rs` finishes World 1-2 now.
+
+Two things about the instrument. The fly loop has to keep flattening the
+terrain ahead: pinning Mario's Y byte carries him over the ground but not
+through anything at that height, and World 1-2's block at column 212 stopped
+him dead between the two lifts being compared, which is why the first run of
+this reported the horizontal lift as never appearing. And the vertical lift is
+the control for camera drift in the same run: its x moved 2 pixels in 400
+frames after the release, so the horizontal one's 105 frames of leftward
+travel are not the camera.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine
@@ -737,6 +770,7 @@ the first and `docs/reference/sprites.md` for the second.
 | `tools/find_object_bank.py` | which ROM bank a level's object list is in |
 | `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
 | `tools/measure_level_kind.py` | how a kind moves, in 1-2 and 1-3 as well as 1-1 |
+| `tools/measure_lift_phase.py` | which way a lift sets off, and from where in its cycle |
 | `tools/probe_object_contact.py` | whether touching a kind costs Mario a life |
 | `tools/probe_faller_trigger.py` | whether a fall is on a timer or on Mario |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |

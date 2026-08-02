@@ -62,7 +62,11 @@ fn a_horizontal_lift_carries_him_sideways() {
         game.lifts[0].x - lift_left,
         "carried exactly as far as the lift went, without pressing anything"
     );
-    assert!(game.lifts[0].x > lift_left, "and the lift did move");
+    assert!(
+        game.lifts[0].x < lift_left,
+        "and the lift did move, which is leftwards: a lift sets off away from \
+where its record puts it and the horizontal one goes left"
+    );
 }
 
 #[test]

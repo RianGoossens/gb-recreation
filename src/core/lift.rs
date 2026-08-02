@@ -71,6 +71,28 @@ impl LiftAxis {
             LiftAxis::Horizontal => HORIZONTAL_HALF_CYCLE,
         }
     }
+
+    /// Which way a lift sets off from the position its record decodes to.
+    ///
+    /// Both directions were +1 here for as long as nobody had looked, and one
+    /// of them was wrong. `tools/measure_lift_phase.py` catches the slot on
+    /// the frame the game fills it and then freezes the camera, so every pixel
+    /// that follows is the object's own: the vertical lift goes down and the
+    /// horizontal one goes left, in World 1-1 and again in World 1-2. Each
+    /// runs a full half cycle before reversing (119 and 105 frames traced
+    /// against 120 and 106), so a lift is created at the end of its travel
+    /// rather than partway along it.
+    ///
+    /// World 1-2's third gap is what made this worth measuring. Its lift sets
+    /// off from column 232 and the ledge ends at 223: going right it never
+    /// comes nearer than 72 pixels, which no jump in the engine covers, and
+    /// going left it comes back to column 225.
+    pub fn first_direction(self) -> i32 {
+        match self {
+            LiftAxis::Vertical => 1,
+            LiftAxis::Horizontal => -1,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +125,10 @@ impl Lift {
             x,
             y,
             motion,
-            direction: 1,
+            direction: match motion {
+                Motion::Cycle(axis) => axis.first_direction(),
+                Motion::Drop => 1,
+            },
             phase: 0,
             tick: 0,
             triggered: false,
@@ -342,8 +367,30 @@ mod tests {
         for _ in 0..HORIZONTAL_HALF_CYCLE {
             lift.step();
         }
-        assert_eq!(lift.x, 53);
-        assert_eq!(lift.direction, -1);
+        assert_eq!(lift.x, -53);
+        assert_eq!(lift.direction, 1);
+    }
+
+    /// A lift sets off away from its record's position and comes back to it.
+    /// Traced on the cartridge in two levels: down for the vertical one, left
+    /// for the horizontal one, a full half cycle each way.
+    #[test]
+    fn a_lift_sets_off_the_way_the_cartridge_sends_it() {
+        for (axis, expect) in [
+            (LiftAxis::Vertical, (0, 60)),
+            (LiftAxis::Horizontal, (-53, 0)),
+        ] {
+            let mut lift = Lift::new(0, 0, axis);
+            let half = axis.half_cycle();
+            for _ in 0..half {
+                lift.step();
+            }
+            assert_eq!((lift.x, lift.y), expect, "half a cycle of {axis:?}");
+            for _ in 0..half {
+                lift.step();
+            }
+            assert_eq!((lift.x, lift.y), (0, 0), "and back to where it started");
+        }
     }
 
     #[test]

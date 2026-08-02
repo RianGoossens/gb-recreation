@@ -1,5 +1,11 @@
 [
   {
+    "title": "The bottom eight pixels",
+    "date": "2026-08-02",
+    "slug": "2026-08-02-the-bottom-eight-pixels",
+    "summary": "World 1-3 has a corridor with eight pixels of headroom that our twelve-pixel Mario could not enter. Building the same corridor in World 1-1's tilemap says the cartridge only tests the bottom eight pixels of him when he walks."
+  },
+  {
     "title": "The lift was going the wrong way",
     "date": "2026-08-02",
     "slug": "2026-08-02-the-lift-was-going-the-wrong-way",

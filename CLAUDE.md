@@ -56,6 +56,8 @@ When a search over a whole parameter space comes back empty, stop tuning the sea
 
 A fit's residuals are worth less than one end-to-end simulation, which is already written down here for the constant it was learned on, and was not applied to the one next to it. `JUMP_CUT` sat at a value that made pressing the jump button *longer* produce a *lower* jump, which the traces it was fitted to contradict outright, for as long as nobody stepped the whole arc and looked at the peak. Stepping candidate values reproduced both traced peaks exactly. When one constant in a group gets the simulate-it treatment, give it to the rest of the group.
 
+Before building an instrument, run the one that already exists against the question. Four rounds of work went into a rig for measuring boss contact in World 1-3, each round correctly diagnosing the previous round's failure, and the fourth ended on "no contact probe can run in World 1-3" plus a named next step to explain a byte. `tools/probe_object_contact.py` had already measured two kinds in that level, and that result was written in the plan a few lines above the conclusion contradicting it. Pointing it at the boss took one command and gave a clean window with both controls passing. A claim of the form "this cannot be measured here" is worth checking against the list of times it was measured here, and the tools directory is short enough to read. The corollary is about where the fault gets looked for: four rounds all searched the state the trials ran in, and none asked whether a different rig would answer the same question.
+
 ## Communication and style rules (hard constraints)
 
 These are not preferences. Treat a violation as a bug.
@@ -77,7 +79,7 @@ These are not preferences. Treat a violation as a bug.
 - Rust is the implementation language. Use stable `cargo`.
 - Python is fine, and often the faster choice, for prototyping and trying things out: hunting a ROM format, driving PyBoy, measuring a constant, checking whether an idea holds. Reach for it freely there. The finished thing is always Rust. Anything that survives as part of the product (parsing the cartridge, decoding assets, game logic) gets ported once it is understood, and the Python that found it either goes away or stays as the observation tool it always was.
 - The dividing line that keeps coming up: reading the cartridge's bytes belongs in Rust, observing a running emulator stays Python (there is no Game Boy emulator in this project, and those scripts are measuring instruments, not shipped code).
-- Whether asset extraction happens at build time (writing a gitignored file) or at runtime (loading straight from the ROM) is deliberately undecided. Rian does not consider it important; pick whichever suits the task and do not treat either as settled policy.
+- Whether asset extraction happens at build time (writing a gitignored file) or at runtime (loading straight from the ROM) is deliberately undecided. Rian does not consider it important; pick whichever suits the task and do not treat either as settled policy. What is settled, because getting it wrong hid a bug: nothing that verifies behaviour may depend on a generated file being current. `assets::level::level_from_rom` decodes a level in memory and `extracted_level` reads the ROM before the file, so tests and the game both work from a checkout holding only the cartridge.
 
 ## Git and commits
 

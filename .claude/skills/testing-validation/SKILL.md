@@ -72,3 +72,28 @@ whose per-trial fit looked fine in isolation but undershot once the full
 arc was actually simulated (see `docs/reference/physics.md`). Checking
 "does it compile and pass its own tests" is not the same question as "does
 running it look like the thing it was supposed to reproduce."
+
+## Delete the generated input and see if the tests still run
+
+A test that reads a generated, gitignored artifact passes against whatever
+was last generated, however old that is. `assets/extracted/level_*.txt` is
+written by `sml extract-level`, and a change to what extraction produces
+reached no test at all until somebody regenerated the files by hand: World
+1-3 gained its boss and the spawn-count assertion that should have caught it
+stayed green across two commits.
+
+The control is to move the artifact away and run the suite. Doing that here
+found the larger half of the problem. With every extracted level removed the
+suite finished in 0.28 seconds instead of 28, because `session::world_levels`
+read only those files, so a checkout with the ROM but no extraction run got
+the placeholder campaign and every walkthrough test returned early without
+reporting anything. A test that skips and a test that passes produce the same
+summary line, so read the wall-clock time next to the count: a suite that got
+much faster after a change to test inputs has stopped doing something.
+
+Prefer deriving a fixture from the source inside the test
+(`assets::level::level_from_rom`) over reading what a command wrote. Where a
+test genuinely has to skip (no ROM in the tree), make the skip depend on the
+source being absent rather than on a derived file being absent, so the only
+thing that can silence the suite is the one condition a checkout is allowed
+to be in.

@@ -17,13 +17,17 @@ use crate::tuning::Tuning;
 /// level-format markers (see docs/reference/level-format.md).
 /// One world's three levels, decoded from the cartridge.
 ///
-/// The files are written by `sml extract-level` and are gitignored, so this
-/// returns `None` on a checkout without the ROM and callers fall back to the
-/// placeholder campaign.
+/// Each level is decoded from the ROM, so this returns `None` only on a
+/// checkout without the cartridge, and callers fall back to the placeholder
+/// campaign. It used to read what `sml extract-level` had written, which meant
+/// a checkout holding the ROM but no extraction run played the placeholders
+/// and said nothing about it.
 ///
-/// Only World 1 can be finished. Worlds 2 to 4 load and are walkable as far as
-/// their geometry allows, which is not far: World 2 needs swimming, and none of
-/// the three has its enemies (docs/reference/faithfulness.md).
+/// Only World 1 can be finished. Worlds 2 to 4 load with their own graphics
+/// and enemies and are walkable as far as a scripted walker gets, which is not
+/// to the end: what stops it is measured per level and recorded in
+/// `docs/GRAND_MASTER_PLAN.md`, and World 4-3 is a vehicle stage the engine has
+/// nothing to fly (docs/reference/faithfulness.md).
 pub fn world_levels(world: usize) -> Option<Vec<Level>> {
     if !(1..=4).contains(&world) {
         return None;

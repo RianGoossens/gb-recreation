@@ -228,6 +228,7 @@ Goal: expand from a vertical slice to coverage of the original game.
     - [ ] What finishing it does to the level, which nothing has looked at
   - [ ] The fireball, if the boss fight needs one. Nothing has established whether Mario has one without the superball
   - [ ] 4-3's vehicle stage, which the engine has nothing to fly
+- [x] Self-improvement pass: three rules from this session are in CLAUDE.md. Read every number your own instrument printed before writing down what it means (a probe reported a 33 px rise and a furthest x of 88, and the wrong conclusion from the first went into four places before anybody read the second). A control has to be able to fail (pinning Mario's Y byte below the screen is not a fall and answers "unharmed" from any state). And when a search over a whole parameter space comes back empty, look at what it is searching against rather than tuning the search
 - [x] Blog posts per major addition (power-ups and polish post covers the star, superball, pause, one-way camera, sound; more per addition)
 
 ## Milestone 7: Moddability

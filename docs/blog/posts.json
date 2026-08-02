@@ -1,5 +1,11 @@
 [
   {
+    "title": "Fire and fish",
+    "date": "2026-08-03",
+    "slug": "2026-08-03-fire-and-fish",
+    "summary": "King Totomesu breathes fire, and World 2's leaping fish is in the engine. Both measurements were wrong on the first pass for the same reason: a tracker whose match radius equalled the sprite grid's spacing, and a contact probe too slow for something moving two pixels a frame."
+  },
+  {
     "title": "The boss you cannot jump on",
     "date": "2026-08-03",
     "slug": "2026-08-03-the-boss-you-cannot-jump-on",

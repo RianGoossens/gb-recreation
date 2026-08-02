@@ -29,6 +29,40 @@ fn feet_row(y: i32) -> i32 {
     (y + 12).div_euclid(8)
 }
 
+/// A walker's jump button, with the one rule the engine imposes on it: the
+/// button is latched, so holding A does not start a second jump. A walker that
+/// re-arms the moment its hold runs out presses A on every single frame, which
+/// means it jumps once and then never again. That is what pinned Mario in
+/// World 1-3's pocket at column 11 for nine thousand frames: he was pressing
+/// jump the whole time and the latch was never released.
+struct Jump {
+    held: u32,
+    was_held: bool,
+}
+
+impl Jump {
+    fn new() -> Self {
+        Jump { held: 0, was_held: false }
+    }
+
+    /// A new jump can only start on a frame after one where A was up.
+    fn ready(&self) -> bool {
+        self.held == 0 && !self.was_held
+    }
+
+    fn start(&mut self) {
+        self.held = FULL_JUMP;
+    }
+
+    fn press(&mut self, buttons: &mut Buttons) {
+        self.was_held = self.held > 0;
+        if self.held > 0 {
+            buttons.set(Button::A, true);
+            self.held -= 1;
+        }
+    }
+}
+
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
         Some(Level::from_file(PATH).expect("extracted level parses"))
@@ -164,7 +198,7 @@ fn extracted_level_can_be_walked_from_spawn_to_the_end() {
 
     let mut stalled = 0;
     let mut furthest = i32::MIN;
-    let mut hold_jump = 0;
+    let mut jump = Jump::new();
 
     for _ in 0..20_000 {
         let x = game.mario.pixel_x();
@@ -175,16 +209,13 @@ fn extracted_level_can_be_walked_from_spawn_to_the_end() {
             furthest = x;
         }
         let gap = !ground_ahead(&game, x, game.mario.pixel_y());
-        if (stalled > 6 || gap) && game.mario.on_ground {
-            hold_jump = FULL_JUMP;
+        if (stalled > 6 || gap) && game.mario.on_ground && jump.ready() {
+            jump.start();
         }
 
         let mut buttons = Buttons::default();
         buttons.set(Button::Right, true);
-        if hold_jump > 0 {
-            buttons.set(Button::A, true);
-            hold_jump -= 1;
-        }
+        jump.press(&mut buttons);
         game.step(buttons);
 
         if game.completed {
@@ -504,7 +535,7 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // because the glide that replaced the old cliff-edge cap climbs a step it
     // could not.
     for (name, expected) in [
-        ("2_1", 19), ("2_2", 52), ("2_3", 178),
+        ("2_1", 19), ("2_2", 63), ("2_3", 178),
         ("3_1", 90), ("3_2", 34), ("3_3", 23),
         ("4_1", 65), ("4_2", 106), ("4_3", 7),
     ] {
@@ -522,7 +553,7 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
 
         let mut stalled = 0;
         let mut furthest = i32::MIN;
-        let mut hold_jump = 0;
+        let mut jump = Jump::new();
         let mut reached = 0;
         for _ in 0..20_000 {
             let x = game.mario.pixel_x();
@@ -534,15 +565,12 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
             }
             reached = reached.max(furthest / 8);
             let gap = !ground_ahead(&game, x, game.mario.pixel_y());
-            if (stalled > 6 || gap) && game.mario.on_ground {
-                hold_jump = FULL_JUMP;
+            if (stalled > 6 || gap) && game.mario.on_ground && jump.ready() {
+                jump.start();
             }
             let mut buttons = Buttons::default();
             buttons.set(Button::Right, true);
-            if hold_jump > 0 {
-                buttons.set(Button::A, true);
-                hold_jump -= 1;
-            }
+            jump.press(&mut buttons);
             game.step(buttons);
             if game.completed {
                 reached = game.level.solids.width as i32;
@@ -1197,7 +1225,8 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
         session.step(Buttons::default());
 
         let (mut finished, mut on_level) = (0usize, 0usize);
-        let (mut furthest, mut stalled, mut hold_jump) = (0, 0, 0);
+        let (mut furthest, mut stalled) = (0, 0);
+        let mut jump = Jump::new();
         let (mut decisions, mut retreat, mut armed) = (0usize, 0u32, false);
         for _ in 0..24_000 {
             if session.current_level() != on_level {
@@ -1265,7 +1294,7 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
                 session.step(buttons);
                 continue;
             }
-            if game.mario.on_ground && !ground_soon && hold_jump == 0 {
+            if game.mario.on_ground && !ground_soon && jump.ready() {
                 // The lift he is standing on counts. Riding one to the far end
                 // of its travel and jumping from there is how 1-2's third gap
                 // is crossed, and a test for a lift strictly ahead of him made
@@ -1289,17 +1318,14 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
                             continue;
                         }
                     }
-                    hold_jump = FULL_JUMP;
+                    jump.start();
                 }
             }
-            if (stalled > 6 || !ground_ahead) && game.mario.on_ground && hold_jump == 0 {
-                hold_jump = FULL_JUMP;
+            if (stalled > 6 || !ground_ahead) && game.mario.on_ground && jump.ready() {
+                jump.start();
             }
             buttons.set(Button::Right, true);
-            if hold_jump > 0 {
-                buttons.set(Button::A, true);
-                hold_jump -= 1;
-            }
+            jump.press(&mut buttons);
             session.step(buttons);
         }
         (finished, furthest)
@@ -1333,10 +1359,61 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
     // nobody had looked, and the cartridge sends the horizontal one left
     // (`tools/measure_lift_phase.py`). Going right it never comes within 72
     // pixels of the ledge at column 222, so no plan could have crossed it.
+    // He then walks into World 1-3's pocket at column 11 and stops there. That
+    // is geometry rather than a plan: see
+    // `world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model`.
     assert_eq!(best.0, 2, "1-1 and 1-2 both have to finish");
     assert!(
         best.1 / 8 >= 10,
         "with plan {plan:?} he only reached column {} of World 1-3",
         best.1 / 8
     );
+}
+
+/// What stops the World 1 walk, pinned so a change to the collision model
+/// shows up here rather than as a mystery further along.
+///
+/// World 1-3 opens with a raised block at row 10 spanning columns 7 to 11, and
+/// a two-tile wall at columns 13 and 14 whose top is row 12. Walking right
+/// along the floor at row 14 takes Mario under the block and up against the
+/// wall, and from there he cannot get out: the wall's top is 16 pixels above
+/// his feet, and the block above him stops his rise 4 pixels short of that.
+/// The route the level means him to take is over the block rather than under
+/// it, which the walker has no rule for.
+///
+/// Ours is the only collision model this has ever been checked against. The
+/// rise is capped because *any* part of his 11 pixel width is under the block,
+/// and he is only under it by one column here; a cartridge that tests a
+/// narrower head would let him through. Nothing has measured that.
+#[test]
+fn world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model() {
+    let Ok(mut level) = sml::assets::level::extracted_level("1-3") else {
+        return;
+    };
+    for row in 12..=13 {
+        assert!(level.solids.is_solid(13, row), "the wall at column 13");
+    }
+    assert!(level.solids.is_solid(11, 10), "the block overhead");
+    assert!(!level.solids.is_solid(12, 10), "which ends at column 11");
+
+    level.enemy_spawns.clear();
+    level.spawn = (11 * 8, 14 * 8 - 12);
+    let mut game = Game::new(level);
+    let mut jump = Jump::new();
+    let mut highest = i32::MAX;
+    let mut furthest = 0;
+    for _ in 0..600 {
+        if game.mario.on_ground && jump.ready() {
+            jump.start();
+        }
+        let mut buttons = Buttons::default();
+        buttons.set(Button::Right, true);
+        jump.press(&mut buttons);
+        game.step(buttons);
+        highest = highest.min(game.mario.pixel_y());
+        furthest = furthest.max(game.mario.pixel_x());
+    }
+    // His feet at the top of the jump, against the top of the wall at row 12.
+    assert_eq!(highest + 12, 100, "the ceiling caps his feet here");
+    assert_eq!(furthest, 13 * 8 - 11, "and he never gets past the wall");
 }

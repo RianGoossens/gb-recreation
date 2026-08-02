@@ -741,3 +741,36 @@ the first and `docs/reference/sprites.md` for the second.
 | `tools/probe_faller_trigger.py` | whether a fall is on a timer or on Mario |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |
 | `tools/verify_skip_flag.py` | that byte across a whole level |
+
+## The boss rooms
+
+The four boss records place themselves the same way in the three worlds whose
+boss is fought on foot. Read off the extracted levels rather than played:
+
+| level | boss | column | right edge | row |
+| --- | --- | --- | --- | --- |
+| 1-3 | `0x08` King Totomesu | 292 | 300 | 11, on the floor |
+| 2-3 | `0x1A` Dragonzamasu | 352 | 360 | 10, over open water |
+| 3-3 | `0x32` Hiyoihoi | 292 | 300 | 12, on the floor |
+| 4-3 | `0x61` Biokinton | 473 | 480 | 8 |
+
+Each sits exactly eight columns from the right edge, and the last three
+columns are a wall with a gap around rows 6 to 9 in the final one, which is
+the passage out behind him. Three instances, so the shape is checked rather
+than read off one (`each_world_builds_the_same_room_for_its_boss`).
+
+Two things the third instance corrected. Distance to the end trigger looked
+like the invariant from 1-3 and 3-3, which both put it four columns past the
+boss, and 2-3 puts it one: a third level has no exit door, so its trigger
+comes from `level::far_end` picking a standable cell, and where that lands is
+a fact about that rule. And 1-3 and 3-3 both stand their boss on the room's
+floor where 2-3's record is over open water, which is World 2 throughout.
+
+4-3 is the exception in the way it should be. Its boss is eight columns from
+the right edge like the others, but the end trigger is 155 columns behind it
+at 318 and there is no wall anywhere in the level. That is the shape of a
+flight rather than a room, and it is independent support for 4-3 being the
+vehicle stage.
+
+What none of this says is what a boss *does*: how it moves, what hurts it, or
+what happens to the level when it dies. That needs the running cartridge.

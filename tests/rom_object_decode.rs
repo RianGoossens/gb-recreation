@@ -561,3 +561,60 @@ fn every_kind_the_levels_place_has_a_name_but_one() {
     assert_eq!(unnamed, std::collections::BTreeSet::from([0x2F]));
 }
 
+
+/// The four boss ids, each appearing exactly once in the cartridge, in the
+/// third level of its own world.
+const BOSSES: [u8; 4] = [0x08, 0x1A, 0x32, 0x61];
+
+/// Every world that fights its boss on foot builds the same room for it.
+///
+/// The boss record sits exactly eight columns from the right edge, on the
+/// room's own floor, and the level's last three columns are a wall with a gap
+/// near the top of the final one, which is the way out behind him (row 0 is
+/// excluded: 2-3 leaves it open and the other two fill it). World 1-3,
+/// 2-3 and 3-3 all match, which is three instances of a shape read off one.
+///
+/// Distance to the end trigger is *not* the invariant, which the third
+/// instance is what showed: 1-3 and 3-3 both put it four columns past the
+/// boss and 2-3 puts it one. A third level has no exit door, so its trigger
+/// comes from `level::far_end` picking a standable cell rather than from the
+/// cartridge, and where that lands is a fact about the rule.
+///
+/// 4-3 is deliberately not in the list. Its boss record is at column 473 with
+/// the end trigger 155 columns behind it at 318 and no wall anywhere, which is
+/// what a vehicle stage looks like rather than a room, and is independent
+/// support for 4-3 being the one the engine has nothing to fly.
+#[test]
+fn each_world_builds_the_same_room_for_its_boss() {
+    let Some(rom) = rom() else { return };
+    for name in ["1-3", "2-3", "3-3"] {
+        let path = format!("assets/extracted/level_{}.txt", name.replace('-', "_"));
+        if !std::path::Path::new(&path).exists() {
+            continue;
+        }
+        let level = sml::core::level::Level::from_file(&path).expect("parses");
+        let start = level::level_objects(&rom, name).expect("the header names it");
+        let boss = object::spawning(&object::object_list(&rom, start))
+            .into_iter()
+            .find(|r| BOSSES.contains(&r.kind_id()))
+            .unwrap_or_else(|| panic!("{name} has no boss record"));
+        let width = level.solids.width as i32;
+        assert_eq!(
+            width - boss.column() as i32,
+            8,
+            "{name}: the boss stands eight columns from the right edge"
+        );
+        assert!(level.end.is_some(), "{name}: and the room still has an end trigger");
+        // No floor check. 1-3 and 3-3 both stand their boss on the room's
+        // floor and 2-3 does not: its record is at row 10 over open water,
+        // which is World 2 all over.
+        assert!(
+            (1..16).all(|row| level.solids.is_solid(width - 2, row)),
+            "{name}: the second-to-last column walls the room in"
+        );
+        assert!(
+            (6..=9).any(|row| !level.solids.is_solid(width - 1, row)),
+            "{name}: the last column has the way out in it"
+        );
+    }
+}

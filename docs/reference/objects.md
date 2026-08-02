@@ -795,3 +795,17 @@ anchor and Mario's are not the same point, so dx=0 need not overlap anything.
 
 Both kinds do leave their slot when Mario is placed 10 pixels above it, which
 is a stomp for the ordinary enemy and an open question for the boss.
+
+The second attempt swept all 41 offsets instead of testing one
+(`tools/measure_boss_box.py`, which reaches the level once and restores a
+snapshot per trial rather than replaying two levels 41 times). It moved the
+failure rather than fixing it: the positive control now has no window
+anywhere, so an ordinary enemy in World 1-3 does not cost Mario a life at any
+offset. The offset was not the problem. Something about arriving here leaves
+him in a state nothing collides with, and the suspect is the fly loop that
+pins his Y byte every frame for thousands of frames to carry him across two
+levels. The tie-breaker, if this is picked up again, is a control that uses
+no enemy at all: walk him into a pit from the same restored state and see
+whether *that* costs a life.
+
+Two failures, so this is unmeasured rather than attempted again now.

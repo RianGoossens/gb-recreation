@@ -479,9 +479,16 @@ tilemap it reads back, so a flattened opening screen would be visible rather
 than silent; this one matches the decode column for column. Two controls: walking right without jumping stays at x 88 forever,
 and a free jump at column 3 rises 33 pixels.
 
-**The cartridge gets him out.** Holding right at x 88 and tapping A, his Y byte
-runs 134 to 101, a rise of 33 with his feet ending at 95, above the block's own
-top at 96. He does not land on it; he comes back down through it.
+**The cartridge rises 33 pixels where we rise 12.** Holding right at x 88 and
+tapping A, his Y byte runs 134 to 101, with his feet ending at 95, above the
+block's own top at 96. He does not land on it; he comes back down through it.
+
+He also does not get out. His screen x reads 88 on every frame of that run, so
+the higher jump does not become progress: pressed against the wall his speed
+never builds, and a jump with no horizontal speed goes straight up and comes
+straight back down. The same walk started at column 3 stops at x 81, a column
+earlier than ours does. So the pocket stops the cartridge too, and what is
+measured here is the height of the jump rather than a way out.
 
 That does not settle it as "the ceiling test is narrower than he is". A
 standing jump from the same spot is capped. Sweeping a
@@ -521,6 +528,6 @@ edge at x 95, so at least 8 pixels ahead of him; the same offset at x 48 would
 land on the block's left column and cap him there, and it does not. The
 standing sweep does not fit a single point either: it starts capping 6 pixels
 into the block, alternates 12 and 16 on an 8 pixel cadence, and carries on 10
-pixels past the far edge. Something about this is being read wrong, and the
-part that is settled is that the pocket is a dead end for us and not for the
-cartridge, and that direction is the variable.
+pixels past the far edge. Something about this is being read wrong, and what
+is settled is that the direction pressed is the variable and that our rise
+under this block is 21 pixels short of the cartridge's.

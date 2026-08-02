@@ -63,6 +63,21 @@ impl Jump {
     }
 }
 
+/// Is there ground ahead and above him that a jump would reach?
+///
+/// A walker that only jumps at gaps and walls takes the low road everywhere,
+/// and some of these levels put the route on a raised block with open floor
+/// running underneath it. World 3-2's walker spent every run on that floor,
+/// and World 1-3's opening is the same shape with a dead end at the end of it.
+/// Four rows is the most a jump climbs.
+fn step_up_ahead(game: &Game, x: i32, y: i32) -> bool {
+    let column = (x + 12) / 8;
+    (1..=4).any(|up| {
+        let row = feet_row(y) - up;
+        row >= 0 && (1..=3).any(|ahead| game.level.solids.is_standable(column + ahead, row))
+    })
+}
+
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
         Some(Level::from_file(PATH).expect("extracted level parses"))
@@ -534,10 +549,17 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // 2-2 from 69, 3-1 from 98, 4-1 from 66. 3-3 went the other way, 12 to 23,
     // because the glide that replaced the old cliff-edge cap climbs a step it
     // could not.
+    //
+    // Two later fixes moved three more. Releasing the jump button between
+    // jumps took 2-2 from 52 to 63, since a walker that holds A forever gets
+    // one jump and then none. Climbing onto ground ahead and above him took
+    // 3-2 from 34 to 121 and 4-1 from 65 to 70: both put the route on a raised
+    // block with open floor running underneath, and a walker that only jumps
+    // at gaps and walls takes the low road every time.
     for (name, expected) in [
         ("2_1", 19), ("2_2", 63), ("2_3", 178),
-        ("3_1", 90), ("3_2", 34), ("3_3", 23),
-        ("4_1", 65), ("4_2", 106), ("4_3", 7),
+        ("3_1", 90), ("3_2", 121), ("3_3", 23),
+        ("4_1", 70), ("4_2", 106), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
         if !std::path::Path::new(&path).exists() {
@@ -564,8 +586,10 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
                 furthest = x;
             }
             reached = reached.max(furthest / 8);
-            let gap = !ground_ahead(&game, x, game.mario.pixel_y());
-            if (stalled > 6 || gap) && game.mario.on_ground && jump.ready() {
+            let y = game.mario.pixel_y();
+            let gap = !ground_ahead(&game, x, y);
+            let climb = step_up_ahead(&game, x, y);
+            if (stalled > 6 || gap || climb) && game.mario.on_ground && jump.ready() {
                 jump.start();
             }
             let mut buttons = Buttons::default();
@@ -1381,13 +1405,14 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
 /// The route the level means him to take is over the block rather than under
 /// it, which the walker has no rule for.
 ///
-/// The cartridge is not stuck here. `tools/probe_ceiling_cap.py` does the same
-/// thing in the running game: holding right at x 88 and tapping A takes
-/// Mario's Y byte from 134 to 101, a rise of 33 that puts his feet above the
-/// block's own top. A standing jump from that spot is capped the way ours is,
-/// so what differs is a jump held with a direction against one held without,
-/// and the cause is not established (`docs/reference/physics.md`). This pins
-/// our side of the gap.
+/// The cartridge is stuck here too, and for a different reason.
+/// `tools/probe_ceiling_cap.py` does the same walk in the running game and it
+/// stops at x 88 as well, but its jump there rises 33 pixels against our 12:
+/// pressed against the wall its speed never builds, so the height goes
+/// nowhere. A standing jump from that spot is capped the way ours is, so what
+/// differs is a jump held with a direction against one held without, and the
+/// cause is not established (`docs/reference/physics.md`). This pins our side
+/// of it.
 #[test]
 fn world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model() {
     let Ok(mut level) = sml::assets::level::extracted_level("1-3") else {

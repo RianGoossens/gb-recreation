@@ -9,7 +9,9 @@
 use crate::camera::Camera;
 use crate::core::animation::{AnimState, Animator};
 use crate::core::block::{Block, BlockKind};
-use crate::core::enemy::{despawn_offscreen, update_enemy, Enemy, ENEMY_CONTACT, ENEMY_SIZE};
+use crate::core::enemy::{
+    chase_mario, despawn_offscreen, update_enemy, Enemy, ENEMY_CONTACT, ENEMY_SIZE,
+};
 use crate::core::entity::{pixels, Facing, Mario, Power};
 use crate::core::level::{Level, ANIMATION_HOLD, TILE};
 use crate::core::lift::{ride_lifts, Lift};
@@ -253,6 +255,8 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::KingTotomesu => sprite::KING_TOTOMESU,
         EnemyKind::BossFire => sprite::BOSS_FIRE,
         EnemyKind::Honen => sprite::HONEN,
+        // Yurarin's tiles have never been measured, so it draws the placeholder.
+        EnemyKind::Yurarin => return None,
     })
 }
 
@@ -270,6 +274,7 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
         EnemyKind::KingTotomesu => Enemy::king_totomesu(px, py),
         EnemyKind::BossFire => Enemy::boss_fire(px, py),
         EnemyKind::Honen => Enemy::honen(px, py),
+        EnemyKind::Yurarin => Enemy::yurarin(px, py),
     }
 }
 
@@ -455,6 +460,7 @@ impl Game {
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
         }
+        chase_mario(&mut self.enemies, self.mario.pixel_y());
         self.spit_fireballs();
         for item in &mut self.items {
             update_item(item, &self.level.solids);

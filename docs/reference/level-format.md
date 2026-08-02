@@ -21,6 +21,7 @@ code with `Level::from_file` / `Level::from_text`.
 | `A` | a Gao (kind `0x3F`): stands still, and spits a fireball every 137 frames |
 | `K` | King Totomesu (kind `0x08`), World 1-3's boss: leaps 20 px straight up every 162 frames, breathes fire twice a leap, and cannot be stomped |
 | `O` | a Honen (kind `0x10`): dives 114 px from where it is put and comes back, every 161 frames, without moving sideways |
+| `Y` | a Yurarin (kind `0x1D`): swims left across the level and follows Mario's height a pixel every three frames |
 | `F` | a Bouncer (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility), see the note on non-cartridge content |

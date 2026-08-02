@@ -296,6 +296,20 @@ pub fn gao_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
         .collect()
 }
 
+/// Yurarin, World 2-3's swimmer. Crosses the screen leftwards at 191 pixels
+/// in 163 frames and follows Mario's height a pixel every three frames
+/// (`tools/measure_flyer.py`, `tools/probe_vertical_chase.py`).
+pub const YURARIN: u8 = 0x1D;
+
+/// Where a level puts its Yurarin, as (column, row).
+pub fn yurarin_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == YURARIN)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// Honen, World 2's leaping fish. Its x never moves and its y runs a
 /// symmetric arc of 114 pixels on a 161-frame cycle
 /// (`tools/measure_level_kind.py 2-1 0x10`). 24 records across 2-1 and 2-3,

@@ -809,6 +809,51 @@ before the next appeared, so whether the game counts 137 frames from the last
 spit or waits 20 frames after the last fireball is gone fits the trace equally.
 Ours counts.
 
+### Kind 0x1D, Yurarin, swims towards Mario's height
+
+Nine records in World 2-3, the largest kind in that level, and the first thing
+measured in this project whose movement depends on where Mario is.
+
+The horizontal half does not. `uv run tools/measure_flyer.py 2-3 0x1D` gives
+191 pixels left in 163 frames, to the pixel, in all four of its trials: Mario
+pinned high, pinned low, moved to its far side once it had passed him, and a
+second instance. It never turns and never changes speed.
+
+The vertical half was visible in the same output and easy to miss. The
+"held low" trial ended with the object 9 pixels from where it started while
+every other trial had it 55 pixels higher, and its steps included a `+1` no
+other trial had. Two heights fit "it chases him" and fit "it drifts up until
+something stops it" equally well.
+
+`tools/probe_vertical_chase.py` separates them. It snapshots the frame the slot
+fills, then restores and pins Mario at a spread of heights around the object's
+own:
+
+```
+slot 0, the object starts at y 104
+  Mario at  48 (-56): y 103 -> 49, towards him, closest 1 px off him
+  Mario at  80 (-24): y 103 -> 81, towards him, closest 0 px off him
+  control, level with it ( +0): y 103 -> 95, closest 0 px off him
+  Mario at 128 (+24): y 103 -> 127, towards him, closest 1 px off him
+  Mario at 160 (+56): y 103 -> 127, towards him, closest 33 px off him
+```
+
+It converges on him from above and from below, within a pixel, at one pixel
+every three frames. Two things that run says and one it does not. The last row
+stops at 127 and stays there with Mario 33 pixels lower, so something bounds it
+at the bottom of the screen. And the control, Mario level with it, drifted 8
+pixels up rather than holding still, which is the one trial that did not behave
+as the model predicts; nothing explains it, and the reading rests on the four
+trials that changed direction with him.
+
+Contact needed the follow mode Honen needed, and gives the harder answer: a
+life at all six offsets, +10 included, with both controls passing. So a stomp
+does not beat it, which puts it with King Totomesu and its fire breath rather
+than with the walkers.
+
+`Y` in the level format. Its tiles have never been measured, so ours draws the
+placeholder block (`docs/reference/faithfulness.md`).
+
 ### Kind 0x10, Honen, leaps out of the water
 
 24 records across World 2-1 and 2-3, more than any other kind in World 2, and

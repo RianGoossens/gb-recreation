@@ -1675,6 +1675,36 @@ fn world_2_1_carries_its_honen() {
     assert_eq!(game.enemies[i].pixel_y(), top, "and it comes back");
 }
 
+/// World 2-3 carries its Yurarin, and each one crosses the level leftwards
+/// while climbing towards whatever height Mario is at.
+#[test]
+fn world_2_3_carries_its_yurarin() {
+    let Some(level) = rom_level("2-3") else { return };
+    let swimmers = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Yurarin)
+        .count();
+    // The level's list holds 9. One of them sits in a cell the text grid has
+    // already given to terrain, the same way World 1-3 loses two of its eight
+    // fallers, so 8 survive the format.
+    assert_eq!(swimmers, 8);
+
+    let mut game = Game::new(level);
+    game.enemies
+        .push(sml::core::enemy::Enemy::yurarin(120, game.mario.pixel_y() + 40));
+    let i = game.enemies.len() - 1;
+    let (x0, y0) = (game.enemies[i].pixel_x(), game.enemies[i].pixel_y());
+    for _ in 0..60 {
+        game.step(Buttons::default());
+    }
+    assert!(game.enemies[i].pixel_x() < x0 - 60, "it swims left");
+    assert!(
+        game.enemies[i].pixel_y() < y0,
+        "and up towards Mario, who is above it"
+    );
+}
+
 /// A Gao spits on the cadence the cartridge spits on: seven fireballs in 900
 /// frames, 137 frames apart, each starting 4 px to its left.
 #[test]

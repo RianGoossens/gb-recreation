@@ -147,6 +147,27 @@ pub const HONEN_CYCLE: u32 = 2 * (HONEN_HOLD_TOP + HONEN_SLOW_FRAMES + HONEN_FAS
 /// How far it drops below the record's own row: `8 * 1 + 53 * 2`.
 pub const HONEN_DIVE: i32 = HONEN_SLOW_FRAMES as i32 + 2 * HONEN_FAST_FRAMES as i32;
 
+/// How fast Yurarin swims left, in subpixels a frame.
+///
+/// 191 pixels in 163 frames, the same to the pixel across all four of
+/// `measure_flyer.py`'s controls (`tools/measure_flyer.py 2-3 0x1D`). 300
+/// That rate is 299.97 subpixels a frame, and 299 is the integer that lands on
+/// the traced distance: 300 crosses one more pixel boundary over those 163
+/// frames and arrives a pixel early.
+///
+/// The cartridge's own per-frame steps are not a constant rate at all. They
+/// come in sizes of 0 to 3 pixels in a repeating pattern nothing explains,
+/// staying within about 2 pixels of a straight line the whole way
+/// (`docs/reference/faithfulness.md`).
+pub const YURARIN_SPEED: i32 = 299;
+/// Frames between the single pixels it moves towards Mario's height.
+///
+/// Its y steps one pixel every three frames, and which way depends on where he
+/// is: pinned 56 and 24 pixels above it, it rose; pinned 24 below, it came
+/// down; and it stopped within a pixel of him every time
+/// (`tools/probe_vertical_chase.py 2-3 0x1D`).
+pub const YURARIN_CHASE_FRAMES: u32 = 3;
+
 /// Where in the leap King Totomesu breathes fire, as phases of [`LEAP_CYCLE`].
 ///
 /// Two shots a cycle, nine of them in 700 frames, 56 and 106 frames apart
@@ -270,12 +291,28 @@ pub enum EnemyKind {
     /// a walker's signature (`tools/probe_object_contact.py 0x10 2-1
     /// --follow`).
     Honen,
+    /// Yurarin, World 2-3's swimmer: crosses the screen leftwards and follows
+    /// Mario's height while it does.
+    ///
+    /// 191 pixels left in 163 frames, identical across all four of
+    /// `measure_flyer.py`'s controls, so the horizontal half ignores him
+    /// completely. The vertical half does not: it steps one pixel every three
+    /// frames towards whatever height he is pinned at, up or down, and stops
+    /// within a pixel of him (`tools/probe_vertical_chase.py`).
+    ///
+    /// It hurts at every offset the contact sweep tries, +10 included, with
+    /// both controls passing, so a stomp does not beat it either
+    /// (`tools/probe_object_contact.py 0x1D 2-3 --follow`).
+    Yurarin,
 }
 
 impl EnemyKind {
     /// Whether landing on this kind kills it rather than Mario.
     pub fn stompable(self) -> bool {
-        !matches!(self, EnemyKind::KingTotomesu | EnemyKind::BossFire)
+        !matches!(
+            self,
+            EnemyKind::KingTotomesu | EnemyKind::BossFire | EnemyKind::Yurarin
+        )
     }
 }
 
@@ -366,6 +403,11 @@ impl Enemy {
     /// A fireball, where a Gao at `(gao_x, gao_y)` puts one.
     pub fn fireball(gao_x: i32, gao_y: i32) -> Self {
         Self::new(gao_x - SPIT_OFFSET, gao_y, true, EnemyKind::Fireball)
+    }
+
+    /// Yurarin, where its record put it, already swimming.
+    pub fn yurarin(pixel_x: i32, pixel_y: i32) -> Self {
+        Self::new(pixel_x, pixel_y, true, EnemyKind::Yurarin)
     }
 
     /// Honen, at the top of its arc, which is where its record puts it.
@@ -502,6 +544,14 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
         enemy.phase = (enemy.phase + 1) % LEAP_CYCLE;
         return;
     }
+    // Yurarin swims left at a fixed speed. The height it swims at is Mario's
+    // business, so `Game` does that half after this one, the way it does the
+    // fireballs an enemy cannot spawn from in here.
+    if enemy.kind == EnemyKind::Yurarin {
+        enemy.x -= YURARIN_SPEED;
+        enemy.phase = (enemy.phase + 1) % YURARIN_CHASE_FRAMES;
+        return;
+    }
     // Honen dives and comes back on the spot. Like the boss's leap this runs
     // off the phase counter rather than the velocity model, since the trace is
     // a step between two speeds rather than an acceleration.
@@ -607,6 +657,21 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
 
 /// Remove enemies that are dead or have scrolled off screen. `camera_x` is the
 /// left edge of the visible window in pixels.
+/// Move every Yurarin one pixel towards Mario's height, on its own cadence.
+///
+/// Separate from [`update_enemy`] because that one is given the level and
+/// nothing else, and this is the only kind measured whose movement depends on
+/// where Mario is.
+pub fn chase_mario(enemies: &mut [Enemy], mario_y: i32) {
+    for enemy in enemies.iter_mut() {
+        if enemy.kind != EnemyKind::Yurarin || !enemy.alive || enemy.phase != 0 {
+            continue;
+        }
+        let step = (mario_y - enemy.pixel_y()).signum();
+        enemy.y += step * crate::core::entity::SUBPIXEL;
+    }
+}
+
 pub fn despawn_offscreen(enemies: &mut Vec<Enemy>, camera_x: i32) {
     let left_bound = camera_x - DESPAWN_MARGIN;
     let right_bound = camera_x + SCREEN_WIDTH as i32 + DESPAWN_MARGIN;
@@ -978,6 +1043,43 @@ mod tests {
     fn a_fireball_starts_beside_its_gao() {
         let f = Enemy::fireball(200, 100);
         assert_eq!((f.pixel_x(), f.pixel_y()), (200 - SPIT_OFFSET, 100));
+    }
+
+    /// 191 pixels in 163 frames, which is what all four controls gave, and
+    /// nothing about the horizontal half depends on Mario.
+    #[test]
+    fn yurarin_crosses_the_screen_at_the_speed_it_was_traced_at() {
+        let solids = floor();
+        let mut y = Enemy::yurarin(200, 100);
+        for _ in 0..163 {
+            update_enemy(&mut y, &solids);
+        }
+        assert_eq!(200 - y.pixel_x(), 191);
+        assert_eq!(y.pixel_y(), 100, "and its own update never moves its y");
+    }
+
+    /// It follows his height a pixel every three frames, either way, and stops
+    /// when it is level with him. The middle assertion is the control the
+    /// probe used: level with him, it has nothing to do.
+    #[test]
+    fn yurarin_swims_towards_marios_height() {
+        let solids = floor();
+        for (mario_y, expected) in [(40, 60), (160, 140), (100, 100)] {
+            let mut y = Enemy::yurarin(200, 100);
+            for _ in 0..3 * 40 {
+                update_enemy(&mut y, &solids);
+                chase_mario(std::slice::from_mut(&mut y), mario_y);
+            }
+            assert_eq!(y.pixel_y(), expected, "Mario at {mario_y}");
+        }
+    }
+
+    /// Landing on it costs a life, the same six lines the boss and its fire
+    /// give and one more than a walker.
+    #[test]
+    fn yurarin_cannot_be_stomped() {
+        assert!(!EnemyKind::Yurarin.stompable());
+        assert!(EnemyKind::Honen.stompable(), "the control still can be");
     }
 
     /// The whole 700-frame trace of Honen compresses to six runs repeating

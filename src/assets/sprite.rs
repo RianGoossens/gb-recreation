@@ -215,6 +215,37 @@ pub const GAO: &[Piece] = &[
     piece(8, -8, 0xB5),
 ];
 
+/// King Totomesu (kind `0x08`), nine tiles: 32 pixels wide and 24 tall, the
+/// largest drawing of any object measured.
+///
+/// The whole-run survey has never reached it, because it skips any object
+/// within 28 pixels of Mario and the walkthrough flies him straight over the
+/// boss. `tools/measure_boss_sprite.py` parks him at the far side of the
+/// screen instead and reads the hardware's sprite table around the slot for a
+/// whole leap cycle. Two drawings come back with this same nine-sprite layout,
+/// this one on 163 frames of 200 and a second (`0xCA` `0xCB` `0xCC` `0xBA` /
+/// `0xDA` `0xDB` `0xDC`, sharing the head) on 32. What selects between them is
+/// unmeasured, so only the common one is drawn
+/// (`docs/reference/faithfulness.md`).
+///
+/// The offsets are stated against Gao, measured in the same run as a control:
+/// this tool reads Gao's rows 8 pixels lower than the survey did, for a reason
+/// nothing has explained, so the whole table is shifted by the control's own
+/// disagreement. Two things then agree with the result: the tiles come back
+/// identical to the survey's for Gao, and the bottom row lands on the slot's
+/// own y, which is the anchor every other measured kind uses.
+pub const KING_TOTOMESU: &[Piece] = &[
+    piece(0, -24, 0xCD),
+    piece(8, -24, 0xCE),
+    piece(0, -16, 0xAB),
+    piece(8, -16, 0xC6),
+    piece(16, -16, 0xC7),
+    piece(24, -16, 0xAA),
+    piece(0, -8, 0xBB),
+    piece(8, -8, 0xD6),
+    piece(16, -8, 0xD7),
+];
+
 /// Gao's fireball (kind `0x23`), a single tile, measured on the running game
 /// (`tools/measure_object_sprites.py`).
 pub const FIREBALL: &[Piece] = &[piece(0, -8, 0xE2)];

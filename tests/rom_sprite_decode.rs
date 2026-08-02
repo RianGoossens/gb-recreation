@@ -127,7 +127,7 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
             .count()
     };
 
-    let tables: [(&str, &[Piece]); 8] = [
+    let tables: [(&str, &[Piece]); 9] = [
         ("Chibibo", sprite::CHIBIBO),
         ("Gao", sprite::GAO),
         ("Bunbun", sprite::BUNBUN),
@@ -136,6 +136,7 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
         ("Falling Slab", sprite::FALLING_SLAB),
         ("lift", sprite::LIFT),
         ("drop block", sprite::DROP_BLOCK),
+        ("King Totomesu", sprite::KING_TOTOMESU),
     ];
     for (name, pieces) in tables {
         assert!(!pieces.is_empty(), "{name} has no tiles");
@@ -196,7 +197,11 @@ fn only_the_per_world_kinds_change_between_worlds() {
     }
     let differs = |id: u8| sheets.iter().any(|s| s[id as usize] != sheets[0][id as usize]);
 
-    for piece in sprite::FLY.iter().chain(sprite::GAO) {
+    for piece in sprite::FLY
+        .iter()
+        .chain(sprite::GAO)
+        .chain(sprite::KING_TOTOMESU)
+    {
         assert!(differs(piece.tile), "{:#04X} should be per world", piece.tile);
     }
     for piece in sprite::CHIBIBO {

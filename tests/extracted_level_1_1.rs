@@ -475,15 +475,21 @@ fn world_1_3_carries_its_fallers() {
         .filter(|&&(_, _, kind)| kind == EnemyKind::Faller)
         .count();
     assert_eq!(fallers, 6);
-    // Its one ground walker starts inside terrain, so the six fallers and the
-    // three Gaos are all the level ends up with.
-    assert_eq!(level.enemy_spawns.len(), 9);
+    let bosses = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::KingTotomesu)
+        .count();
+    assert_eq!(bosses, 1, "the level ends on King Totomesu");
+    // Its one ground walker starts inside terrain, so the six fallers, the
+    // three Gaos and the boss are all the level ends up with.
+    assert_eq!(level.enemy_spawns.len(), 10);
 
     // They arrive with the camera, so a fresh Game has none of them live yet:
-    // the nearest is well past the first screen. All nine are waiting.
+    // the nearest is well past the first screen. All ten are waiting.
     let game = Game::new(level);
     assert!(game.enemies.is_empty());
-    assert_eq!(game.pending_enemy_count(), 9);
+    assert_eq!(game.pending_enemy_count(), 10);
 }
 
 /// World 1-2's nine Bunbuns, the kind it has more of than any other.

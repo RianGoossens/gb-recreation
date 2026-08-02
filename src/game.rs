@@ -250,9 +250,7 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::Gao => sprite::GAO,
         EnemyKind::Fireball => sprite::FIREBALL,
         EnemyKind::Bouncer => return None,
-        // The sprite survey never isolated the boss, so its tiles are
-        // unmeasured and it keeps the placeholder block.
-        EnemyKind::KingTotomesu => return None,
+        EnemyKind::KingTotomesu => sprite::KING_TOTOMESU,
     })
 }
 

@@ -184,3 +184,40 @@ animator, and the palette is the cartridge's `0xE4`. What is left open here is
 narrow: the four unidentified blocks per row, and whether the walk's four-frame
 cadence changes with his speed. Both are in
 `docs/reference/faithfulness.md`.
+
+## The boss, which the survey could never reach
+
+`measure_object_sprites.py` sweeps every kind in one walkthrough and skips any
+object with a neighbour or with Mario within 28 pixels, since both are drawn
+from the same atlas and would be collected as the object's own tiles. World
+1-3's King Totomesu (`0x08`) fails that check every frame it is on screen: the
+walkthrough flies Mario across the level and straight over the boss.
+
+`tools/measure_boss_sprite.py` reaches one kind, stops, writes Mario to the far
+side of the screen, and then reads OAM around the slot for a whole leap cycle
+with a wider window. Its control is Gao, measured in the same run, whose tiles
+the survey already has.
+
+The boss is nine sprites, 32 pixels wide and 24 tall, the largest drawing of
+any object measured. Two of them come back with the same layout, sharing a
+head:
+
+| | row 1 | row 2 | row 3 |
+|---|---|---|---|
+| 163 frames of 200 | `CD CE` | `AB C6 C7 AA` | `BB D6 D7` |
+| 32 frames of 200 | `CD CE` | `CA CB CC BA` | `DA DB DC` |
+
+Only the common one is drawn. What selects between the two is unmeasured, and
+so is what the stray `C4` `C5` / `D4` `D5` / `FE` sprites in some frames belong
+to: they move leftwards across the run, which is the shape of a projectile.
+
+**One thing about this tool disagrees with the survey and is unexplained.** It
+reads Gao's rows 8 pixels lower than the survey did, for the same kind in the
+same level. The tiles are identical, so the disagreement is in the vertical
+offset alone. The boss's offsets here are therefore stated against the control
+measured beside them, shifted by the control's own disagreement rather than
+taken raw. Two things then agree with the result: the tiles match the survey's
+for Gao exactly, and the bottom row lands on the slot's own y, which is the
+bottom-left anchor every other measured kind uses. Rendering the result and
+looking at it is the third check, and it draws a maned lion rather than a
+scramble.

@@ -842,4 +842,22 @@ levels. The tie-breaker, if this is picked up again, is a control that uses
 no enemy at all: walk him into a pit from the same restored state and see
 whether *that* costs a life.
 
-Two failures, so this is unmeasured rather than attempted again now.
+The third attempt ran that tie-breaker, and it answers cleanly. Take the floor
+out of the tilemap under him, write nothing else at all so that what follows
+is the game's own fall and the game's own death, and he loses no life. The
+state is the problem, and no contact probe run from it can mean anything
+whatever it points at. Note that the first version of this control pinned his
+Y byte below the screen instead, which is not a fall and comes back
+"unharmed" from any state at all.
+
+That run also clears the fly loop, which was the standing suspect. The tool
+lets go for 90 frames first so he falls to the floor, which is what
+`tools/probe_ceiling_cap.py` does before walking him and where he collides
+with terrain normally, and the pit still does not kill him. What is left is
+the snapshot: every trial begins with `restore`, and `tools/measure_lift.py`
+already recorded that restoring a save state per trial silently breaks a
+placement experiment, dropping Mario through a lift at every offset including
+ones a continuous run held him at. The next thing to try is the pit control
+with no restore in front of it, inside one continuous approach.
+
+Three attempts, so this stays unmeasured, with that as the named next step.

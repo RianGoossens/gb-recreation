@@ -486,6 +486,44 @@ fn world_1_3_carries_its_fallers() {
     assert_eq!(game.pending_enemy_count(), 6);
 }
 
+/// World 1-2's nine Bunbuns, the kind it has more of than any other.
+///
+/// Nineteen records carry the kind and nine of them spawn in normal play; the
+/// other ten are expert mode's. They fly, so nothing about them depends on the
+/// terrain under the cell they start in, and all nine reach the level file.
+#[test]
+fn world_1_2_carries_its_bunbuns() {
+    let path = "assets/extracted/level_1_2.txt";
+    if !std::path::Path::new(path).exists() {
+        return;
+    }
+    let level = Level::from_file(path).expect("extracted level parses");
+    let flyers: Vec<(i32, i32)> = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Bunbun)
+        .map(|&(x, y, _)| (x, y))
+        .collect();
+    assert_eq!(flyers.len(), 9);
+
+    // They arrive with the camera like every other enemy, so none is live on
+    // frame one and all nine are waiting.
+    let mut game = Game::new(level);
+    assert!(!game.enemies.iter().any(|e| e.kind == EnemyKind::Bunbun));
+
+    // One put on screen and flown to the end of a burst has covered 41 px and
+    // lost no height, which is the trace's shape rather than its constants
+    // restated. Its own row, so nothing about where it is placed is invented.
+    let row = flyers[0].1;
+    game.enemies.push(sml::core::enemy::Enemy::bunbun(100, row));
+    let i = game.enemies.len() - 1;
+    for _ in 0..41 {
+        game.step(Buttons::default());
+    }
+    assert_eq!(game.enemies[i].pixel_x(), 100 - 41);
+    assert_eq!(game.enemies[i].pixel_y(), row);
+}
+
 /// World 2-1 and 2-2 carry the cartridge's own exit door, the 2x2 block of
 /// `0x13 0x21` over `0x24 0x39`, in the same place World 1's levels do: twice
 /// in one column, a raised one for the bonus route and one at ground level.

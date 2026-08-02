@@ -265,6 +265,21 @@ pub fn faller_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)
         .collect()
 }
 
+/// Bunbun. Flies level and leftwards in bursts, one pixel a frame for 41
+/// frames and then 33 frames still, taking no notice of Mario
+/// (`tools/measure_flyer.py`). Its contact sweep is a walker's
+/// (`tools/probe_object_contact.py`). World 1-2 has 19 of them.
+pub const BUNBUN: u8 = 0x42;
+
+/// Where a level puts its Bunbuns, as (column, row).
+pub fn bunbun_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == BUNBUN)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// Where a level puts its jumpers, as (column, row).
 pub fn fly_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
     spawning_in(records, mode)

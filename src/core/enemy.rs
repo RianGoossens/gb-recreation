@@ -92,6 +92,14 @@ pub const HOP_HEIGHT: i32 = 15;
 /// rather than something he sets off.
 pub const FALL_DELAY: u32 = 175;
 
+/// Frames Bunbun (object kind `0x42`) spends moving in each cycle, one pixel
+/// a frame. Traced with the camera held still (`tools/measure_flyer.py`).
+pub const FLIGHT_FRAMES: u32 = 41;
+/// Frames it holds still between bursts.
+pub const FLIGHT_HOLD: u32 = 33;
+/// The whole cycle, so 41 pixels every 74 frames.
+pub const FLIGHT_CYCLE: u32 = FLIGHT_FRAMES + FLIGHT_HOLD;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
@@ -127,6 +135,17 @@ pub enum EnemyKind {
     /// atlas tiles `0xA0`, `0xA1`, `0xB0`, `0xB1`, measured on the running
     /// game (`docs/reference/sprites.md`).
     Fly,
+    /// Bunbun: flies level, in bursts, and ignores everything.
+    ///
+    /// One pixel a frame for 41 frames, then 33 frames still, repeating. It
+    /// never reverses and never changes height, and the trace is the same
+    /// with Mario pinned high, pinned low, or moved to its far side, so
+    /// nothing about it follows him (`tools/measure_flyer.py`). On contact it
+    /// is an ordinary enemy: it hurts from every side but a stomp, the same
+    /// six lines as the walker that is that probe's positive control.
+    ///
+    /// World 1-2 carries 19, more of one kind than any other World 1 level.
+    Bunbun,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,6 +210,11 @@ impl Enemy {
         // there gives it a moment on the ground before its first hop.
         hopper.phase = HOP_FRAMES;
         hopper
+    }
+
+    /// Bunbun, at the start of a burst. Every one traced set off left.
+    pub fn bunbun(pixel_x: i32, pixel_y: i32) -> Self {
+        Self::new(pixel_x, pixel_y, true, EnemyKind::Bunbun)
     }
 
     pub fn pixel_x(&self) -> i32 {
@@ -274,6 +298,16 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     }
     if enemy.kind == EnemyKind::Fly {
         update_hopper(enemy, solids);
+        return;
+    }
+    // Bunbun flies through everything it crosses. Whether terrain stops it is
+    // not measured: the rows it flew along in World 1-2 had nothing solid on
+    // them (docs/reference/faithfulness.md).
+    if enemy.kind == EnemyKind::Bunbun {
+        if enemy.phase < FLIGHT_FRAMES {
+            enemy.x -= crate::core::entity::SUBPIXEL;
+        }
+        enemy.phase = (enemy.phase + 1) % FLIGHT_CYCLE;
         return;
     }
     // The faller holds still, then drops. Once the wait is over the shared
@@ -667,6 +701,49 @@ mod tests {
         }
         assert_eq!(f.pixel_y(), 16, "floor top is y=24 and it is 8 tall");
         assert!(f.on_ground);
+    }
+
+    #[test]
+    fn bunbun_flies_in_bursts_the_length_the_trace_gives() {
+        let solids = floor();
+        let mut b = Enemy::bunbun(120, 40);
+        let start = (b.pixel_x(), b.pixel_y());
+        for step in 1..=FLIGHT_FRAMES {
+            update_enemy(&mut b, &solids);
+            assert_eq!(b.pixel_x(), start.0 - step as i32, "a pixel a frame, left");
+            assert_eq!(b.pixel_y(), start.1, "and never a pixel of height");
+        }
+        let held = b.pixel_x();
+        for _ in 0..FLIGHT_HOLD {
+            update_enemy(&mut b, &solids);
+            assert_eq!(b.pixel_x(), held, "then it holds still");
+        }
+        update_enemy(&mut b, &solids);
+        assert_eq!(b.pixel_x(), held - 1, "and the next burst starts");
+    }
+
+    #[test]
+    fn bunbun_covers_forty_one_pixels_every_seventy_four_frames() {
+        let solids = floor();
+        let mut b = Enemy::bunbun(400, 40);
+        let start = b.pixel_x();
+        for _ in 0..(FLIGHT_CYCLE * 4) {
+            update_enemy(&mut b, &solids);
+        }
+        assert_eq!(start - b.pixel_x(), 4 * FLIGHT_FRAMES as i32);
+    }
+
+    #[test]
+    fn bunbun_flies_through_the_floor_it_meets() {
+        // The cartridge was never seen crossing terrain, so ours passes
+        // through rather than inventing a collision (docs/reference/faithfulness.md).
+        let solids = floor();
+        let mut b = Enemy::bunbun(40, 24);
+        for _ in 0..FLIGHT_FRAMES {
+            update_enemy(&mut b, &solids);
+        }
+        assert_eq!(b.pixel_y(), 24, "the floor at y=24 does not hold it up");
+        assert_eq!(b.pixel_x(), 40 - FLIGHT_FRAMES as i32, "or stop it");
     }
 
     #[test]

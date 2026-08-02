@@ -315,6 +315,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     let hoppers = object::fly_spawns(&records, mode);
     let fallers = object::faller_spawns(&records, mode);
     let drops = object::drop_block_spawns(&records, mode);
+    let flyers = object::bunbun_spawns(&records, mode);
     let mut objects: Vec<(usize, usize, u8)> =
         walkers
             .iter()
@@ -328,6 +329,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     objects.extend(hoppers.iter().map(|&(c, r)| (c, r, b'J')));
     objects.extend(fallers.iter().map(|&(c, r)| (c, r, b'D')));
     objects.extend(drops.iter().map(|&(c, r)| (c, r, b'X')));
+    objects.extend(flyers.iter().map(|&(c, r)| (c, r, b'N')));
 
     let text = level::to_level_text_with_objects(&columns, &objects);
     if let Err(e) = std::fs::write(path, text) {
@@ -354,13 +356,14 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {}x{} -> {out}", columns.len(), level::ROWS);
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!(
-        "  {} ground walkers, {} jumpers, {} fallers, {} drop blocks and {} \
-lifts, from {} object records ({} spawn in {} mode)",
+        "  {} ground walkers, {} jumpers, {} fallers, {} drop blocks, {} \
+lifts and {} Bunbuns, from {} object records ({} spawn in {} mode)",
         walkers.len(),
         hoppers.len(),
         fallers.len(),
         drops.len(),
         lifts.len(),
+        flyers.len(),
         records.len(),
         object::spawning_in(&records, mode).len(),
         if expert { "expert" } else { "normal" },

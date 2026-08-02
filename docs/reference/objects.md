@@ -774,3 +774,24 @@ vehicle stage.
 
 What none of this says is what a boss *does*: how it moves, what hurts it, or
 what happens to the level when it dies. That needs the running cartridge.
+
+### What World 1-3's boss does
+
+King Totomesu (`0x08`) traced with the camera frozen
+(`uv run tools/measure_level_kind.py 1-3 0x08 700`): **x never moves**, not a
+pixel in 700 frames, and y runs 20 pixels up at one pixel every two frames,
+20 back down at the same rate, then holds still for about 81 frames. That is
+a 162-frame cycle of leaping straight up on the spot, 170 position updates
+with 8 reversals, alternately 41 and 121 frames apart.
+
+What happens on contact is **not measured**, and the reason is worth keeping.
+`tools/probe_boss_contact.py` holds Mario at a fixed offset from the boss's
+slot for 320 frames, longer than the 212 a death takes to register, and the
+boss came back unharmed. That result is worthless: the same probe run against
+`0x3F`, an ordinary enemy standing in the same room, also comes back
+unharmed, so it cannot detect a death at that offset. One offset was the
+mistake. `measure_enemy_box.py` sweeps a range precisely because the slot's
+anchor and Mario's are not the same point, so dx=0 need not overlap anything.
+
+Both kinds do leave their slot when Mario is placed 10 pixels above it, which
+is a stomp for the ordinary enemy and an open question for the boss.

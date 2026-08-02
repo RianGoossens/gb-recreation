@@ -431,6 +431,63 @@ mod tests {
         assert_eq!(JUMP_CUT, 76);
         assert_eq!(BOUNCE_CUT, 29);
         assert_eq!(STOMP_BOUNCE, 360);
+        assert_eq!(GLIDE_VELOCITY, 384);
+        assert_eq!(GLIDE_CUT, 32);
+        assert_eq!(GLIDE_FRAMES, 12);
+        // The two parts of him the terrain tests, both measured by writing
+        // into World 1-1's own tilemap and both smaller than his 11 by 12.
+        assert_eq!(WALK_HEIGHT, 8);
+        assert_eq!(HEAD_WIDTH, 5);
+    }
+
+    /// The two boxes the terrain tests are smaller than the box he stands
+    /// with, so a run of tiles at head height is somewhere he can walk and a
+    /// tile above one shoulder is not something he bumps.
+    #[test]
+    fn the_walking_box_and_the_head_are_smaller_than_he_is() {
+        let (w, h) = Mario::new(0, 0).size();
+        assert_eq!((w, h), (11, 12), "his standing box, measured on the cartridge");
+        assert!(WALK_HEIGHT < h, "a corridor one row high is walkable");
+        assert!(HEAD_WIDTH < w, "a ceiling over one shoulder is not a cap");
+    }
+
+    /// World 1-3's opening in miniature: a floor, a block four rows up ending
+    /// one column short of him, and a two-tile wall in front. With his whole
+    /// width tested against the block he cannot clear the wall, which is what
+    /// pinned the World 1 walk at column 11 of that level for a whole session.
+    #[test]
+    fn a_ceiling_over_one_shoulder_does_not_cap_the_jump() {
+        let solids = Solids::from_rows(&[
+            "..###...",
+            "........",
+            "........",
+            "........",
+            "########",
+        ]);
+        // The block covers columns 2 to 4, so it ends at x 39. At x 37 his
+        // box runs 37 to 47 and overlaps it; his head, 5 wide and centred,
+        // runs 40 to 44 and does not.
+        let free = |x: i32| {
+            let mut mario = Mario::new(x, 32 - 12);
+            mario.on_ground = true;
+            let mut highest = mario.pixel_y();
+            let t = Tuning::default();
+            let mut buttons = Buttons::default();
+            buttons.set(Button::A, true);
+            buttons.set(Button::Right, true);
+            for _ in 0..40 {
+                step_motion(&mut mario, buttons, &solids, &t);
+                highest = highest.min(mario.pixel_y());
+            }
+            32 - 12 - highest
+        };
+        let under = free(37);
+        let clear = free(56);
+        assert!(
+            under > 20,
+            "one column under the block should barely matter, and he rose {under}"
+        );
+        assert_eq!(under, clear, "the same jump as in open air");
     }
 
     // Gravity and collision.

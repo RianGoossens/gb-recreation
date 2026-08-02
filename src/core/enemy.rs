@@ -126,6 +126,21 @@ pub const LEAP_RISE_FRAMES: u32 = LEAP_HEIGHT as u32 * LEAP_STEP_FRAMES;
 /// own figure for it was "about 81", which is that within its resolution.
 pub const LEAP_HOLD: u32 = LEAP_CYCLE - 2 * LEAP_RISE_FRAMES;
 
+/// Where in the leap King Totomesu breathes fire, as phases of [`LEAP_CYCLE`].
+///
+/// Two shots a cycle, nine of them in 700 frames, 56 and 106 frames apart
+/// (`tools/measure_boss_fire.py`), which sums to the leap. Reading the boss's
+/// own y beside the shot frames places one at the top of the leap and one
+/// while it is standing, shortly before the next takeoff.
+/// `tools/watch_kind_neighbours.py` counted the same two a cycle from the
+/// slots instead of the sprites and read the pair a frame apart the other way
+/// (105 and 57), so each of these is good to about a frame.
+pub const FIRE_PHASES: [u32; 2] = [LEAP_RISE_FRAMES, LEAP_CYCLE - 16];
+/// How far above the boss's own position its fire flies. The slot appears 4
+/// pixels to its left at its own height and is 7 pixels up three frames later,
+/// after which the line never moves.
+pub const BOSS_FIRE_RISE: i32 = 7;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
@@ -177,9 +192,8 @@ pub enum EnemyKind {
     /// 700 frames with the camera held still and it does not move a pixel on
     /// either axis (`tools/measure_level_kind.py`). It is not inert: a kind
     /// `0x23` fireball appears 4 pixels to its left every 137 frames and
-    /// flies up and to the left (`tools/watch_kind_neighbours.py`). The
-    /// fireball is measured and not implemented yet, so ours only stands
-    /// there (`docs/reference/faithfulness.md`).
+    /// flies up and to the left (`tools/watch_kind_neighbours.py`), which
+    /// `Game` releases on its behalf.
     ///
     /// World 1-3 carries nine, three of which spawn in normal play.
     Gao,
@@ -207,12 +221,25 @@ pub enum EnemyKind {
     /// What it takes to defeat one is not measured, so nothing here does
     /// (`docs/reference/faithfulness.md`).
     KingTotomesu,
+    /// What King Totomesu breathes: kind `0x1E`, flying level and to the left.
+    ///
+    /// A straight horizontal line, one pixel a frame, from screen x 109 until
+    /// it leaves at 0. All four of that tool's controls (Mario held high, held
+    /// low, moved behind it, and a second instance) give the same numbers to
+    /// the frame, so it does not aim at him (`tools/measure_flyer.py`).
+    ///
+    /// It hurts at every offset the contact sweep tries, feet on top included,
+    /// the same six lines the boss itself gives and one more than an ordinary
+    /// enemy (`tools/probe_object_contact.py 0x1E 1-3`, both controls passing).
+    ///
+    /// It is not placed by any object list. Only the boss makes one.
+    BossFire,
 }
 
 impl EnemyKind {
     /// Whether landing on this kind kills it rather than Mario.
     pub fn stompable(self) -> bool {
-        self != EnemyKind::KingTotomesu
+        !matches!(self, EnemyKind::KingTotomesu | EnemyKind::BossFire)
     }
 }
 
@@ -303,6 +330,18 @@ impl Enemy {
     /// A fireball, where a Gao at `(gao_x, gao_y)` puts one.
     pub fn fireball(gao_x: i32, gao_y: i32) -> Self {
         Self::new(gao_x - SPIT_OFFSET, gao_y, true, EnemyKind::Fireball)
+    }
+
+    /// The boss's fire, where a King Totomesu at `(boss_x, boss_y)` puts one:
+    /// out of its mouth, the same 4 pixels to the left a Gao spits from, on a
+    /// line [`BOSS_FIRE_RISE`] above its own position.
+    pub fn boss_fire(boss_x: i32, boss_y: i32) -> Self {
+        Self::new(
+            boss_x - SPIT_OFFSET,
+            boss_y - BOSS_FIRE_RISE,
+            true,
+            EnemyKind::BossFire,
+        )
     }
 
     pub fn pixel_x(&self) -> i32 {
@@ -420,6 +459,12 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
             };
         }
         enemy.phase = (enemy.phase + 1) % LEAP_CYCLE;
+        return;
+    }
+    // The boss's fire flies level and to the left, a pixel a frame, and takes
+    // no notice of anything either.
+    if enemy.kind == EnemyKind::BossFire {
+        enemy.x -= crate::core::entity::SUBPIXEL;
         return;
     }
     // The fireball flies up and to the left and takes no notice of anything.
@@ -871,6 +916,39 @@ mod tests {
     fn a_fireball_starts_beside_its_gao() {
         let f = Enemy::fireball(200, 100);
         assert_eq!((f.pixel_x(), f.pixel_y()), (200 - SPIT_OFFSET, 100));
+    }
+
+    /// The boss's fire is the flat case: 107 frames from screen x 109 to 0 is
+    /// a pixel a frame, and the height never changes across any of the five
+    /// instances traced.
+    #[test]
+    fn the_bosss_fire_flies_level_and_left() {
+        let solids = floor();
+        let mut f = Enemy::boss_fire(200, 100);
+        let start = (f.pixel_x(), f.pixel_y());
+        for _ in 0..107 {
+            update_enemy(&mut f, &solids);
+        }
+        assert_eq!(start.0 - f.pixel_x(), 107, "a pixel a frame across");
+        assert_eq!(f.pixel_y(), start.1, "and never a pixel of height");
+    }
+
+    /// It leaves the boss's mouth: 4 pixels to its left, the same offset a Gao
+    /// spits from, on a line 7 pixels above its own position.
+    #[test]
+    fn the_bosss_fire_starts_at_its_mouth() {
+        let f = Enemy::boss_fire(200, 100);
+        let expected = (200 - SPIT_OFFSET, 100 - BOSS_FIRE_RISE);
+        assert_eq!((f.pixel_x(), f.pixel_y()), expected);
+    }
+
+    /// Landing on it costs Mario a life the way landing on the boss does. The
+    /// sweep hurt at every offset it tried, +10 (feet on top) included, which
+    /// is one line more than an ordinary enemy gives.
+    #[test]
+    fn the_bosss_fire_cannot_be_stomped() {
+        assert!(!EnemyKind::BossFire.stompable());
+        assert!(EnemyKind::Goomba.stompable(), "the control still can be");
     }
 
     #[test]

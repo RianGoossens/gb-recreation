@@ -251,6 +251,7 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::Fireball => sprite::FIREBALL,
         EnemyKind::Bouncer => return None,
         EnemyKind::KingTotomesu => sprite::KING_TOTOMESU,
+        EnemyKind::BossFire => sprite::BOSS_FIRE,
     })
 }
 
@@ -266,6 +267,7 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
         EnemyKind::Gao => Enemy::gao(px, py),
         EnemyKind::Fireball => Enemy::fireball(px, py),
         EnemyKind::KingTotomesu => Enemy::king_totomesu(px, py),
+        EnemyKind::BossFire => Enemy::boss_fire(px, py),
     }
 }
 
@@ -596,13 +598,14 @@ impl Game {
 
     /// Advance superballs, remove fizzled ones, and defeat any enemy a ball hits.
     /// A ball that connects is spent.
-    /// Every Gao whose timer came round this frame spits a fireball.
+    /// Every Gao whose timer came round this frame spits a fireball, and every
+    /// King Totomesu at one of the two points in its leap breathes fire.
     ///
-    /// The timer lives on the Gao and is stepped in `update_enemy`; the
-    /// fireball is added here because an enemy cannot add another enemy from
+    /// Both timers live on the enemy and are stepped in `update_enemy`; what
+    /// they spawn is added here because an enemy cannot add another enemy from
     /// inside its own update.
     fn spit_fireballs(&mut self) {
-        use crate::core::enemy::EnemyKind;
+        use crate::core::enemy::{EnemyKind, FIRE_PHASES};
         let spits: Vec<(i32, i32)> = self
             .enemies
             .iter()
@@ -611,6 +614,18 @@ impl Game {
             .collect();
         for (x, y) in spits {
             self.enemies.push(Enemy::fireball(x, y));
+        }
+
+        let breaths: Vec<(i32, i32)> = self
+            .enemies
+            .iter()
+            .filter(|e| {
+                e.kind == EnemyKind::KingTotomesu && e.alive && FIRE_PHASES.contains(&e.phase)
+            })
+            .map(|e| (e.pixel_x(), e.pixel_y()))
+            .collect();
+        for (x, y) in breaths {
+            self.enemies.push(Enemy::boss_fire(x, y));
         }
     }
 

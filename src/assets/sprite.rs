@@ -250,6 +250,16 @@ pub const KING_TOTOMESU: &[Piece] = &[
 /// (`tools/measure_object_sprites.py`).
 pub const FIREBALL: &[Piece] = &[piece(0, -8, 0xE2)];
 
+/// King Totomesu's fire (kind `0x1E`), two tiles side by side, measured by
+/// tracking every sprite on screen through a leap cycle
+/// (`tools/measure_boss_fire.py`).
+///
+/// The pair swaps to `0xD4` `0xD5` every 8 frames, and `0xFE` stands in for
+/// the left half on the frame it appears. Neither is drawn: what a two-frame
+/// flicker looks like is one drawing, and the engine has no per-kind animation
+/// clock to hang the swap on (`docs/reference/faithfulness.md`).
+pub const BOSS_FIRE: &[Piece] = &[piece(0, -8, 0xC4), piece(8, -8, 0xC5)];
+
 /// The Falling Slab (kind `0x0C`), two tiles side by side.
 pub const FALLING_SLAB: &[Piece] = &[piece(0, -8, 0xDD), piece(8, -8, 0xDE)];
 

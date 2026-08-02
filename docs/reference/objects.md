@@ -809,6 +809,68 @@ before the next appeared, so whether the game counts 137 frames from the last
 spit or waits 20 frames after the last fireball is gone fits the trace equally.
 Ours counts.
 
+### King Totomesu breathes fire, twice a leap
+
+`measure_boss_sprite.py` had left a loose end: some frames near the boss held
+sprites (`C4` `C5`, `D4` `D5`, `FE`) that were not part of its nine, moving
+leftwards, which is the shape of a projectile and nothing more than that.
+
+Three routes agree on what they are, and the first two were tools that already
+existed for Gao:
+
+**`watch_kind_neighbours.py 1-3 0x08 900`.** Two slots fill per leap cycle,
+eleven in 900 frames. Each one appears as kind `0x1B` exactly 4 pixels to the
+boss's left at its own height, and three frames later the same slot holds
+`0x1E`, 16 left and 7 up. Neither kind is in the level's records; like Gao's
+`0x23` they only exist at runtime. The two shots in a cycle are 105 and 57
+frames apart, which sums to the 162-frame leap.
+
+**`measure_flyer.py 1-3 0x1E`.** A straight horizontal line: 1 pixel a frame
+left, y never moves, 107 frames from screen x 109 to 0, where it leaves. All
+four of that tool's controls (Mario held high, held low, moved behind it, and
+a second instance) give the same numbers to the frame, so it does not aim or
+react to him. A fifth instance fired from the top of the leap flies along
+screen row 9 instead of row 12, at the same speed.
+
+**`measure_boss_fire.py`**, new here, for the part neither of those reads: the
+drawing. The fire is two 8x8 sprites side by side, 16 by 8, whose tiles swap
+every 8 frames (`C4` `C5` and `D4` `D5`), with `FE` in the left half on the
+spawn frame only. Its control is Gao in the same run, which comes back with
+its own `E2` fireball on a 137-frame cadence and none of these tiles, and its
+positive control is the boss's own nine sprites, which the tracker has to
+follow through a leap: it reports them holding x to the pixel and moving only
+in y, which is the movement already measured.
+
+Where in the cycle each shot happens comes from the boss's own y beside the
+shot frames: one while it is standing, 15 frames before the rise begins, and
+one at the apex, so the two lines it puts across the screen are 20 pixels
+apart. Both leave from its mouth, 4 pixels left of its position at the height
+it is currently at.
+
+**It hurts, and it cannot be jumped on.** `uv run
+tools/probe_object_contact.py 0x1E 1-3` costs a life at all six offsets, in a
+run where the positive control (World 1-1's walker) and the negative control
+(Mario 60 pixels to the side) both passed. That includes +10, feet on top,
+where every ordinary enemy is stomped harmlessly and only the boss itself has
+ever taken a life before. So the fire is the boss's second way of using the
+same rule.
+
+The engine has all of it. `EnemyKind::BossFire` flies level and left at a pixel
+a frame and is not stompable, and `Game::spit_fireballs` (which already did
+this for Gao, since an enemy cannot add another enemy from inside its own
+update) releases one at each of the two phases. Drawn from `0xC4` `0xC5`; the
+8-frame swap to `0xD4` `0xD5` is not reproduced
+(`docs/reference/faithfulness.md`).
+
+Two things this cost, both from reading the instrument's own numbers rather
+than trusting the first pass. The tracker's match radius started at 8, which
+is the spacing of the grid the boss's nine sprites sit on, so tracks hopped to
+their neighbours and came back holding half the drawing each. And every
+projectile appeared to vanish at x 33, which is 8 + 24 + 1: Mario's parked
+position plus the width the tool cut sprites out at. Cutting on both axes
+instead (he is parked in the air, well above the fire's row) shows it crossing
+to x 1.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine

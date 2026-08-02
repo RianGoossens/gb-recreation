@@ -1681,3 +1681,46 @@ fn a_gao_spits_a_fireball_every_hundred_and_thirty_seven_frames() {
     assert!(ball.pixel_x() <= 120 - SPIT_OFFSET, "it flies left");
     assert!(ball.pixel_y() <= 8, "and up");
 }
+
+/// King Totomesu breathes twice a leap, 56 frames apart and then 106, which is
+/// the 162-frame leap split by the two points the shots were read at: the top
+/// of the leap, and standing, shortly before the next takeoff.
+///
+/// The two lines it puts across the screen are the leap apart, since each one
+/// leaves at the height the boss was at when it fired.
+#[test]
+fn the_boss_breathes_fire_twice_a_leap() {
+    use sml::core::enemy::{Enemy, BOSS_FIRE_RISE, LEAP_CYCLE, LEAP_HEIGHT, SPIT_OFFSET};
+
+    let level = Level::from_rows(&[
+        "                    ",
+        "                    ",
+        "M                   ",
+        "####################",
+    ]);
+    let mut game = Game::new(level);
+    game.enemies.push(Enemy::king_totomesu(120, 8));
+
+    let mut shots = Vec::new();
+    for frame in 0..3 * LEAP_CYCLE {
+        let before = game.enemies.len();
+        game.step(Buttons::default());
+        if game.enemies.len() > before {
+            let fire = game.enemies.last().expect("the one just added");
+            shots.push((frame, fire.pixel_x(), fire.pixel_y()));
+        }
+    }
+
+    assert_eq!(shots.len(), 6, "two a leap over three leaps");
+    let gaps: Vec<u32> = shots.windows(2).map(|p| p[1].0 - p[0].0).collect();
+    assert_eq!(gaps, vec![56, 106, 56, 106, 56]);
+
+    for (_, x, _) in &shots {
+        assert_eq!(*x, 120 - SPIT_OFFSET, "every one leaves its mouth");
+    }
+    let heights: Vec<i32> = shots.iter().map(|s| s.2).collect();
+    let high = 8 - LEAP_HEIGHT - BOSS_FIRE_RISE;
+    let low = 8 - BOSS_FIRE_RISE;
+    // It is put down resting, so the standing shot is the one that comes first.
+    assert_eq!(heights, vec![low, high, low, high, low, high]);
+}

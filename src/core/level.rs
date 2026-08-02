@@ -53,6 +53,15 @@ impl Solids {
         self.platforms[ty as usize * self.width + tx as usize]
     }
 
+    /// Can Mario stand on the tile at (tx, ty)? A one-way platform holds him
+    /// up from above just as a solid tile does, so anything asking "is there
+    /// ground here" has to count both. Asking `is_solid` alone reads a run of
+    /// platforms as a hole: World 1-2's second gap ends on four platform
+    /// tiles at column 203 and looked 25 columns wide instead of 16.
+    pub fn is_standable(&self, tx: i32, ty: i32) -> bool {
+        self.is_solid(tx, ty) || self.is_platform(tx, ty)
+    }
+
     /// The topmost platform row touched by the pixel span, if any.
     pub fn platform_under(&self, left: i32, right: i32, bottom: i32) -> Option<i32> {
         let ty = bottom.div_euclid(TILE);

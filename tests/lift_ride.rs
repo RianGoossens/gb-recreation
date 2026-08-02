@@ -209,117 +209,183 @@ fn a_level_without_lifts_has_none() {
     assert!(game.lifts.is_empty());
 }
 
-/// Can World 1-2's pit be crossed at all?
+/// How long to hold A for the highest jump the engine gives. Holding past
+/// `MAX_RISE_FRAMES` ends the rise on the spot, so a walker that holds longer
+/// jumps lower, which is how the climb out of 1-2's first platform run was
+/// being missed.
+const FULL_JUMP: u32 = sml::core::physics::MAX_RISE_FRAMES as u32;
+
+/// One run over a lift crossing with a given plan, returning how far right
+/// Mario stood.
 ///
-/// Columns 100 to 116 hold nothing solid and the crossing is two vertical
-/// lifts, at columns 105 and 111, each moving 60 pixels on a 120 frame cycle.
-/// Three heuristic walkers failed at it, and a heuristic is the wrong tool: a
-/// jump onto a moving platform is a timing, and the engine is deterministic,
-/// so the timing can be searched for instead of guessed at.
+/// He makes one decision and makes it the same way every time: standing with
+/// nothing to stand on two columns ahead, he waits `w` frames and then jumps
+/// right, taking each `w` from the plan in turn. Everything else is holding
+/// right. A jump onto a moving platform is a timing, and the engine is
+/// deterministic, so the timing is searched for rather than guessed at; three
+/// heuristic walkers failed at the first of these crossings before that.
+fn run_plan(level: &Level, first_edge: i32, target: i32, waits: &[u32]) -> i32 {
+    let mut level = level.clone();
+    level.enemy_spawns.clear();
+    let mut game = Game::new(level);
+    let (mut furthest, mut decisions, mut waited, mut hold_jump) = (0, 0usize, 0, 0);
+    for _ in 0..6000 {
+        let x = game.mario.pixel_x();
+        // Standing only. Drifting rightwards while falling into the pit covers
+        // ground too, and counting that would score the fall as progress; the
+        // engine kills him at the bottom and puts him back, so a death has to
+        // end the attempt as well.
+        if game.mario.on_ground {
+            furthest = furthest.max(x);
+        }
+        if furthest >= target || game.deaths > 0 {
+            break;
+        }
+        // Two columns of look-ahead. Checking the column under his front foot
+        // is too late: by the time it is empty he has already walked off the
+        // edge and is in the air, where he has no decision left to make. And
+        // the question is whether he can *stand* there, so a one-way platform
+        // counts: 1-2's second gap ends on four of them.
+        let column = (x + 20) / 8;
+        // From his own row downwards. Anything above him he cannot fall onto,
+        // and counting it walks him off the edge at column 15 of this level,
+        // where a platform hangs well below the ledge he is on.
+        let ground_ahead =
+            (game.mario.pixel_y() / 8..16).any(|row| game.level.solids.is_standable(column, row));
+        let mut buttons = Buttons::default();
+        if game.mario.on_ground && !ground_ahead && hold_jump == 0 {
+            // Only this crossing's own edges are decisions. 1-2 has small
+            // holes elsewhere that a plain jump clears, and letting those
+            // consume plan entries tunes the wrong gap.
+            if x > first_edge {
+                let want = waits.get(decisions).copied().unwrap_or(0);
+                if waited < want {
+                    // Backing up rather than standing still. The jump has to
+                    // cover 48 pixels to the first lift's near edge, and a
+                    // standing jump does not, so the wait doubles as the
+                    // run-up.
+                    waited += 1;
+                    // Back up only when he is on terrain. On a lift there is
+                    // nothing behind him but the pit, so waiting there means
+                    // standing still.
+                    let feet = game.mario.pixel_y() + 12;
+                    let on_lift = game.lifts.iter().any(|l| {
+                        (l.y - feet).abs() <= 2 && x + 11 >= l.x && x <= l.x + l.width()
+                    });
+                    buttons.set(Button::Left, !on_lift);
+                    game.step(buttons);
+                    continue;
+                }
+                waited = 0;
+                decisions += 1;
+            }
+            hold_jump = FULL_JUMP;
+        }
+        buttons.set(Button::Right, true);
+        if hold_jump > 0 {
+            buttons.set(Button::A, true);
+            hold_jump -= 1;
+        }
+        game.step(buttons);
+    }
+    furthest
+}
+
+/// Search for a plan that gets Mario to `target`.
 ///
-/// The walker here has one decision to make and makes it the same way every
-/// time: whenever he is standing with nothing solid ahead, he waits `w`
-/// frames and then jumps right, taking `w` from a list. The search fills that
-/// list one entry at a time, keeping whichever wait got him furthest. A cycle
-/// is 120 frames, so 120 candidates covers every phase a lift can be in.
+/// A beam rather than a hill climb. Keeping only the single best plan tunes
+/// one decision at a time, which is enough for a two-lift crossing and not
+/// enough for a three-lift one: the wait that gets furthest on the second lift
+/// can be the one that leaves the third out of reach, and a single-plan search
+/// has already thrown away the alternative by the time it finds out. `WIDTH`
+/// plans carried forward keeps those alternatives alive.
+fn search_plan(level: &Level, first_edge: i32, target: i32, rounds: usize) -> (i32, Vec<u32>) {
+    const WIDTH: usize = 4;
+    // A vertical lift's full cycle is 240 frames, so 240 candidate waits cover
+    // every phase it can be in when he decides to jump.
+    const PHASES: u32 = 240;
+
+    let mut beam: Vec<(i32, Vec<u32>)> = vec![(run_plan(level, first_edge, target, &[]), Vec::new())];
+    for _ in 0..rounds {
+        let mut next: Vec<(i32, Vec<u32>)> = Vec::new();
+        for (_, plan) in &beam {
+            for w in 0..PHASES {
+                let mut candidate = plan.clone();
+                candidate.push(w);
+                next.push((run_plan(level, first_edge, target, &candidate), candidate));
+            }
+        }
+        next.sort_by_key(|(reach, _)| std::cmp::Reverse(*reach));
+        next.dedup_by_key(|(reach, _)| *reach);
+        next.truncate(WIDTH);
+        beam = next;
+        if beam[0].0 >= target {
+            break;
+        }
+    }
+    beam.into_iter().next().unwrap()
+}
+
+/// Can World 1-2's first pit be crossed at all?
+///
+/// Columns 103 to 116 have nothing to stand on and the crossing is two
+/// vertical lifts, at columns 105 and 111, each moving 60 pixels on a 120
+/// frame cycle. The far side is solid ground at column 117.
+///
+/// He is placed on the ledge rather than walked to it, so that what fails
+/// when this fails is the crossing and not the platform maze before it.
 #[test]
 fn world_1_2s_pit_can_be_crossed_by_riding_its_lifts() {
     use sml::assets::level as assets;
 
-    let Ok(level) = assets::extracted_level("1-2") else { return };
+    let Ok(mut level) = assets::extracted_level("1-2") else { return };
+    // The ledge is the one-way platform at row 7, columns 100 to 102.
+    level.spawn = (100 * 8, 7 * 8 - 12);
     let target = 117 * 8;
-
-    // One run of the level with a given plan, returning how far right he got.
-    let attempt = |waits: &[u32]| -> i32 {
-        let mut level = level.clone();
-        level.enemy_spawns.clear();
-        let mut game = Game::new(level);
-        let (mut furthest, mut decisions, mut waited, mut hold_jump) = (0, 0usize, 0, 0);
-        for _ in 0..6000 {
-            let x = game.mario.pixel_x();
-            // Standing only. Drifting rightwards while falling into the pit
-            // covers ground too, and counting that would score the fall as
-            // progress; the engine kills him at the bottom and puts him back,
-            // so a death has to end the attempt as well.
-            if game.mario.on_ground {
-                furthest = furthest.max(x);
-            }
-            if furthest >= target || game.deaths > 0 {
-                break;
-            }
-            // Two columns of look-ahead. Checking the column under his front
-            // foot is too late: by the time it is empty he has already walked
-            // off the edge and is in the air, where he has no decision left to
-            // make.
-            let column = (x + 20) / 8;
-            let ground_ahead = (0..16).any(|row| game.level.solids.is_solid(column, row));
-            let mut buttons = Buttons::default();
-            if game.mario.on_ground && !ground_ahead && hold_jump == 0 {
-                // Only the pit's own edges are decisions. 1-2 has small holes
-                // earlier that a plain jump clears, and letting those consume
-                // plan entries tunes the wrong gap.
-                if x > 95 * 8 {
-                    let want = waits.get(decisions).copied().unwrap_or(0);
-                    if waited < want {
-                        // Backing up rather than standing still. The jump has
-                        // to cover 48 pixels to the lift's near edge, and a
-                        // standing jump does not, so the wait doubles as the
-                        // run-up.
-                        waited += 1;
-                        // Back up only when he is on terrain. On a lift there
-                        // is nothing behind him but the pit, so waiting there
-                        // means standing still.
-                        let feet = game.mario.pixel_y() + 12;
-                        let on_lift = game.lifts.iter().any(|l| {
-                            (l.y - feet).abs() <= 2 && x + 11 >= l.x && x <= l.x + l.width()
-                        });
-                        buttons.set(Button::Left, !on_lift);
-                        game.step(buttons);
-                        continue;
-                    }
-                    waited = 0;
-                    decisions += 1;
-                }
-                hold_jump = 14;
-            }
-            buttons.set(Button::Right, true);
-            if hold_jump > 0 {
-                buttons.set(Button::A, true);
-                hold_jump -= 1;
-            }
-            game.step(buttons);
-        }
-        furthest
-    };
-
-    let mut plan: Vec<u32> = Vec::new();
-    let mut best = attempt(&plan);
-    for _round in 0..6 {
-        let mut improved = (best, None);
-        for w in 0..120 {
-            plan.push(w);
-            let got = attempt(&plan);
-            plan.pop();
-            if got > improved.0 {
-                improved = (got, Some(w));
-            }
-        }
-        // A round that improves nothing still moves on: the next decision is
-        // the one that matters, and stopping here would leave it untried.
-        plan.push(improved.1.unwrap_or(0));
-        best = improved.0;
-        if best >= target {
-            break;
-        }
-    }
+    let (best, plan) = search_plan(&level, 99 * 8, target, 4);
     assert!(
         best >= target,
         "the best plan {plan:?} only reached column {}, short of the far side \
 at 117",
         best / 8
     );
-    // What it finds, with the search as it stands: back up 11 frames at the
-    // ledge and jump, hop straight off the first lift, then wait 24 frames on
-    // the second for it to rise before the last jump.
-    assert_eq!(plan.len(), 3, "three jumps, one per edge: {plan:?}");
+}
+
+/// And the second one, which is three lifts.
+///
+/// Columns 187 to 202 have nothing to stand on, with vertical lifts at 187,
+/// 192 and 197, and the far side is a run of one-way platforms starting at
+/// column 203. This gap read as 25 columns wide and impossible for a while,
+/// because the walker asked whether a column was solid and platforms are not:
+/// on that reading the nearest thing to stand on was 96 pixels past the last
+/// lift, well beyond any jump.
+///
+/// He is placed on the ledge rather than walked to it, so what this measures
+/// is the gap and not everything before it. The camera has to come along or
+/// the lifts are never stepped.
+#[test]
+fn world_1_2s_second_gap_is_crossed_by_riding_three_lifts() {
+    use sml::assets::level as assets;
+    use sml::core::entity::pixels;
+
+    let Ok(mut level) = assets::extracted_level("1-2") else { return };
+    // Column 184 is the last full step of the ledge, its top at row 13.
+    level.spawn = (184 * 8, 13 * 8 - 12);
+    let target = 203 * 8;
+    let (best, plan) = search_plan(&level, 183 * 8, target, 5);
+    assert!(
+        best >= target,
+        "the best plan {plan:?} only reached column {}, short of the platform \
+at 203",
+        best / 8
+    );
+
+    // And the plan replays: the search is over a deterministic engine, so the
+    // same waits have to produce the same crossing a second time.
+    let mut replay = level.clone();
+    replay.enemy_spawns.clear();
+    let mut game = Game::new(replay);
+    assert_eq!(game.mario.x, pixels(184 * 8));
+    assert_eq!(run_plan(&level, 183 * 8, target, &plan), best);
+    game.step(Buttons::default());
 }

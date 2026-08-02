@@ -476,7 +476,7 @@ fn implemented_kinds_are_placed_in_open_space() {
 }
 
 /// What each level gets when it is extracted, as (walkers, jumpers, fallers,
-/// drop blocks, lifts, Bunbuns, Gaos). Pinned so a change in the decode or in which kinds are
+/// drop blocks, lifts, Bunbuns, Gaos, bosses). Pinned so a change in the decode or in which kinds are
 /// implemented
 /// is visible per level rather than only in a total. Worlds 3 and 4 have never
 /// been played here, so this is the record of what the ROM says they hold.
@@ -485,18 +485,18 @@ fn every_level_hands_over_the_same_objects_each_time() {
     let Some(data) = rom() else { return };
 
     let expected = [
-        ("1-1", (11, 3, 0, 0, 2, 0, 0)),
-        ("1-2", (8, 0, 0, 2, 7, 9, 0)),
-        ("1-3", (1, 0, 8, 5, 0, 0, 3)),
-        ("2-1", (10, 0, 0, 2, 4, 0, 0)),
-        ("2-2", (14, 0, 0, 3, 5, 0, 0)),
-        ("2-3", (0, 0, 0, 0, 0, 0, 0)),
-        ("3-1", (7, 0, 0, 8, 3, 0, 0)),
-        ("3-2", (8, 5, 0, 13, 1, 0, 0)),
-        ("3-3", (2, 0, 0, 4, 3, 0, 0)),
-        ("4-1", (8, 0, 1, 6, 5, 0, 0)),
-        ("4-2", (16, 0, 0, 5, 4, 0, 3)),
-        ("4-3", (0, 0, 0, 0, 0, 0, 0)),
+        ("1-1", (11, 3, 0, 0, 2, 0, 0, 0)),
+        ("1-2", (8, 0, 0, 2, 7, 9, 0, 0)),
+        ("1-3", (1, 0, 8, 5, 0, 0, 3, 1)),
+        ("2-1", (10, 0, 0, 2, 4, 0, 0, 0)),
+        ("2-2", (14, 0, 0, 3, 5, 0, 0, 0)),
+        ("2-3", (0, 0, 0, 0, 0, 0, 0, 0)),
+        ("3-1", (7, 0, 0, 8, 3, 0, 0, 0)),
+        ("3-2", (8, 5, 0, 13, 1, 0, 0, 0)),
+        ("3-3", (2, 0, 0, 4, 3, 0, 0, 0)),
+        ("4-1", (8, 0, 1, 6, 5, 0, 0, 0)),
+        ("4-2", (16, 0, 0, 5, 4, 0, 3, 0)),
+        ("4-3", (0, 0, 0, 0, 0, 0, 0, 0)),
     ];
     let mode = object::Mode::Normal;
     for (name, counts) in expected {
@@ -510,6 +510,7 @@ fn every_level_hands_over_the_same_objects_each_time() {
             object::lift_spawns(&records, mode).len(),
             object::bunbun_spawns(&records, mode).len(),
             object::gao_spawns(&records, mode).len(),
+            object::king_totomesu_spawns(&records, mode).len(),
         );
         assert_eq!(got, counts, "World {name}");
     }

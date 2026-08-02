@@ -1047,8 +1047,13 @@ in a run whose positive and negative controls both passed:
 
 Every enemy measured up to now (the walker `0x00`, the falling slab `0x0C`,
 Bunbun `0x42`, Gao `0x3F`) is unharmed at +10, which is feet on top, and
-empties its own slot there. The boss is the first kind that hurts Mario at
-that offset and does not go away. Landing on it costs a life, so the fight
-is not won by jumping on it, which is what the cartridge does: the way past
-King Totomesu is the passage behind it, and the wall with a gap around rows
-6 to 9 in the level's last three columns is that passage.
+empties its own slot there. The boss is the first kind that costs Mario a
+life at that offset, so landing on it is not how the fight is won. That fits
+the level, whose last three columns are a wall with a gap around rows 6 to 9,
+a passage behind him rather than over him.
+
+Whether the boss *also* dies from that landing is not something this run
+separates, and the earlier note that it leaves its slot at +10 does not
+settle it either: Mario dying resets the level and empties every slot, so a
+kind that hurts him at an offset gives the same reading whatever else
+happens to it. What is measured is the life.

@@ -109,6 +109,23 @@ pub const SPIT_CYCLE: u32 = 137;
 /// How far to the left of a Gao its fireball appears.
 pub const SPIT_OFFSET: i32 = 4;
 
+/// The whole cycle of King Totomesu's leap, in frames. Traced with the camera
+/// frozen (`uv run tools/measure_level_kind.py 1-3 0x08 700`): 170 position
+/// updates with 8 reversals, alternately 41 and 121 frames apart.
+pub const LEAP_CYCLE: u32 = 162;
+/// How high it leaps, in pixels. Straight up: its x never moves, not a pixel
+/// in 700 frames.
+pub const LEAP_HEIGHT: i32 = 20;
+/// Frames between position updates while it is off the ground, so one pixel
+/// every two frames going up and the same coming down.
+pub const LEAP_STEP_FRAMES: u32 = 2;
+/// Frames spent rising, and the same again falling.
+pub const LEAP_RISE_FRAMES: u32 = LEAP_HEIGHT as u32 * LEAP_STEP_FRAMES;
+/// Frames it holds still at the bottom between leaps. The trace measures the
+/// cycle and the two legs, so this is what is left of the cycle; the trace's
+/// own figure for it was "about 81", which is that within its resolution.
+pub const LEAP_HOLD: u32 = LEAP_CYCLE - 2 * LEAP_RISE_FRAMES;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
@@ -177,6 +194,26 @@ pub enum EnemyKind {
     ///
     /// It is not placed by any object list. Only a Gao makes one.
     Fireball,
+    /// King Totomesu, World 1-3's boss: leaps straight up on the spot and
+    /// cannot be stomped.
+    ///
+    /// 20 pixels up at one pixel every two frames, 20 back down, then still
+    /// for the rest of a 162-frame cycle, with its x fixed through all 700
+    /// frames of the trace (`tools/measure_level_kind.py`). On contact it is
+    /// the first kind measured that costs Mario a life at +10, feet on top,
+    /// where every other enemy is stomped harmlessly
+    /// (`tools/probe_object_contact.py`).
+    ///
+    /// What it takes to defeat one is not measured, so nothing here does
+    /// (`docs/reference/faithfulness.md`).
+    KingTotomesu,
+}
+
+impl EnemyKind {
+    /// Whether landing on this kind kills it rather than Mario.
+    pub fn stompable(self) -> bool {
+        self != EnemyKind::KingTotomesu
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,6 +288,16 @@ impl Enemy {
     /// Gao, which stays exactly where the level put it.
     pub fn gao(pixel_x: i32, pixel_y: i32) -> Self {
         Self::new(pixel_x, pixel_y, true, EnemyKind::Gao)
+    }
+
+    /// King Totomesu, resting at the bottom of its leap.
+    pub fn king_totomesu(pixel_x: i32, pixel_y: i32) -> Self {
+        let mut boss = Self::new(pixel_x, pixel_y, true, EnemyKind::KingTotomesu);
+        boss.vx = 0;
+        // The still stretch comes last in the cycle, so starting there gives
+        // it a moment on the ground before its first leap.
+        boss.phase = 2 * LEAP_RISE_FRAMES;
+        boss
     }
 
     /// A fireball, where a Gao at `(gao_x, gao_y)` puts one.
@@ -358,6 +405,21 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     // add another enemy from in here.
     if enemy.kind == EnemyKind::Gao {
         enemy.phase = (enemy.phase + 1) % SPIT_CYCLE;
+        return;
+    }
+    // The boss leaps straight up on the spot. Its x never moves and neither
+    // does the height it comes back to, so this runs off the phase counter
+    // alone rather than through the velocity model.
+    if enemy.kind == EnemyKind::KingTotomesu {
+        if enemy.phase < 2 * LEAP_RISE_FRAMES && enemy.phase.is_multiple_of(LEAP_STEP_FRAMES) {
+            let rising = enemy.phase < LEAP_RISE_FRAMES;
+            enemy.y += if rising {
+                -crate::core::entity::SUBPIXEL
+            } else {
+                crate::core::entity::SUBPIXEL
+            };
+        }
+        enemy.phase = (enemy.phase + 1) % LEAP_CYCLE;
         return;
     }
     // The fireball flies up and to the left and takes no notice of anything.
@@ -852,6 +914,66 @@ mod tests {
         }
         assert_eq!(b.pixel_y(), 24, "the floor at y=24 does not hold it up");
         assert_eq!(b.pixel_x(), 40 - FLIGHT_FRAMES as i32, "or stop it");
+    }
+
+    /// The traced leap, stepped rather than restated: 20 pixels up over a
+    /// full cycle, back to exactly the height it started at, and never a
+    /// pixel sideways. Its x is the part of the trace with no slack in it,
+    /// 700 frames without moving.
+    #[test]
+    fn the_boss_leaps_twenty_pixels_straight_up_and_comes_back() {
+        let solids = floor();
+        let mut b = Enemy::king_totomesu(120, 40);
+        let start = (b.pixel_x(), b.pixel_y());
+
+        let mut highest = start.1;
+        for _ in 0..LEAP_CYCLE {
+            update_enemy(&mut b, &solids);
+            assert_eq!(b.pixel_x(), start.0, "its x never moves");
+            highest = highest.min(b.pixel_y());
+        }
+        assert_eq!(start.1 - highest, LEAP_HEIGHT, "the height of the leap");
+        assert_eq!(b.pixel_y(), start.1, "and it comes back to where it was");
+    }
+
+    /// The other half of the trace: it rises at one pixel every two frames,
+    /// so a leg takes 40 frames, and it holds still for the rest of the cycle.
+    #[test]
+    fn the_boss_holds_still_between_leaps() {
+        let solids = floor();
+        let mut b = Enemy::king_totomesu(120, 40);
+        // It starts at the bottom of the cycle, in the still stretch.
+        for _ in 0..LEAP_HOLD {
+            update_enemy(&mut b, &solids);
+            assert_eq!(b.pixel_y(), 40, "it should be resting");
+        }
+        for frame in 0..LEAP_RISE_FRAMES {
+            update_enemy(&mut b, &solids);
+            // It moves on the first frame of the leg, so the pixel count is
+            // one ahead of the halved frame number.
+            let risen = frame as i32 / LEAP_STEP_FRAMES as i32 + 1;
+            assert_eq!(b.pixel_y(), 40 - risen, "one pixel every two frames");
+        }
+    }
+
+    /// Every other kind is stomped harmlessly with Mario's feet on top. The
+    /// boss is the one that costs him a life there
+    /// (`tools/probe_object_contact.py`), which in the engine is this flag.
+    #[test]
+    fn the_boss_is_the_only_kind_a_landing_does_not_kill() {
+        assert!(!EnemyKind::KingTotomesu.stompable());
+        for kind in [
+            EnemyKind::Goomba,
+            EnemyKind::LedgeTurner,
+            EnemyKind::Bouncer,
+            EnemyKind::Fly,
+            EnemyKind::Faller,
+            EnemyKind::Bunbun,
+            EnemyKind::Gao,
+            EnemyKind::Fireball,
+        ] {
+            assert!(kind.stompable(), "{kind:?} should be stompable");
+        }
     }
 
     #[test]

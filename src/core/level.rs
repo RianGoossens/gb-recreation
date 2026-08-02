@@ -186,7 +186,8 @@ impl Level {
     /// `T` a walker that turns at ledges,
     /// `S` a star, `?` a question block, `P` a power block, `B` a brick block,
     /// `N` a Bunbun, the flyer that crosses leftwards, `A` a Gao, which
-    /// stands still,
+    /// stands still, `K` King Totomesu, which leaps on the spot and cannot be
+    /// stomped,
     /// `E` the level-end trigger, `V` and `H` a lift running up and down or
     /// side to side, `X` a drop block that gives way when stood on.
     /// The block markers are also solid; `E`, `S`, and coins are not. Anything
@@ -213,6 +214,7 @@ impl Level {
                     'D' => enemy_spawns.push((px, py, EnemyKind::Faller)),
                     'N' => enemy_spawns.push((px, py, EnemyKind::Bunbun)),
                     'A' => enemy_spawns.push((px, py, EnemyKind::Gao)),
+                    'K' => enemy_spawns.push((px, py, EnemyKind::KingTotomesu)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),

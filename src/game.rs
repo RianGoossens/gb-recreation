@@ -250,6 +250,9 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::Gao => sprite::GAO,
         EnemyKind::Fireball => sprite::FIREBALL,
         EnemyKind::Bouncer => return None,
+        // The sprite survey never isolated the boss, so its tiles are
+        // unmeasured and it keeps the placeholder block.
+        EnemyKind::KingTotomesu => return None,
     })
 }
 
@@ -264,6 +267,7 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
         EnemyKind::Bunbun => Enemy::bunbun(px, py),
         EnemyKind::Gao => Enemy::gao(px, py),
         EnemyKind::Fireball => Enemy::fireball(px, py),
+        EnemyKind::KingTotomesu => Enemy::king_totomesu(px, py),
     }
 }
 
@@ -513,6 +517,11 @@ impl Game {
     /// Resolve Mario touching enemies. Coming down onto an enemy's upper half is
     /// a stomp: the enemy dies and Mario bounces. Any other contact is a fatal
     /// hit (Mario is small; power-ups come later).
+    ///
+    /// King Totomesu is the one kind a landing does not kill. Swept the same
+    /// way as every other kind, it costs Mario a life at the offset where they
+    /// are stomped harmlessly (`tools/probe_object_contact.py`), so it takes
+    /// the other branch.
     fn resolve_interactions(&mut self) {
         let (mw, mh) = self.mario.size();
         let ml = self.mario.pixel_x();
@@ -537,7 +546,10 @@ impl Game {
                 // A star runs straight through enemies, defeating them.
                 enemy.alive = false;
                 plowed = true;
-            } else if descending && mb <= et + ENEMY_CONTACT / 2 {
+            } else if descending
+                && mb <= et + ENEMY_CONTACT / 2
+                && enemy.kind.stompable()
+            {
                 enemy.alive = false;
                 stomped = true;
             } else {
@@ -1174,6 +1186,26 @@ mod tests {
         }
         assert!(game.enemies.is_empty(), "the goomba should have been stomped");
         assert!(bounced, "Mario should bounce up off the stomp");
+    }
+
+    /// The same drop onto the boss instead, which the cartridge answers
+    /// differently: a life, where the Goomba above gives a bounce
+    /// (`tools/probe_object_contact.py`). The Goomba test is the control that
+    /// says this arrangement does produce a landing.
+    #[test]
+    fn falling_onto_king_totomesu_kills_mario_instead() {
+        use crate::core::level::Level;
+        let level = Level::from_rows(&[".M..", "....", "....", ".K..", "####"]);
+        let mut game = Game::new(level);
+
+        for _ in 0..120 {
+            game.step(Buttons::default());
+            if game.deaths > 0 {
+                break;
+            }
+        }
+        assert_eq!(game.deaths, 1, "landing on the boss should cost a life");
+        assert_eq!(game.enemies.len(), 1, "and should not defeat it");
     }
 
     #[test]

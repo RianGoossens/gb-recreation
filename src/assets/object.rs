@@ -296,6 +296,22 @@ pub fn gao_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
         .collect()
 }
 
+/// King Totomesu, World 1-3's boss. Leaps 20 pixels straight up at a pixel
+/// every two frames and back down on a 162-frame cycle, with its x fixed
+/// (`tools/measure_level_kind.py`). It is the one kind measured that costs
+/// Mario a life when he lands on it (`tools/probe_object_contact.py`).
+pub const KING_TOTOMESU: u8 = 0x08;
+
+/// Where a level puts King Totomesu, as (column, row). Only World 1-3 has
+/// one, eight columns from the level's right edge.
+pub fn king_totomesu_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == KING_TOTOMESU)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// Where a level puts its jumpers, as (column, row).
 pub fn fly_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
     spawning_in(records, mode)

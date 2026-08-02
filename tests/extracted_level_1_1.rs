@@ -20,9 +20,13 @@ const ROWS: i32 = 16;
 /// 78 and 79 is 32px above the ground and needs the glide.
 const FULL_JUMP: u32 =
     (sml::core::physics::MAX_RISE_FRAMES + sml::core::physics::GLIDE_FRAMES) as u32;
-/// The row Mario's feet are in, given his top edge. Small Mario is 12 tall.
+/// The first row a surface can be in and still hold Mario up, given his top
+/// edge. A surface in row `r` has its top at `r * 8`, and he can step onto it
+/// when that is at or below his feet, which are at `y + 12` since small Mario
+/// is 12 tall. Using his lowest *pixel* instead is a row out and counts the
+/// ledge he is already standing on top of as somewhere ahead he can walk to.
 fn feet_row(y: i32) -> i32 {
-    (y + 11) / 8
+    (y + 12).div_euclid(8)
 }
 
 fn extracted() -> Option<Level> {
@@ -1298,17 +1302,21 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
     // him, which no walker managed before the search went in: it used to take
     // every life there.
     //
-    // He used to get to column 180 from here, and that was an accident of the
-    // look-ahead reading rows from his head down: a platform level with his
-    // chest counted as ground he could walk onto, which is wrong and is what
-    // let him blunder up several steps. Reading from his feet he stops at the
-    // 8 pixel step into column 120, which he should be able to jump and does
-    // not. That is a bot problem with its own entry on the plan.
+    // 1-2's second gap (columns 187 to 202, three vertical lifts) is behind
+    // him too. He stops at column 220, on the near side of the gap at 223 to
+    // 236, which is crossed on the horizontal lift at column 232.
+    //
+    // Two readings of "is there ground ahead" had to be fixed to get here and
+    // both were off in the same direction. A one-way platform is standable and
+    // was not being counted, and the row to start counting from is the first
+    // whose *surface* is at or below his feet: using his lowest pixel is a row
+    // out, so the ledge he was standing on top of counted as somewhere ahead
+    // he could walk to, and he stepped off it at column 120 every time.
     assert_eq!(best.0, 1, "World 1-1 has to finish and hand over to 1-2");
     assert!(
-        best.1 / 8 >= 117,
-        "with plan {plan:?} he only reached column {} of 1-2, so the first \
-pit is no longer being crossed",
+        best.1 / 8 >= 210,
+        "with plan {plan:?} he only reached column {} of 1-2, so one of its \
+two lift crossings is no longer being made",
         best.1 / 8
     );
 }

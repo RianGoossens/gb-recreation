@@ -253,7 +253,11 @@ fn run_plan(level: &Level, first_edge: i32, target: i32, waits: &[u32]) -> i32 {
         // From his feet, not his head. A platform level with his chest sits 16
         // pixels above the surface he is standing on, so counting it walks him
         // off the step at column 29 rather than jumping up it.
-        let feet_row = (game.mario.pixel_y() + 11) / 8;
+        // The first row whose surface can hold him: a surface in row `r` has
+        // its top at `r * 8`, and his feet are at `y + 12`. His lowest pixel
+        // is a row out and counts the ledge he is standing on as somewhere
+        // ahead he can walk to.
+        let feet_row = (game.mario.pixel_y() + 12).div_euclid(8);
         let ground_ahead =
             (feet_row..16).any(|row| game.level.solids.is_standable(column, row));
         let mut buttons = Buttons::default();

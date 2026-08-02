@@ -139,6 +139,15 @@ playing it faithfully.
   This replaced his full 11 pixel width, which was never measured. World 1-3's
   opening pocket, where he is under a block by one column, is escapable with
   the measured number and was not with the assumed one.
+- **A ceiling that only caps some jumps**: **not reproduced**. Ours caps any
+  rise whose 5 pixel head is under a solid tile. The cartridge does that
+  standing still and pressing left, and pressing right it caps nothing at all,
+  measured at two ceiling widths in World 1-1 and again against World 1-3's own
+  block (`tools/measure_head_width.py`, `tools/probe_ceiling_cap.py`). It is
+  not the instrument: Mario's position byte stays within a pixel of where the
+  probe pins it, so he is under the ceiling for the whole jump. What the
+  direction selects is unknown, and until it is, capping both ways is the
+  conservative choice, since it makes fewer places reachable rather than more.
 - **World 1 geometry**: canonical, and verified end to end. Every column of
   all three levels (300, 280, 300) matches the running cartridge exactly.
 - **Lifts**: canonical, measured. World 1-1's kinds `0x0A` and `0x0B` carry

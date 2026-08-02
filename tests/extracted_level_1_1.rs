@@ -1651,3 +1651,40 @@ fn world_1_3_carries_its_gaos() {
     assert_eq!((game.enemies[i].pixel_x(), game.enemies[i].pixel_y()), (120, y));
     assert!(x > 0, "and the level's own one is somewhere in it");
 }
+
+/// A Gao spits on the cadence the cartridge spits on: seven fireballs in 900
+/// frames, 137 frames apart, each starting 4 px to its left.
+#[test]
+fn a_gao_spits_a_fireball_every_hundred_and_thirty_seven_frames() {
+    use sml::core::enemy::{Enemy, SPIT_CYCLE, SPIT_OFFSET};
+
+    let level = Level::from_rows(&[
+        "                    ",
+        "                    ",
+        "M                   ",
+        "####################",
+    ]);
+    let mut game = Game::new(level);
+    game.enemies.push(Enemy::gao(120, 8));
+
+    let mut spits = Vec::new();
+    for frame in 0..900u32 {
+        let before = game.enemies.len();
+        game.step(Buttons::default());
+        if game.enemies.len() > before {
+            spits.push(frame);
+        }
+    }
+    assert_eq!(spits.len(), 900 / SPIT_CYCLE as usize);
+    for pair in spits.windows(2) {
+        assert_eq!(pair[1] - pair[0], SPIT_CYCLE);
+    }
+
+    let ball = game
+        .enemies
+        .iter()
+        .find(|e| e.kind == EnemyKind::Fireball)
+        .expect("one is in flight");
+    assert!(ball.pixel_x() <= 120 - SPIT_OFFSET, "it flies left");
+    assert!(ball.pixel_y() <= 8, "and up");
+}

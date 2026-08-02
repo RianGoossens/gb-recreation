@@ -798,9 +798,16 @@ up. The position updates on alternate frames in steps of 2 and 3, which is
 what a subpixel speed looks like read off a whole-pixel byte. The same shape
 comes back from all three controls and from a second Gao on a different row.
 
-The engine has the Gao standing still (`A` in the level format). The fireball
-is measured and not implemented, and neither one's contact is: World 1-3
-cannot host a contact probe, for reasons above.
+The engine has both: a Gao stands still (`A` in the level format) and counts
+to 137, and `Game` turns that into a fireball beside it, since an enemy cannot
+add another enemy from inside its own update. What neither has is a measured
+contact, because World 1-3 cannot host a contact probe, for reasons above; ours
+use the same contact every other enemy uses.
+
+One thing the run cannot separate: each fireball left the screen 20 frames
+before the next appeared, so whether the game counts 137 frames from the last
+spit or waits 20 frames after the last fireball is gone fits the trace equally.
+Ours counts.
 
 ## What is not decoded yet
 

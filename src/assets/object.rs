@@ -284,8 +284,7 @@ pub fn bunbun_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)
 /// on either axis (`tools/measure_level_kind.py`). What it does instead is
 /// spit: a kind `0x23` fireball appears 4 pixels to its left every 137
 /// frames, lives 117 of them, and travels up and to the left
-/// (`tools/watch_kind_neighbours.py`). The fireball is measured and not yet
-/// implemented (`docs/reference/objects.md`).
+/// (`tools/watch_kind_neighbours.py`).
 pub const GAO: u8 = 0x3F;
 
 /// Where a level puts its Gaos, as (column, row).

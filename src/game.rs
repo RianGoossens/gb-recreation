@@ -248,6 +248,7 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::Faller => sprite::FALLING_SLAB,
         EnemyKind::Bunbun => sprite::BUNBUN,
         EnemyKind::Gao => sprite::GAO,
+        EnemyKind::Fireball => sprite::FIREBALL,
         EnemyKind::Bouncer => return None,
     })
 }
@@ -262,6 +263,7 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
         EnemyKind::Faller => Enemy::faller(px, py),
         EnemyKind::Bunbun => Enemy::bunbun(px, py),
         EnemyKind::Gao => Enemy::gao(px, py),
+        EnemyKind::Fireball => Enemy::fireball(px, py),
     }
 }
 
@@ -447,6 +449,7 @@ impl Game {
         for enemy in &mut self.enemies {
             update_enemy(enemy, &self.level.solids);
         }
+        self.spit_fireballs();
         for item in &mut self.items {
             update_item(item, &self.level.solids);
         }
@@ -583,6 +586,24 @@ impl Game {
 
     /// Advance superballs, remove fizzled ones, and defeat any enemy a ball hits.
     /// A ball that connects is spent.
+    /// Every Gao whose timer came round this frame spits a fireball.
+    ///
+    /// The timer lives on the Gao and is stepped in `update_enemy`; the
+    /// fireball is added here because an enemy cannot add another enemy from
+    /// inside its own update.
+    fn spit_fireballs(&mut self) {
+        use crate::core::enemy::EnemyKind;
+        let spits: Vec<(i32, i32)> = self
+            .enemies
+            .iter()
+            .filter(|e| e.kind == EnemyKind::Gao && e.alive && e.phase == 0)
+            .map(|e| (e.pixel_x(), e.pixel_y()))
+            .collect();
+        for (x, y) in spits {
+            self.enemies.push(Enemy::fireball(x, y));
+        }
+    }
+
     fn update_superballs(&mut self) {
         let solids = &self.level.solids;
         self.superballs.retain_mut(|s| update_superball(s, solids));

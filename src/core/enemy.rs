@@ -100,6 +100,15 @@ pub const FLIGHT_HOLD: u32 = 33;
 /// The whole cycle, so 41 pixels every 74 frames.
 pub const FLIGHT_CYCLE: u32 = FLIGHT_FRAMES + FLIGHT_HOLD;
 
+/// Frames between one of Gao's fireballs and the next. Seven appeared in 900
+/// frames at exactly this spacing (`tools/watch_kind_neighbours.py`). Each
+/// lived 117 of the 137 and then left the screen, so whether the game counts
+/// 137 from the last spit or waits 20 frames after the last fireball is gone
+/// is not something that run can separate; ours counts.
+pub const SPIT_CYCLE: u32 = 137;
+/// How far to the left of a Gao its fireball appears.
+pub const SPIT_OFFSET: i32 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     /// Walks along the ground, turns at walls, and walks off ledges.
@@ -157,6 +166,17 @@ pub enum EnemyKind {
     ///
     /// World 1-3 carries nine, three of which spawn in normal play.
     Gao,
+    /// What a Gao spits: kind `0x23`, flying up and to the left.
+    ///
+    /// 103 pixels left and 50 up in 102 frames, so a pixel a frame across and
+    /// one every two frames up, in a straight line until it leaves the screen
+    /// (`tools/measure_flyer.py`). The cartridge updates its position on
+    /// alternate frames in steps of 2 and 3, which is a subpixel speed read
+    /// off a whole-pixel byte; ours carries the subpixels instead, so the
+    /// pixel it is on each frame is the same.
+    ///
+    /// It is not placed by any object list. Only a Gao makes one.
+    Fireball,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,6 +251,11 @@ impl Enemy {
     /// Gao, which stays exactly where the level put it.
     pub fn gao(pixel_x: i32, pixel_y: i32) -> Self {
         Self::new(pixel_x, pixel_y, true, EnemyKind::Gao)
+    }
+
+    /// A fireball, where a Gao at `(gao_x, gao_y)` puts one.
+    pub fn fireball(gao_x: i32, gao_y: i32) -> Self {
+        Self::new(gao_x - SPIT_OFFSET, gao_y, true, EnemyKind::Fireball)
     }
 
     pub fn pixel_x(&self) -> i32 {
@@ -328,8 +353,17 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
     }
     // Gao does not move on either axis in 700 frames, so it neither walks nor
     // falls. The one traced was standing on the floor, so whether it would
-    // fall off a ledge is not something the trace can say.
+    // fall off a ledge is not something the trace can say. Its timer runs
+    // here; `Game` is what turns it into a fireball, since an enemy cannot
+    // add another enemy from in here.
     if enemy.kind == EnemyKind::Gao {
+        enemy.phase = (enemy.phase + 1) % SPIT_CYCLE;
+        return;
+    }
+    // The fireball flies up and to the left and takes no notice of anything.
+    if enemy.kind == EnemyKind::Fireball {
+        enemy.x -= crate::core::entity::SUBPIXEL;
+        enemy.y -= crate::core::entity::SUBPIXEL / 2;
         return;
     }
     // The faller holds still, then drops. Once the wait is over the shared
@@ -752,6 +786,29 @@ mod tests {
             update_enemy(&mut g, &solids);
         }
         assert_eq!(g.pixel_y(), 0);
+    }
+
+    /// The traced fireball covered 103 pixels left and 50 up in 102 frames.
+    /// This is that shape rather than the constants restated: the ratio
+    /// between the axes is what a diagonal is.
+    #[test]
+    fn a_fireball_flies_the_diagonal_it_was_traced_on() {
+        let solids = floor();
+        let mut f = Enemy::fireball(200, 100);
+        let start = (f.pixel_x(), f.pixel_y());
+        for _ in 0..102 {
+            update_enemy(&mut f, &solids);
+        }
+        assert_eq!(start.0 - f.pixel_x(), 102, "a pixel a frame across");
+        assert_eq!(start.1 - f.pixel_y(), 51, "and one every two frames up");
+    }
+
+    /// It appears 4 pixels to the left of the Gao that spat it, which is where
+    /// every one of the seven watched came from.
+    #[test]
+    fn a_fireball_starts_beside_its_gao() {
+        let f = Enemy::fireball(200, 100);
+        assert_eq!((f.pixel_x(), f.pixel_y()), (200 - SPIT_OFFSET, 100));
     }
 
     #[test]

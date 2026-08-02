@@ -215,6 +215,10 @@ pub const GAO: &[Piece] = &[
     piece(8, -8, 0xB5),
 ];
 
+/// Gao's fireball (kind `0x23`), a single tile, measured on the running game
+/// (`tools/measure_object_sprites.py`).
+pub const FIREBALL: &[Piece] = &[piece(0, -8, 0xE2)];
+
 /// The Falling Slab (kind `0x0C`), two tiles side by side.
 pub const FALLING_SLAB: &[Piece] = &[piece(0, -8, 0xDD), piece(8, -8, 0xDE)];
 

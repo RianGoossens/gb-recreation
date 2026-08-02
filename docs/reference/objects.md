@@ -1008,3 +1008,47 @@ with the terrain intact, so it can say when the byte turns 1 and what that
 tracks. If it means the object has been woken by Mario actually arriving,
 then no flatten-and-fly walkthrough can ever measure contact and the route
 has to be a real playthrough.
+
+### The byte was the wrong question, and contact in 1-3 already worked
+
+`watch_object_slot.py` answers the first half immediately: slot 0 of a plain
+World 1-1 walk holds byte 1 as 1 from the frame the game fills it, at the
+spawn x of `0xBF`, before Mario is anywhere near it. So it is not a flag the
+object gets when he arrives, and the reason the boss sweep found nothing was
+never that the objects in 1-3 were asleep.
+
+What settles it is the other rig. `probe_object_contact.py` had already
+measured kinds `0x02` and `0x0C` in World 1-3, which contradicts "contact
+does not register in 1-3", and running it on the same ordinary enemy the
+boss sweep used as its control gives a clean answer with both controls
+passing in the same run (`uv run tools/probe_object_contact.py 0x3F 1-3`):
+
+| offset | Gao `0x3F` in 1-3 | walker `0x00` in 1-1 (control) |
+|---|---|---|
+| +10 | unharmed, object went away | unharmed, object went away |
+| +6 to -8 | lost a life | lost a life |
+
+Six lines identical to the positive control. So World 1-3 was never the
+problem. The two rigs differ in what they write: this one puts Mario's own
+position bytes on the object once and then leaves both to the game, while
+`measure_boss_box.py` rewrites the object's position onto Mario every frame
+from a restored snapshot. Why that second rig registers contact in World 1-1
+and not in World 1-3 is still unexplained, and it no longer blocks anything,
+so it is recorded rather than chased.
+
+### King Totomesu cannot be stomped
+
+The boss swept the same way (`uv run tools/probe_object_contact.py 0x08 1-3`),
+in a run whose positive and negative controls both passed:
+
+| offset | +10 | +6 | +2 | 0 | -4 | -8 |
+|---|---|---|---|---|---|---|
+| King Totomesu `0x08` | life | life | life | life | life | life |
+
+Every enemy measured up to now (the walker `0x00`, the falling slab `0x0C`,
+Bunbun `0x42`, Gao `0x3F`) is unharmed at +10, which is feet on top, and
+empties its own slot there. The boss is the first kind that hurts Mario at
+that offset and does not go away. Landing on it costs a life, so the fight
+is not won by jumping on it, which is what the cartridge does: the way past
+King Totomesu is the passage behind it, and the wall with a gap around rows
+6 to 9 in the level's last three columns is that passage.

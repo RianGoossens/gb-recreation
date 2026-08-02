@@ -26,26 +26,22 @@ means anything:
 2. An ordinary enemy in the same room, swept the same way, which has to give
    a window with both edges inside the swept range.
 
-**Result: the pit control now passes and the enemy control still does not.**
-From a restored, thawed World 1-3, a dug pit costs him a life, and an
-ordinary enemy laid exactly on top of him for 300 frames costs him nothing,
-at every one of the 41 offsets. Two things that could have explained that are
-ruled out. Writing the object rather than Mario is not it: the same rig run
-in World 1-1 (`uv run tools/measure_boss_box.py 1-1 0x00 0x00 x`) hurts him
-at every offset in the sweep. And his screen position is not it either, since
-the object is placed from his own bytes each frame.
+**Result: the pit control passes here and the enemy control does not, and
+this rig was abandoned rather than fixed.** From a restored, thawed World
+1-3, a dug pit costs him a life, and an ordinary enemy laid exactly on top of
+him for 300 frames costs him nothing at every one of the 41 offsets. The same
+rig in World 1-1 (`uv run tools/measure_boss_box.py 1-1 0x00 0x00 x`) hurts
+him at every offset, so it does register contact somewhere.
 
-What is left is a difference in the bytes. Byte 1 of the slot record holds 1
-for World 1-1's walker while it is hurting him, and 0 for every object in
-World 1-3 reached by flying. Writing 1 into it every frame does not stick:
-the game puts it back to 0 on the same frame. Mario also stands at y 22 in
-mid air here against y 134 on the floor in World 1-1, and `land` cannot fix
-that without losing the object. So the named next step is to find out what
-byte 1 of a slot record is (`tools/watch_object_slot.py` follows one slot
-through a plain walk with the terrain intact and can say when it turns 1).
-If it means the object has been woken by Mario arriving, the
-flatten-and-fly walkthrough can never measure contact and the route has to be
-a real playthrough.
+What the boss was measured with in the end is `probe_object_contact.py`,
+which answers the same question in World 1-3 with both its controls passing.
+It writes Mario's position onto the object once and then leaves the two of
+them to the game, where this rewrites the object onto Mario every frame from
+a restored snapshot. Why that difference matters in World 1-3 and not in
+World 1-1 is unexplained. Byte 1 of the slot record was the suspect for a
+while, being 1 for the walker that hurts him and 0 for everything here, and
+it is not: `tools/watch_object_slot.py` shows it holding 1 from the frame the
+game fills a slot, before Mario is anywhere near the object.
 
 Usage: uv run tools/measure_boss_box.py [level] [kind] [control-kind] [axis]
 """

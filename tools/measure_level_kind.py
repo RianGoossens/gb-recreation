@@ -15,7 +15,12 @@ Mario moves, so releasing right freezes it, and every pixel the object's slot
 coordinates change after that is its own. This prints the raw per-frame trace
 and a summary of both axes, which covers a walker and a hopper alike.
 
-Usage: uv run tools/measure_level_kind.py [1-1|1-2|1-3] [kind] [frames]
+A fourth argument writes the raw per-frame trace to a file. Reaching a level
+past the first costs minutes of emulation, so anything that wants to look at
+the shape of an arc rather than at this summary should keep the trace instead
+of running again.
+
+Usage: uv run tools/measure_level_kind.py [level] [kind] [frames] [out.csv]
 """
 
 import sys
@@ -97,6 +102,13 @@ def main():
     if len(trace) < 2:
         print("the slot emptied before anything could be read")
         return 1
+    if len(sys.argv) > 4:
+        with open(sys.argv[4], "w") as out:
+            out.write("frame,x,y\n")
+            for frame, (x, y) in enumerate(trace):
+                out.write(f"{frame},{x},{y}\n")
+        print(f"trace written to {sys.argv[4]}")
+
     print(f"slot {found}, {len(trace)} frames traced, "
           f"x {trace[0][0]}->{trace[-1][0]}, y {trace[0][1]}->{trace[-1][1]}")
 

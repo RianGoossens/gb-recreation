@@ -318,6 +318,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     let flyers = object::bunbun_spawns(&records, mode);
     let gaos = object::gao_spawns(&records, mode);
     let bosses = object::king_totomesu_spawns(&records, mode);
+    let honen = object::honen_spawns(&records, mode);
     let objects = level::object_markers(&records, mode);
 
     let text = level::to_level_text_with_objects(&columns, &objects);
@@ -346,7 +347,8 @@ fn extract_level(args: &[String]) -> ExitCode {
     println!("  {solid} solid cells, {platforms} platform cells, {coins} coins");
     println!(
         "  {} ground walkers, {} jumpers, {} fallers, {} drop blocks, {} \
-lifts, {} Bunbuns, {} Gaos and {} bosses, from {} object records ({} spawn in {} mode)",
+lifts, {} Bunbuns, {} Gaos, {} bosses and {} Honen, from {} object records \
+({} spawn in {} mode)",
         walkers.len(),
         hoppers.len(),
         fallers.len(),
@@ -355,6 +357,7 @@ lifts, {} Bunbuns, {} Gaos and {} bosses, from {} object records ({} spawn in {}
         flyers.len(),
         gaos.len(),
         bosses.len(),
+        honen.len(),
         records.len(),
         object::spawning_in(&records, mode).len(),
         if expert { "expert" } else { "normal" },

@@ -260,6 +260,12 @@ pub const FIREBALL: &[Piece] = &[piece(0, -8, 0xE2)];
 /// clock to hang the swap on (`docs/reference/faithfulness.md`).
 pub const BOSS_FIRE: &[Piece] = &[piece(0, -8, 0xC4), piece(8, -8, 0xC5)];
 
+/// Honen (kind `0x10`), one tile over another, measured by the whole-run
+/// survey (`tools/measure_object_sprites.py`). The survey also read its
+/// priority bit set, so the cartridge draws it behind the level's own tiles;
+/// ours does not model priority (`docs/reference/faithfulness.md`).
+pub const HONEN: &[Piece] = &[piece(0, -16, 0xC1), piece(0, -8, 0xD1)];
+
 /// The Falling Slab (kind `0x0C`), two tiles side by side.
 pub const FALLING_SLAB: &[Piece] = &[piece(0, -8, 0xDD), piece(8, -8, 0xDE)];
 

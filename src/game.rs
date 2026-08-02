@@ -252,6 +252,7 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::Bouncer => return None,
         EnemyKind::KingTotomesu => sprite::KING_TOTOMESU,
         EnemyKind::BossFire => sprite::BOSS_FIRE,
+        EnemyKind::Honen => sprite::HONEN,
     })
 }
 
@@ -268,6 +269,7 @@ fn make_enemy(px: i32, py: i32, kind: crate::core::enemy::EnemyKind) -> Enemy {
         EnemyKind::Fireball => Enemy::fireball(px, py),
         EnemyKind::KingTotomesu => Enemy::king_totomesu(px, py),
         EnemyKind::BossFire => Enemy::boss_fire(px, py),
+        EnemyKind::Honen => Enemy::honen(px, py),
     }
 }
 

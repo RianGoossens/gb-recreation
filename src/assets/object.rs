@@ -296,6 +296,21 @@ pub fn gao_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
         .collect()
 }
 
+/// Honen, World 2's leaping fish. Its x never moves and its y runs a
+/// symmetric arc of 114 pixels on a 161-frame cycle
+/// (`tools/measure_level_kind.py 2-1 0x10`). 24 records across 2-1 and 2-3,
+/// more than any other kind in World 2.
+pub const HONEN: u8 = 0x10;
+
+/// Where a level puts its Honen, as (column, row).
+pub fn honen_spawns(records: &[ObjectRecord], mode: Mode) -> Vec<(usize, usize)> {
+    spawning_in(records, mode)
+        .iter()
+        .filter(|r| r.kind_id() == HONEN)
+        .filter_map(|r| usize::try_from(r.row()).ok().map(|row| (r.column(), row)))
+        .collect()
+}
+
 /// King Totomesu, World 1-3's boss. Leaps 20 pixels straight up at a pixel
 /// every two frames and back down on a 162-frame cycle, with its x fixed
 /// (`tools/measure_level_kind.py`). It is the one kind measured that costs

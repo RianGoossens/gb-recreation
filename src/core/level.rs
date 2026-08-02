@@ -215,6 +215,7 @@ impl Level {
                     'N' => enemy_spawns.push((px, py, EnemyKind::Bunbun)),
                     'A' => enemy_spawns.push((px, py, EnemyKind::Gao)),
                     'K' => enemy_spawns.push((px, py, EnemyKind::KingTotomesu)),
+                    'O' => enemy_spawns.push((px, py, EnemyKind::Honen)),
                     'C' => coins.push((px, py)),
                     '?' => blocks.push((px, py, BlockKind::Question)),
                     'P' => blocks.push((px, py, BlockKind::PowerUp)),

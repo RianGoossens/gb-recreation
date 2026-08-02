@@ -809,6 +809,45 @@ before the next appeared, so whether the game counts 137 frames from the last
 spit or waits 20 frames after the last fireball is gone fits the trace equally.
 Ours counts.
 
+### Kind 0x10, Honen, leaps out of the water
+
+24 records across World 2-1 and 2-3, more than any other kind in World 2, and
+until now every one of them was dropped at extraction.
+
+Traced with the camera frozen (`uv run tools/measure_level_kind.py 2-1 0x10
+700`) its x never moves, and 700 frames of y compress to six runs repeating
+with not a frame's variation across four cycles:
+
+| frames | step | what it is |
+|---|---|---|
+| 8 | 0 | still at the top |
+| 8 | +1 | dropping a pixel a frame |
+| 53 | +2 | dropping two |
+| 31 | 0 | still at the bottom, below the screen |
+| 53 | -2 | rising two |
+| 8 | -1 | rising one |
+
+161 frames, and 114 pixels between the top and the bottom. It is the shape of
+a leap without the acceleration: nothing in the trace passes through the
+speeds between 1 and 2, it steps from one to the other and holds.
+
+Its records put it at the top of the arc, not the bottom, which is where ours
+starts it. That agrees with the sprite survey, which found the priority bit set
+on this kind and called it one of the two that place themselves below the
+screen and swim up (`docs/reference/sprites.md`).
+
+**Contact needed a mode the probe did not have.** Placed once and left, the way
+every kind before it was tested, Honen came back harmless at all six offsets
+with both controls passing, which for a fish that leaps at Mario is the wrong
+answer for a visible reason: it moves two pixels a frame, so it is only inside
+the spot he was put at for a couple of frames. `probe_object_contact.py` now
+takes `--follow`, which writes him onto the object every frame and keeps the
+offset, so a stomp is still a different trial from a side. Kept on it, `0x10`
+takes a life at offsets 0 and -4 and empties its own slot at +10, +6 and +2,
+which is a walker's signature. One thing that run cannot separate: this kind
+removes itself from the slot by diving below the screen anyway, so "the object
+went away" is not evidence of a stomp here.
+
 ### King Totomesu breathes fire, twice a leap
 
 `measure_boss_sprite.py` had left a loose end: some frames near the boss held

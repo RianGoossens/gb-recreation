@@ -18,7 +18,7 @@ everything is worth nothing. The positive control is World 1-1's kind `0x00`,
 a walker that is definitely an enemy. The negative is Mario left in open air
 at the same height with no object at all.
 
-Usage: uv run tools/probe_object_contact.py [kind] [1-1|1-2|1-3]
+Usage: uv run tools/probe_object_contact.py [kind] [level] [--follow]
 """
 
 import sys
@@ -69,14 +69,28 @@ def approach(kind, level):
     return None, None
 
 
-def watch(pb, s, kind, at_x, at_y):
-    """Put Mario at a screen position and report what happens to each of them."""
+def watch(pb, s, kind, at_x, at_y, follow=False):
+    """Put Mario at a screen position and report what happens to each of them.
+
+    `follow` writes him onto the object every frame instead of once. A kind
+    that moves 2 pixels a frame is only overlapping the spot he was put at for
+    a couple of frames, which is not the same trial as standing in a walker,
+    and the still version of this reported Honen (`0x10`, which crosses the
+    whole screen on every leap) harmless at all six offsets. The offset is
+    kept, so a stomp is still a different trial from a side.
+    """
     lives = pb.memory[LIVES]
+    offset_y = at_y - slot(pb, s)[2] if follow and s is not None else 0
     pb.memory[SCREEN_X] = at_x
     pb.memory[MARIO_Y] = at_y
     hurt = False
     gone = False
     for _ in range(WATCH):
+        if follow and s is not None:
+            state = slot(pb, s)
+            if state[0] == kind:
+                pb.memory[SCREEN_X] = state[3]
+                pb.memory[MARIO_Y] = state[2] + offset_y
         pb.tick()
         if pb.memory[LIVES] < lives:
             hurt = True
@@ -86,7 +100,7 @@ def watch(pb, s, kind, at_x, at_y):
     return hurt, gone
 
 
-def sweep(kind, level, label):
+def sweep(kind, level, label, follow=False):
     """Try every overlap, and report the first that costs Mario a life."""
     print(f"{label}:")
     hurt_at = None
@@ -96,7 +110,7 @@ def sweep(kind, level, label):
             print(f"  kind 0x{kind:02X} never came on screen")
             return None
         state = slot(pb, s)
-        hurt, gone = watch(pb, s, kind, state[3], state[2] - offset)
+        hurt, gone = watch(pb, s, kind, state[3], state[2] - offset, follow)
         pb.stop()
         # The slot also empties when Mario dies and the level resets, so this
         # only means anything on a trial he survived.
@@ -119,10 +133,13 @@ def clear_air(kind, level):
 
 
 def main():
-    kind = int(sys.argv[1], 0) if len(sys.argv) > 1 else 0x02
-    level = sys.argv[2] if len(sys.argv) > 2 else "1-3"
+    args = [a for a in sys.argv[1:] if a != "--follow"]
+    follow = "--follow" in sys.argv
+    kind = int(args[0], 0) if args else 0x02
+    level = args[1] if len(args) > 1 else "1-3"
 
-    control = sweep(0x00, "1-1", "positive control, World 1-1 kind 0x00 (a walker)")
+    control = sweep(0x00, "1-1", "positive control, World 1-1 kind 0x00 (a walker)",
+                    follow)
     print()
     clear = clear_air(0x00, "1-1")
     print(f"negative control, Mario 60 px to the side: "
@@ -133,7 +150,7 @@ def main():
         return 1
     print(f"the control is hurt from offset {control:+d}\n")
 
-    hurt_at = sweep(kind, level, f"World {level}, kind 0x{kind:02X}")
+    hurt_at = sweep(kind, level, f"World {level}, kind 0x{kind:02X}", follow)
     if hurt_at is None:
         print(f"\nkind 0x{kind:02X} never hurt Mario at any overlap")
     else:

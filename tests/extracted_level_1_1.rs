@@ -1645,6 +1645,36 @@ fn world_1_3_carries_its_gaos() {
     assert!(x > 0, "and the level's own one is somewhere in it");
 }
 
+/// World 2-1 carries its Honen, the most-used kind in World 2, and every one
+/// of them sits at the top of its own arc where its record put it.
+#[test]
+fn world_2_1_carries_its_honen() {
+    let Some(level) = rom_level("2-1") else { return };
+    let honen: Vec<(i32, i32)> = level
+        .enemy_spawns
+        .iter()
+        .filter(|&&(_, _, kind)| kind == EnemyKind::Honen)
+        .map(|&(x, y, _)| (x, y))
+        .collect();
+    assert!(
+        honen.len() >= 10,
+        "2-1 holds most of the game's 24 records, found {}",
+        honen.len()
+    );
+
+    let mut game = Game::new(level);
+    let top = honen[0].1;
+    game.enemies.push(sml::core::enemy::Enemy::honen(120, top));
+    let i = game.enemies.len() - 1;
+    let mut lowest = top;
+    for _ in 0..sml::core::enemy::HONEN_CYCLE {
+        game.step(Buttons::default());
+        lowest = lowest.max(game.enemies[i].pixel_y());
+    }
+    assert_eq!(lowest - top, sml::core::enemy::HONEN_DIVE);
+    assert_eq!(game.enemies[i].pixel_y(), top, "and it comes back");
+}
+
 /// A Gao spits on the cadence the cartridge spits on: seven fireballs in 900
 /// frames, 137 frames apart, each starting 4 px to its left.
 #[test]

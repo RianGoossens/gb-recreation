@@ -112,7 +112,7 @@ The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id directly.
 | `0x0C` | Falling Slab | `0xDD` `0xDE` | 16x8 |
 | `0x0E` | Fly | `0xA0` `0xA1` / `0xB0` `0xB1` | 16x16 |
 | `0x10` | Honen | `0xC1` over `0xD1` | 8x16 |
-| `0x1E` | fire breath | `0xD4` `0xD5` | 16x8 |
+| `0x1E` | fire breath | `0xC4` `0xC5`, swapping to `0xD4` `0xD5` | 16x8 |
 | `0x23` | fireball | `0xE2` | 8x8 |
 | `0x24` | Yurarin Boo | `0xA6` `0xA7` / `0xB6` `0xB7` | 16x16 |
 | `0x27` | explosion | `0xCD` `0xCE` / `0xCA` `0xCB` `0xCC` / `0xDA` `0xDB` `0xDC` | 24x24 |
@@ -120,6 +120,15 @@ The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id directly.
 | `0x3F` | Gao | `0xA4` `0xA5` / `0xB4` `0xB5` | 16x16 |
 | `0x42` | Bunbun | `0xC2` `0xC3` / `0xD2` `0xD3` | 16x16 |
 | `0x45` | arrow | `0xAC` over `0xBC` | 8x16 |
+
+The fire breath is the one row with two entries, and the survey had only the
+second. Tracking every sprite on screen through a leap cycle
+(`tools/measure_boss_fire.py`) shows each of its two halves alternating every
+8 frames, `0xC4` with `0xD4` on the left and `0xC5` with `0xD5` on the right,
+with `0xFE` standing in for the left half on the frame it appears. The survey
+samples a kind rather than following it, so it caught one pose of a two-pose
+flicker and nothing said so. The engine draws the first pair and holds it
+(`docs/reference/faithfulness.md`).
 
 Every kind the table gives at 16x16 uses the same four ids relative to its
 first: `n`, `n + 1`, `n + 16`, `n + 17`. The Fly is `0xA0`, Yurarin Boo `0xA6`,
@@ -207,9 +216,15 @@ head:
 | 163 frames of 200 | `CD CE` | `AB C6 C7 AA` | `BB D6 D7` |
 | 32 frames of 200 | `CD CE` | `CA CB CC BA` | `DA DB DC` |
 
-Only the common one is drawn. What selects between the two is unmeasured, and
-so is what the stray `C4` `C5` / `D4` `D5` / `FE` sprites in some frames belong
-to: they move leftwards across the run, which is the shape of a projectile.
+Only the common one is drawn. What selects between the two is unmeasured. The
+second drawing is worth one note: its five replaced tiles are exactly what the
+survey's table lists under kind `0x27` as an explosion, so the boss and that
+kind share a drawing and which of them owns it has not been separated.
+
+The stray `C4` `C5` / `D4` `D5` / `FE` sprites in some frames are its fire
+breath, kind `0x1E`, measured since (`docs/reference/objects.md`). The survey's
+own table already had that kind and those tiles, which nothing checked against
+this loose end for two sessions.
 
 **One thing about this tool disagrees with the survey and is unexplained.** It
 reads Gao's rows 8 pixels lower than the survey did, for the same kind in the

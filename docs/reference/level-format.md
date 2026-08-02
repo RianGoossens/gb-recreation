@@ -19,6 +19,8 @@ code with `Level::from_file` / `Level::from_text`.
 | `D` | a faller: holds position for 175 frames, then drops a pixel a frame |
 | `N` | a Bunbun (kind `0x42`): flies left through everything, 41 px in bursts of 41 frames with 33 still between them |
 | `A` | a Gao (kind `0x3F`): stands still, and spits a fireball every 137 frames |
+| `K` | King Totomesu (kind `0x08`), World 1-3's boss: leaps 20 px straight up every 162 frames, breathes fire twice a leap, and cannot be stomped |
+| `O` | a Honen (kind `0x10`): dives 114 px from where it is put and comes back, every 161 frames, without moving sideways |
 | `F` | a Bouncer (walks and hops), see the note on non-cartridge content |
 | `C` | a coin |
 | `S` | a star (grants brief invincibility), see the note on non-cartridge content |

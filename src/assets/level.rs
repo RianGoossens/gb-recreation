@@ -535,6 +535,7 @@ pub fn object_markers(records: &[super::object::ObjectRecord], mode: super::obje
         (object::bunbun_spawns(records, mode), b'N'),
         (object::gao_spawns(records, mode), b'A'),
         (object::king_totomesu_spawns(records, mode), b'K'),
+        (object::honen_spawns(records, mode), b'O'),
     ] {
         out.extend(spawns.iter().map(|&(c, r)| (c, r, marker)));
     }

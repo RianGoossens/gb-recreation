@@ -126,6 +126,27 @@ pub const LEAP_RISE_FRAMES: u32 = LEAP_HEIGHT as u32 * LEAP_STEP_FRAMES;
 /// own figure for it was "about 81", which is that within its resolution.
 pub const LEAP_HOLD: u32 = LEAP_CYCLE - 2 * LEAP_RISE_FRAMES;
 
+/// Honen's arc, in frames, as the run-length of its per-frame steps. Traced
+/// with the camera frozen in World 2-1 (`tools/measure_level_kind.py 2-1 0x10
+/// 700`): its x never moves, and 700 frames of y compress to this repeating
+/// exactly, four cycles with not a frame's variation between them.
+///
+/// It holds at the top, drops a pixel a frame for 8 frames, then two a frame
+/// for 53, waits below the screen, and comes back up the same way. That is a
+/// falling arc that has had its slow middle cut out: nothing in it accelerates
+/// through 1 to 2, it steps from one to the other.
+pub const HONEN_HOLD_TOP: u32 = 8;
+pub const HONEN_SLOW_FRAMES: u32 = 8;
+pub const HONEN_FAST_FRAMES: u32 = 53;
+pub const HONEN_HOLD_BOTTOM: u32 = 31;
+/// 8 + 8 + 53 + 31 + 53 + 8, which is the 161 frames between apexes, the same
+/// to the frame across every apex in the trace.
+pub const HONEN_CYCLE: u32 = 2 * (HONEN_HOLD_TOP + HONEN_SLOW_FRAMES + HONEN_FAST_FRAMES)
+    + HONEN_HOLD_BOTTOM
+    - HONEN_HOLD_TOP;
+/// How far it drops below the record's own row: `8 * 1 + 53 * 2`.
+pub const HONEN_DIVE: i32 = HONEN_SLOW_FRAMES as i32 + 2 * HONEN_FAST_FRAMES as i32;
+
 /// Where in the leap King Totomesu breathes fire, as phases of [`LEAP_CYCLE`].
 ///
 /// Two shots a cycle, nine of them in 700 frames, 56 and 106 frames apart
@@ -234,6 +255,21 @@ pub enum EnemyKind {
     ///
     /// It is not placed by any object list. Only the boss makes one.
     BossFire,
+    /// Honen, World 2's leaping fish: dives 114 pixels and comes back, on the
+    /// spot, every 161 frames.
+    ///
+    /// Its x never moves. Its record sits at the top of the arc, which is
+    /// where ours starts, and the bottom is below the screen, which is what
+    /// the sprite survey means by one of the two kinds that place themselves
+    /// under the water (`docs/reference/sprites.md`).
+    ///
+    /// Contact needed the probe's follow mode: placed once and left, it is
+    /// only overlapping that spot for a couple of frames, and the still sweep
+    /// called it harmless at all six offsets. Kept on it, it takes a life at
+    /// the two overlaps and empties its own slot at the three above, which is
+    /// a walker's signature (`tools/probe_object_contact.py 0x10 2-1
+    /// --follow`).
+    Honen,
 }
 
 impl EnemyKind {
@@ -330,6 +366,11 @@ impl Enemy {
     /// A fireball, where a Gao at `(gao_x, gao_y)` puts one.
     pub fn fireball(gao_x: i32, gao_y: i32) -> Self {
         Self::new(gao_x - SPIT_OFFSET, gao_y, true, EnemyKind::Fireball)
+    }
+
+    /// Honen, at the top of its arc, which is where its record puts it.
+    pub fn honen(pixel_x: i32, pixel_y: i32) -> Self {
+        Self::new(pixel_x, pixel_y, true, EnemyKind::Honen)
     }
 
     /// The boss's fire, where a King Totomesu at `(boss_x, boss_y)` puts one:
@@ -459,6 +500,27 @@ pub fn update_enemy(enemy: &mut Enemy, solids: &Solids) {
             };
         }
         enemy.phase = (enemy.phase + 1) % LEAP_CYCLE;
+        return;
+    }
+    // Honen dives and comes back on the spot. Like the boss's leap this runs
+    // off the phase counter rather than the velocity model, since the trace is
+    // a step between two speeds rather than an acceleration.
+    if enemy.kind == EnemyKind::Honen {
+        let top = HONEN_HOLD_TOP;
+        let slow_down = top + HONEN_SLOW_FRAMES;
+        let fast_down = slow_down + HONEN_FAST_FRAMES;
+        let bottom = fast_down + HONEN_HOLD_BOTTOM;
+        let fast_up = bottom + HONEN_FAST_FRAMES;
+        let step = match enemy.phase {
+            p if p < top => 0,
+            p if p < slow_down => 1,
+            p if p < fast_down => 2,
+            p if p < bottom => 0,
+            p if p < fast_up => -2,
+            _ => -1,
+        };
+        enemy.y += step * crate::core::entity::SUBPIXEL;
+        enemy.phase = (enemy.phase + 1) % HONEN_CYCLE;
         return;
     }
     // The boss's fire flies level and to the left, a pixel a frame, and takes
@@ -916,6 +978,52 @@ mod tests {
     fn a_fireball_starts_beside_its_gao() {
         let f = Enemy::fireball(200, 100);
         assert_eq!((f.pixel_x(), f.pixel_y()), (200 - SPIT_OFFSET, 100));
+    }
+
+    /// The whole 700-frame trace of Honen compresses to six runs repeating
+    /// with not a frame's variation: 8 frames still at the top, 8 dropping a
+    /// pixel a frame, 53 dropping two, 31 still at the bottom, 53 rising two,
+    /// 8 rising one. This replays that against the engine, which is the trace
+    /// itself rather than the constants restated.
+    #[test]
+    fn honen_dives_the_arc_it_was_traced_on() {
+        let solids = floor();
+        let mut h = Enemy::honen(120, 40);
+        let mut runs: Vec<(i32, u32)> = Vec::new();
+        let mut last = h.pixel_y();
+        for _ in 0..HONEN_CYCLE {
+            update_enemy(&mut h, &solids);
+            let step = h.pixel_y() - last;
+            last = h.pixel_y();
+            match runs.last_mut() {
+                Some(run) if run.0 == step => run.1 += 1,
+                _ => runs.push((step, 1)),
+            }
+        }
+        let expected = vec![
+            (0, HONEN_HOLD_TOP),
+            (1, HONEN_SLOW_FRAMES),
+            (2, HONEN_FAST_FRAMES),
+            (0, HONEN_HOLD_BOTTOM),
+            (-2, HONEN_FAST_FRAMES),
+            (-1, HONEN_SLOW_FRAMES),
+        ];
+        assert_eq!(runs, expected);
+        assert_eq!(h.pixel_y(), 40, "and a cycle puts it back where it started");
+    }
+
+    /// Its record is the top of the arc, and the bottom is 114 pixels below.
+    #[test]
+    fn honen_dives_a_hundred_and_fourteen_pixels() {
+        let solids = floor();
+        let mut h = Enemy::honen(120, 40);
+        let mut lowest = h.pixel_y();
+        for _ in 0..HONEN_CYCLE {
+            update_enemy(&mut h, &solids);
+            lowest = lowest.max(h.pixel_y());
+            assert_eq!(h.pixel_x(), 120, "and its x never moves");
+        }
+        assert_eq!(lowest - 40, HONEN_DIVE);
     }
 
     /// The boss's fire is the flat case: 107 frames from screen x 109 to 0 is

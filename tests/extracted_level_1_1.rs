@@ -567,6 +567,9 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // because the glide that replaced the old cliff-edge cap climbs a step it
     // could not.
     //
+    // Guarding the run-up on ground behind him took 2-2 to 79 and 3-3 back to
+    // 22, since reversing off a ledge kills him.
+    //
     // Measuring the walking box moved three again. The terrain only stops the
     // bottom 8 pixels of Mario when he moves sideways, not his whole 12
     // (`tools/probe_corridor_height.py`), so a corridor with one free row is
@@ -581,8 +584,8 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // block with open floor running underneath, and a walker that only jumps
     // at gaps and walls takes the low road every time.
     for (name, expected) in [
-        ("2_1", 68), ("2_2", 63), ("2_3", 178),
-        ("3_1", 110), ("3_2", 122), ("3_3", 26),
+        ("2_1", 68), ("2_2", 79), ("2_3", 178),
+        ("3_1", 110), ("3_2", 122), ("3_3", 22),
         ("4_1", 65), ("4_2", 106), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
@@ -619,7 +622,13 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
             let mut buttons = Buttons::default();
             if back > 0 {
                 back -= 1;
-                buttons.set(Button::Left, true);
+                // Only where there is ground behind him. Reversing off a ledge
+                // is how the run-up killed World 2-2's walker, which is worth
+                // 16 columns there.
+                let behind = |c: i32| {
+                    (feet_row(y)..ROWS).any(|row| game.level.solids.is_standable(c, row))
+                };
+                buttons.set(Button::Left, behind((x - 4) / 8) && behind((x - 12) / 8));
                 game.step(buttons);
                 continue;
             }

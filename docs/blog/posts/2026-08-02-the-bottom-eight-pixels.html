@@ -80,11 +80,36 @@ fn resolve_horizontal(mario: &mut Mario, solids: &Solids) {
     ...
 }</code></pre>
 
+    <h2>The same question for the other axis</h2>
+
+    <p>If the terrain only sees eight of his twelve pixels vertically, the obvious next question is how many of his eleven it sees horizontally when he jumps into a ceiling. Our engine used all eleven, also unmeasured, and World 1-3 has a second spot where that decides something: an opening pocket where Mario ends up under a block by a single column, with a two-tile wall in front of him that his capped jump misses by four pixels.</p>
+
+    <p>The instrument is the same one with the ceiling moved up to row 9, high enough that a capped jump and a free one are far apart, plus a trick borrowed from measuring the moving platforms: pin his x each frame and sweep it a pixel at a time, so the window where the jump is cut short is <code>ceiling + head - 1</code>.</p>
+
+    <pre><code>a ceiling 1 tile(s) wide at column 10:
+  still: free 33, capped from x 86 to 97, a window of 12, so a head of 5
+a ceiling 3 tile(s) wide at column 10:
+  still: free 33, capped from x 86 to 113, a window of 28, so a head of 5</code></pre>
+
+    <p>Five pixels, from two ceiling widths that share no arithmetic. The free rise of 33 at both ends of each sweep is the control that says the window fits inside what was swept, and the second width is the control that says this is a width rather than one number that happened to fit.</p>
+
+    <p>Five is also what an enemy's contact box came out at, measured a year of sessions ago by an entirely different route. The lift's foot is six. His eleven by twelve is what walls and floors give him, and every other test the cartridge makes is smaller than his drawing.</p>
+
+    <h2>One thing that does not fit</h2>
+
+    <p>The sweep was run three ways: standing still, pressing left, pressing right. Standing and left give the identical window. Pressing right, no ceiling caps the jump anywhere, at either width.</p>
+
+    <p>The obvious explanation is that he walks out from under it, which would mean the pin is failing, so the sweep reports how far his position byte ever gets from the pinned value. Zero pixels standing, one pressing either direction. He is under the ceiling for the whole jump and it does not stop him.</p>
+
+    <p>The other explanation is a tested point far enough ahead of him to sit outside the swept range, and widening the sweep does not settle it: at seventy pixels of margin the trials reach the screen edges and start returning a rise of zero, which is measuring something else. So the honest version is bounded. Over x 60 to 127, with a 24-pixel ceiling in the middle of it and free air at both ends, pressing right caps nothing, and why is unknown. Our engine caps both ways, which is the conservative choice: it makes fewer places reachable rather than more.</p>
+
     <h2>What it opened</h2>
 
-    <p>The test bots measure this immediately, because a rule that says "you can fit here" changes where they can go. World 2-1's reach went from column 19 to 68 on this change alone.</p>
+    <p>The test bots measure all of this immediately, because a rule that says "you can fit here" changes where they can go. World 2-1's reach went from column 19 to 68 on the walking box alone, and World 1-3's pocket stopped being a dead end the moment the head shrank.</p>
 
-    <p>Then two bot fixes landed on top of it, both about the same idea. Where a step up is three or four rows, that is twenty-four to thirty-two pixels, which is most or all of a full jump, so where you leave the ground decides whether you land on it. That makes it a timing, the same as landing on a moving platform, and this project already searches for those. Making a high step take a searched run-up, but only where the floor runs out just past it so the step is the only way on, took World 2-1 from column 16 to 255 of its 320.</p>
+    <p>A bot fix landed on top of that, about the same idea. Where a step up is three or four rows, that is twenty-four to thirty-two pixels, which is most or all of a full jump, so where you leave the ground decides whether you land on it. That makes it a timing, the same as landing on a moving platform, and this project already searches for those. Making a high step take a searched run-up, but only where the floor runs out just past it so the step is the only way on, took the strict walk of World 2-1 from column 16 to 255 of its 320.</p>
+
+    <p>With the head measured as well, that walk finishes World 2-1 outright and carries on into 2-2. It is the first level outside World 1 anything here has completed, and it does it without losing a life, which is the rule that walk plays by: a crossing that costs a life is not a crossing.</p>
 
     <p>Both numbers deserve their caveat. The reach of a scripted walker measures the walker, and every one of these numbers is a fact about a bot that holds right and makes one kind of decision. The corridor measurement is different in kind: it changed a rule about Mario, and it came off the cartridge.</p>
   </main>

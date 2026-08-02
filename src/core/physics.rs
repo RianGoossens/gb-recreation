@@ -251,6 +251,22 @@ fn edges(mario: &Mario) -> (i32, i32, i32, i32) {
 /// ceilings overhead, both measured separately.
 pub const WALK_HEIGHT: i32 = 8;
 
+/// How wide the part of Mario is that a ceiling stops, centred in his box.
+///
+/// Five, measured the way the lift's surface was: write a ceiling of a known
+/// width into World 1-1's own tilemap and sweep a jump under it a pixel at a
+/// time (`tools/measure_head_width.py`). A one tile ceiling cuts the jump
+/// short over a 12 pixel window of his own position and a three tile ceiling
+/// over 28, and `ceiling + head - 1` gives 5 from both. The free rise of 33
+/// either side of each window is the control that says the sweep is wide
+/// enough to hold it, and the second width is the control that says this is a
+/// width at all rather than one number that happened to fit.
+///
+/// Five is the number an enemy's contact box came out at by an unrelated
+/// route, and the lift's foot is six: the cartridge tests small parts of him
+/// rather than his whole drawing, over and over.
+pub const HEAD_WIDTH: i32 = 5;
+
 fn resolve_horizontal(mario: &mut Mario, solids: &Solids) {
     let (w, _h) = mario.size();
     let (left, _full_top, right, bottom) = edges(mario);
@@ -278,7 +294,10 @@ fn resolve_vertical(mario: &mut Mario, solids: &Solids, was_above: i32) {
         let floor_top = bottom.div_euclid(TILE) * TILE;
         mario.y = pixels(floor_top - h);
         mario.vy = 0;
-    } else if mario.vy < 0 && solids.rect_hits_solid(left, top, right, top) {
+    } else if mario.vy < 0 && {
+        let inset = (right - left + 1 - HEAD_WIDTH) / 2;
+        solids.rect_hits_solid(left + inset, top, left + inset + HEAD_WIDTH - 1, top)
+    } {
         let ceil_bottom = top.div_euclid(TILE) * TILE + (TILE - 1);
         mario.y = pixels(ceil_bottom + 1);
         mario.vy = 0;

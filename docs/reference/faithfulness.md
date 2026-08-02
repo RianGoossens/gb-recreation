@@ -132,6 +132,13 @@ playing it faithfully.
   wall in the same place is the control that says the writes landed. World
   1-3's corridor at columns 185 to 192 is one free row under a slab, which is
   why this matters: the walk through that level stopped dead at it.
+- **What a ceiling stops**: canonical, measured. 5 pixels of him, centred.
+  Writing a ceiling of a known width into World 1-1's own tilemap and sweeping
+  a jump under it (`tools/measure_head_width.py`) gives a capped window of 12
+  for one tile and 28 for three, and `ceiling + head - 1` gives 5 from both.
+  This replaced his full 11 pixel width, which was never measured. World 1-3's
+  opening pocket, where he is under a block by one column, is escapable with
+  the measured number and was not with the assumed one.
 - **World 1 geometry**: canonical, and verified end to end. Every column of
   all three levels (300, 280, 300) matches the running cartridge exactly.
 - **Lifts**: canonical, measured. World 1-1's kinds `0x0A` and `0x0B` carry

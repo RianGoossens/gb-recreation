@@ -531,3 +531,35 @@ into the block, alternates 12 and 16 on an 8 pixel cadence, and carries on 10
 pixels past the far edge. Something about this is being read wrong, and what
 is settled is that the direction pressed is the variable and that our rise
 under this block is 21 pixels short of the cartridge's.
+
+
+## How wide the head is
+
+Five pixels, centred in his box. `tools/measure_head_width.py` writes a
+ceiling of a chosen width into World 1-1's own tilemap, over flat ground with
+open sky around it, and sweeps a jump under it a pixel at a time with his x
+pinned. A one tile ceiling cuts the rise short over a 12 pixel window of his
+own position and a three tile ceiling over 28, and `ceiling + head - 1` gives
+5 from both. The free rise of 33 either side of each window is the control
+that the sweep is wide enough to hold it; the second width is the control that
+this is a width at all rather than one number that happened to fit.
+
+That is the same shape as everything else the cartridge tests: an enemy's
+contact box is 5 by 5, the lift holds him over a 6 pixel foot, and the drop
+block reproduces that 6 over a narrower surface. His 11 by 12 is what walls
+and floors give him, and every other test is smaller.
+
+World 1-3's opening pocket falls out of it. He is under that block by a single
+column, which an 11 pixel head catches and a 5 pixel one does not, so he jumps
+out. The searched World 2 walk finished 2-1 on the same change.
+
+The window's position is not read yet. For a one tile ceiling at x 80 to 87
+the capped positions are x 86 to 97, so it starts 6 pixels into the ceiling
+and runs 10 past it, which is the same offset `probe_ceiling_cap.py` saw in
+World 1-3 and does not match his box sitting where his position byte says.
+
+Pressing right during the sweep caps nothing anywhere, at either ceiling
+width, which is the same direction dependence World 1-3 showed. Pressing left
+caps exactly as standing still does. Whether that is a real rule or an
+artefact of pinning his x while the game moves him is untested: the pin writes
+one byte per frame and the game may be testing a position it keeps elsewhere.

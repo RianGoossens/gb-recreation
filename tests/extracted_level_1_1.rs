@@ -95,8 +95,8 @@ fn step_up_ahead(game: &Game, x: i32, y: i32) -> bool {
 const RUNUP: u32 = 32;
 const RUNUP_TRIES: u32 = 4;
 
-/// What the searched walk gets out of World 2 today: column 255 of 2-1's 320,
-/// with no level finished and no life lost.
+/// What the searched walk gets out of World 2 today: **2-1 finished**, and
+/// column 58 of 2-2, with no life lost anywhere.
 ///
 /// The reflex walker in `the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_
 /// it_is_recorded` reaches 68 in the same level, and the two numbers measure
@@ -105,12 +105,13 @@ const RUNUP_TRIES: u32 = 4;
 /// ends at the first death, because a crossing that costs a life is not one.
 ///
 /// It reached 16 until the takeoff for a high step became a searched decision
-/// rather than a fixed escalation. Column 16 is where 2-1's floor runs out and
-/// the route goes up: a step to the platform at row 12, then 32 pixels to the
-/// one at row 8, which is a whole moving jump, so where he leaves the ground
-/// decides whether he lands on it.
-const WORLD_2_LEVELS_FINISHED: usize = 0;
-const WORLD_2_COLUMN: i32 = 250;
+/// rather than a fixed escalation, which took it to 255 of 2-1's 320. Column
+/// 16 is where 2-1's floor runs out and the route goes up: a step to the
+/// platform at row 12, then 32 pixels to the one at row 8, which is a whole
+/// moving jump, so where he leaves the ground decides whether he lands on it.
+/// Measuring the head at 5 pixels rather than his full 11 finished the level.
+const WORLD_2_LEVELS_FINISHED: usize = 1;
+const WORLD_2_COLUMN: i32 = 50;
 
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
@@ -587,6 +588,13 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // Guarding the run-up on ground behind him took 2-2 to 79 and 3-3 back to
     // 22, since reversing off a ledge kills him.
     //
+    // Measuring the head moved four, two each way: 2-1 68 to 19 and 2-2 79 to
+    // 68, against 4-1 65 to 70 and 4-2 106 to 109. A 5 pixel head gets him
+    // through gaps his 11 pixel one could not, and this walker has no idea
+    // which of those it wants; the searched walk in
+    // `world_2_is_walked_as_far_as_the_search_takes_it` finishes 2-1 outright
+    // on the same change. These numbers pin the geometry, not the route.
+    //
     // Measuring the walking box moved three again. The terrain only stops the
     // bottom 8 pixels of Mario when he moves sideways, not his whole 12
     // (`tools/probe_corridor_height.py`), so a corridor with one free row is
@@ -601,9 +609,9 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
     // block with open floor running underneath, and a walker that only jumps
     // at gaps and walls takes the low road every time.
     for (name, expected) in [
-        ("2_1", 68), ("2_2", 79), ("2_3", 178),
+        ("2_1", 19), ("2_2", 68), ("2_3", 178),
         ("3_1", 110), ("3_2", 122), ("3_3", 22),
-        ("4_1", 65), ("4_2", 106), ("4_3", 7),
+        ("4_1", 70), ("4_2", 109), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
         if !std::path::Path::new(&path).exists() {
@@ -1532,27 +1540,20 @@ fn search_a_world(world: usize) -> Option<(usize, i32, Vec<u32>)> {
     Some((best.0, best.1, plan))
 }
 
-/// What stops the World 1 walk, pinned so a change to the collision model
-/// shows up here rather than as a mystery further along.
+/// World 1-3's opening pocket, which used to be a dead end for us.
 ///
-/// World 1-3 opens with a raised block at row 10 spanning columns 7 to 11, and
+/// The level opens with a raised block at row 10 spanning columns 7 to 11 and
 /// a two-tile wall at columns 13 and 14 whose top is row 12. Walking right
 /// along the floor at row 14 takes Mario under the block and up against the
-/// wall, and from there he cannot get out: the wall's top is 16 pixels above
-/// his feet, and the block above him stops his rise 4 pixels short of that.
-/// The route the level means him to take is over the block rather than under
-/// it, which the walker has no rule for.
+/// wall. With his whole 11 pixel width tested against a ceiling he was stuck
+/// there: the wall's top is 16 pixels above his feet, and the block, which he
+/// was under by one column, capped his rise 4 pixels short of it.
 ///
-/// The cartridge is stuck here too, and for a different reason.
-/// `tools/probe_ceiling_cap.py` does the same walk in the running game and it
-/// stops at x 88 as well, but its jump there rises 33 pixels against our 12:
-/// pressed against the wall its speed never builds, so the height goes
-/// nowhere. A standing jump from that spot is capped the way ours is, so what
-/// differs is a jump held with a direction against one held without, and the
-/// cause is not established (`docs/reference/physics.md`). This pins our side
-/// of it.
+/// The cartridge tests 5 pixels of him (`tools/measure_head_width.py`), and
+/// with that he jumps out. This checks the geometry that made the pocket, so
+/// a decode change is visible, and then that he leaves it.
 #[test]
-fn world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model() {
+fn world_1_3s_opening_pocket_can_be_jumped_out_of() {
     let Ok(mut level) = sml::assets::level::extracted_level("1-3") else {
         return;
     };
@@ -1566,7 +1567,6 @@ fn world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model() {
     level.spawn = (11 * 8, 14 * 8 - 12);
     let mut game = Game::new(level);
     let mut jump = Jump::new();
-    let mut highest = i32::MAX;
     let mut furthest = 0;
     for _ in 0..600 {
         if game.mario.on_ground && jump.ready() {
@@ -1576,10 +1576,11 @@ fn world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model() {
         buttons.set(Button::Right, true);
         jump.press(&mut buttons);
         game.step(buttons);
-        highest = highest.min(game.mario.pixel_y());
         furthest = furthest.max(game.mario.pixel_x());
     }
-    // His feet at the top of the jump, against the top of the wall at row 12.
-    assert_eq!(highest + 12, 100, "the ceiling caps his feet here");
-    assert_eq!(furthest, 13 * 8 - 11, "and he never gets past the wall");
+    assert!(
+        furthest > 15 * 8,
+        "he is still in the pocket, reaching only column {}",
+        furthest / 8
+    );
 }

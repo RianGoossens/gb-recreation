@@ -318,22 +318,7 @@ fn extract_level(args: &[String]) -> ExitCode {
     let flyers = object::bunbun_spawns(&records, mode);
     let gaos = object::gao_spawns(&records, mode);
     let bosses = object::king_totomesu_spawns(&records, mode);
-    let mut objects: Vec<(usize, usize, u8)> =
-        walkers
-            .iter()
-            .map(|&(c, r, turns)| (c, r, if turns { b'T' } else { b'G' }))
-            .collect();
-    objects.extend(
-        lifts
-            .iter()
-            .map(|&(c, r, up)| (c, r, if up { b'V' } else { b'H' })),
-    );
-    objects.extend(hoppers.iter().map(|&(c, r)| (c, r, b'J')));
-    objects.extend(fallers.iter().map(|&(c, r)| (c, r, b'D')));
-    objects.extend(drops.iter().map(|&(c, r)| (c, r, b'X')));
-    objects.extend(flyers.iter().map(|&(c, r)| (c, r, b'N')));
-    objects.extend(gaos.iter().map(|&(c, r)| (c, r, b'A')));
-    objects.extend(bosses.iter().map(|&(c, r)| (c, r, b'K')));
+    let objects = level::object_markers(&records, mode);
 
     let text = level::to_level_text_with_objects(&columns, &objects);
     if let Err(e) = std::fs::write(path, text) {

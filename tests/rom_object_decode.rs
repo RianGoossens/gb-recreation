@@ -592,11 +592,8 @@ const BOSSES: [u8; 4] = [0x08, 0x1A, 0x32, 0x61];
 fn each_world_builds_the_same_room_for_its_boss() {
     let Some(rom) = rom() else { return };
     for name in ["1-3", "2-3", "3-3"] {
-        let path = format!("assets/extracted/level_{}.txt", name.replace('-', "_"));
-        if !std::path::Path::new(&path).exists() {
-            continue;
-        }
-        let level = sml::core::level::Level::from_file(&path).expect("parses");
+        let level = level::level_from_rom("super_mario_land.gb", name)
+            .expect("the ROM is here, so every level decodes");
         let start = level::level_objects(&rom, name).expect("the header names it");
         let boss = object::spawning(&object::object_list(&rom, start))
             .into_iter()

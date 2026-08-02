@@ -507,6 +507,67 @@ pub fn to_level_text(columns: &[Column]) -> String {
     to_level_text_with_objects(columns, &[])
 }
 
+/// Where a level's implemented objects go, as (column, row, level marker).
+///
+/// This is the one place that says which measured kind gets which marker.
+/// It used to live in the `extract-level` command, which meant the only way
+/// to check it was to run the command, write a file, and read the file back.
+/// Tests did read those files, and they are gitignored, so a marker added
+/// here passed every test until somebody happened to regenerate them.
+pub fn object_markers(records: &[super::object::ObjectRecord], mode: super::object::Mode)
+    -> Vec<(usize, usize, u8)>
+{
+    use super::object;
+
+    let mut out: Vec<(usize, usize, u8)> = object::walker_spawns(records, mode)
+        .iter()
+        .map(|&(c, r, turns)| (c, r, if turns { b'T' } else { b'G' }))
+        .collect();
+    out.extend(
+        object::lift_spawns(records, mode)
+            .iter()
+            .map(|&(c, r, up)| (c, r, if up { b'V' } else { b'H' })),
+    );
+    for (spawns, marker) in [
+        (object::fly_spawns(records, mode), b'J'),
+        (object::faller_spawns(records, mode), b'D'),
+        (object::drop_block_spawns(records, mode), b'X'),
+        (object::bunbun_spawns(records, mode), b'N'),
+        (object::gao_spawns(records, mode), b'A'),
+        (object::king_totomesu_spawns(records, mode), b'K'),
+    ] {
+        out.extend(spawns.iter().map(|&(c, r)| (c, r, marker)));
+    }
+    out
+}
+
+/// A level built straight from the ROM in memory, with no file on disk.
+///
+/// [`extracted_level`] reads what `sml extract-level` last wrote, which is
+/// the right thing for playing and the wrong thing for a test: the file is
+/// gitignored, so it can be arbitrarily out of date with the code that
+/// produces it. This runs the same pipeline the command runs.
+pub fn level_from_rom(rom_path: &str, name: &str) -> Result<crate::core::level::Level, String> {
+    use super::object;
+
+    let rom = std::fs::read(rom_path).map_err(|e| format!("could not read {rom_path}: {e}"))?;
+    let list = level_list(&rom, name).ok_or_else(|| format!("unknown level {name}"))?;
+    let columns = extract_level(rom_path, list).map_err(|e| e.to_string())?;
+    let records = match level_objects(&rom, name) {
+        Some(start) => object::extract_objects(rom_path, start).map_err(|e| e.to_string())?,
+        None => Vec::new(),
+    };
+    let markers = object_markers(&records, object::Mode::Normal);
+    let text = to_level_text_with_objects(&columns, &markers);
+    let rows: Vec<&str> = text.lines().collect();
+    let mut level = crate::core::level::Level::from_rows(&rows);
+    if let Some(index) = level_index(name) {
+        level.number = Some((index as u8 / 3 + 1, index as u8 % 3 + 1));
+    }
+    level.graphics = level_graphics(&rom, name);
+    Ok(level)
+}
+
 /// The same, with object markers stamped in: `G` for a ground walker, `V` and
 /// `H` for the two lifts.
 ///
@@ -819,10 +880,27 @@ pub const EXTRACTED: &str = "assets/extracted";
 /// The ROM as it sits in the tree.
 pub const DEFAULT_ROM: &str = "super_mario_land.gb";
 
-/// Load one of the cartridge's twelve levels as extracted, with the
-/// cartridge's own background attached when the ROM is at hand. Without it the
-/// level still plays, drawn in placeholder blocks.
+/// Load one of the cartridge's twelve levels, from the ROM when it is in the
+/// tree and from what `sml extract-level` wrote otherwise.
+///
+/// The ROM comes first because it is the source and the file is an export of
+/// it. Reading the file first meant a checkout with the ROM but no extraction
+/// run got the placeholder campaign, and every test that plays a real world
+/// skipped without saying so; it also meant a change to what extraction
+/// produces did not reach anything until somebody regenerated the files by
+/// hand. Levels a person writes are loaded by path through
+/// [`Level::from_file`] and are unaffected by this.
 pub fn extracted_level(name: &str) -> Result<Level, String> {
+    if Path::new(DEFAULT_ROM).exists() {
+        if let Ok(level) = level_from_rom(DEFAULT_ROM, name) {
+            return Ok(level);
+        }
+    }
+    extracted_level_file(name)
+}
+
+/// The same level read from the file `sml extract-level` wrote.
+fn extracted_level_file(name: &str) -> Result<Level, String> {
     let path = format!("{EXTRACTED}/level_{}.txt", name.replace('-', "_"));
     let mut level = Level::from_file(&path)?;
     let index = level_index(name).ok_or_else(|| format!("{name} is not a level of the cartridge"))?;

@@ -760,6 +760,13 @@ kind rather than to the phase one object happened to be created at.
 Nothing solid sits on the rows it crossed, so whether terrain stops it is not
 settled by this run.
 
+On contact it is an ordinary enemy. `tools/probe_object_contact.py` sweeps
+Mario through the whole overlap and its answer for `0x42` in World 1-2 is the
+same six lines as its positive control, World 1-1's walker: unharmed with his
+feet on top and the object gone, a life lost at every other offset. So it hurts
+from the side and from below, and a stomp kills it, which is what the roster's
+separate `0x43` "Bunbun, stomped" already suggested and did not establish.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine

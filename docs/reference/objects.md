@@ -808,6 +808,7 @@ separate `0x43` "Bunbun, stomped" already suggested and did not establish.
 | `tools/measure_flyer.py` | how a flying kind moves, and whether it tracks Mario |
 | `tools/probe_object_contact.py` | whether touching a kind costs Mario a life |
 | `tools/probe_faller_trigger.py` | whether a fall is on a timer or on Mario |
+| `tools/probe_death_state.py` | whether a state can kill Mario at all |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |
 | `tools/verify_skip_flag.py` | that byte across a whole level |
 
@@ -885,14 +886,48 @@ whatever it points at. Note that the first version of this control pinned his
 Y byte below the screen instead, which is not a fall and comes back
 "unharmed" from any state at all.
 
-That run also clears the fly loop, which was the standing suspect. The tool
-lets go for 90 frames first so he falls to the floor, which is what
-`tools/probe_ceiling_cap.py` does before walking him and where he collides
-with terrain normally, and the pit still does not kill him. What is left is
-the snapshot: every trial begins with `restore`, and `tools/measure_lift.py`
-already recorded that restoring a save state per trial silently breaks a
-placement experiment, dropping Mario through a lift at every offset including
-ones a continuous run held him at. The next thing to try is the pit control
-with no restore in front of it, inside one continuous approach.
+That run also appeared to clear the fly loop, which was the standing suspect:
+the tool lets go for 90 frames first so he falls to the floor, which is what
+`tools/probe_ceiling_cap.py` does before walking him, and the pit still did
+not kill him. That left the snapshot, since `tools/measure_lift.py` had
+already recorded restoring a save state per trial silently breaking a
+placement experiment. The named next step was the pit control with no restore
+in front of it, inside one continuous approach.
 
-Three attempts, so this stays unmeasured, with that as the named next step.
+### The state a death can happen in
+
+That control has now been run (`tools/probe_death_state.py`), and the
+snapshot is innocent. Two other things were wrong, and either one on its own
+makes every contact result from World 1-3 meaningless.
+
+**The fly loop leaves Mario unstepped.** It pins `0xC201` (his y) and
+`0xC207` (his vertical phase, 0 for grounded) every frame, and when it lets
+go he stays exactly where it left him: y 22, phase 0, for 240 frames standing
+still and 240 more holding right, without a pixel of movement. Letting go for
+90 frames does not undo it, so the earlier run's "the fly loop is cleared"
+was reading a 90 frame window as a fall that never happened. Diffing his
+bytes against an ordinary World 1-1 Mario shows exactly three that differ:
+
+| address | World 1-1 | after the fly loop |
+|---|---|---|
+| `0xC200` | `0x80` | `0x00` |
+| `0xC203` | `0x00` | `0x10` |
+| `0xC210` | `0x80` | `0x01` |
+
+Writing all three back restarts him. He falls and lands on the level's own
+floor. `0xC200` alone does not do it, which is what makes the set rather than
+the flag the thing to write.
+
+**The pit dug the wrong columns.** It cleared the tilemap at
+`screen x / 8`, and the background is a 32 column ring, so that is only a map
+column while the level has not scrolled. World 1-1 from a cold boot is the one
+place it holds, which is exactly where the control was run. `SCX`, the
+register that shifts the background sideways on screen, reads 0 from work RAM
+because the status bar is drawn at 0 and the playfield's value is set
+mid-frame (`tools/sml_scroll.py`), so there is nothing to correct it with.
+Clearing all 32 columns needs no scroll and cannot miss.
+
+With both fixed, a pit costs Mario a life on frame 197 partway through World
+1-3, reached by flying. The instrument works, and its positive control (the
+same pit in World 1-1 from a cold boot, a life on frame 188) still passes.
+The contact sweep can now be rebuilt on top of it.

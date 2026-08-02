@@ -95,6 +95,21 @@ fn step_up_ahead(game: &Game, x: i32, y: i32) -> bool {
 const RUNUP: u32 = 32;
 const RUNUP_TRIES: u32 = 4;
 
+/// What the searched walk gets out of World 2 today: column 16 of 2-1, with
+/// no level finished and no life lost.
+///
+/// The reflex walker in `the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_
+/// it_is_recorded` reaches 68 in the same level, and the two numbers measure
+/// different things. That walk keeps going after a death, since the game puts
+/// Mario back and it is only asking whether the geometry is open; this one
+/// ends at the first death, because a crossing that costs a life is not one.
+/// 16 is where the floor at row 14 has run out and the route goes up: a step
+/// to the platform at row 12, then 32 pixels to the one at row 8, which is a
+/// whole moving jump and wants the takeoff searched for the way a lift
+/// crossing is.
+const WORLD_2_LEVELS_FINISHED: usize = 0;
+const WORLD_2_COLUMN: i32 = 16;
+
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
         Some(Level::from_file(PATH).expect("extracted level parses"))
@@ -1282,8 +1297,42 @@ fn a_hand_written_level_keeps_the_placeholder_enemy() {
 /// seals a route that used to be open.
 #[test]
 fn world_1_can_be_walked_from_its_first_level_to_its_last() {
+    let Some((finished, reach, plan)) = search_a_world(1) else { return };
+    // World 1-3 then takes him to column 185 of 300. Getting out of its
+    // opening pocket is the run-up: the block he has to land on is 32 pixels
+    // up, the whole of a moving jump, and arriving from under it he has to
+    // walk back far enough to take off from the one place whose arc peaks over
+    // its edge. He stops at a slab he tries to climb rather than walk under;
+    // see the plan for the three fixes that each cost more than they won.
+    assert_eq!(finished, 2, "1-1 and 1-2 both have to finish");
+    assert!(
+        reach / 8 >= 180,
+        "with plan {plan:?} he only reached column {} of World 1-3",
+        reach / 8
+    );
+}
+
+/// World 2 through the same search. Nothing had ever played it with the lift
+/// crossings searched for, only with the reflex walker that stops at the water
+/// gap in 2-1, and the cartridge crosses that gap on a lift
+/// (`tools/probe_water.py`). World 2 is not in the default campaign, so what
+/// this pins is how much of it works.
+#[test]
+fn world_2_is_walked_as_far_as_the_search_takes_it() {
+    let Some((finished, reach, plan)) = search_a_world(2) else { return };
+    assert_eq!(finished, WORLD_2_LEVELS_FINISHED, "with plan {plan:?}");
+    assert!(
+        reach / 8 >= WORLD_2_COLUMN,
+        "with plan {plan:?} he reached column {}",
+        reach / 8
+    );
+}
+
+/// Search a world's crossings and play it. Returns (levels finished, how far
+/// into the one he stopped in, the plan).
+fn search_a_world(world: usize) -> Option<(usize, i32, Vec<u32>)> {
     use sml::session::{Phase, Session};
-    let Some(levels) = sml::session::world_levels(1) else { return };
+    let levels = sml::session::world_levels(world)?;
 
     // One run of the whole world with a given plan. Returns how many levels
     // finished and how far he got in the one he stopped in.
@@ -1441,27 +1490,7 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
         plan.push(improved.1.unwrap_or(0));
         best = improved.0;
     }
-    // Where this gets to today: World 1-1 and World 1-2 both finish, all three
-    // of 1-2's lift crossings included, and he stops early in 1-3.
-    //
-    // The last of those crossings took a measurement rather than a better
-    // search. Every lift in the engine set off in the +1 direction because
-    // nobody had looked, and the cartridge sends the horizontal one left
-    // (`tools/measure_lift_phase.py`). Going right it never comes within 72
-    // pixels of the ledge at column 222, so no plan could have crossed it.
-    // World 1-3 then takes him to column 183 of 300. Getting out of its
-    // opening pocket is the run-up: the block he has to land on is 32 pixels
-    // up, the whole of a moving jump, and arriving from under it he has to
-    // walk back far enough to take off from the one place whose arc peaks over
-    // its edge. See
-    // `world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model`
-    // for what a walker without that rule does there.
-    assert_eq!(best.0, 2, "1-1 and 1-2 both have to finish");
-    assert!(
-        best.1 / 8 >= 180,
-        "with plan {plan:?} he only reached column {} of World 1-3",
-        best.1 / 8
-    );
+    Some((best.0, best.1, plan))
 }
 
 /// What stops the World 1 walk, pinned so a change to the collision model

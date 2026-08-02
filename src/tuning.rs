@@ -6,7 +6,7 @@
 //! recompile. The defaults are the values pinned in the physics module.
 
 use crate::core::physics::{
-    FRICTION, GRAVITY, JUMP_CUT, JUMP_VELOCITY, MAX_FALL_SPEED, MAX_RISE_FRAMES, MAX_WALK_SPEED,
+    BOUNCE_CUT, FRICTION, GLIDE_CUT, GLIDE_FRAMES, GLIDE_VELOCITY, GRAVITY, JUMP_CUT, JUMP_VELOCITY, MAX_FALL_SPEED, MAX_RISE_FRAMES, MAX_WALK_SPEED,
     RISE_DRIFT, STOMP_BOUNCE, WALK_ACCEL,
 };
 
@@ -24,6 +24,10 @@ pub struct Tuning {
     pub rise_drift: i32,
     pub max_rise_frames: i32,
     pub jump_cut: i32,
+    pub bounce_cut: i32,
+    pub glide_velocity: i32,
+    pub glide_cut: i32,
+    pub glide_frames: i32,
     pub stomp_bounce: i32,
     pub timer_start: u32,
 }
@@ -40,6 +44,10 @@ impl Default for Tuning {
             rise_drift: RISE_DRIFT,
             max_rise_frames: MAX_RISE_FRAMES,
             jump_cut: JUMP_CUT,
+            bounce_cut: BOUNCE_CUT,
+            glide_velocity: GLIDE_VELOCITY,
+            glide_cut: GLIDE_CUT,
+            glide_frames: GLIDE_FRAMES,
             stomp_bounce: STOMP_BOUNCE,
             timer_start: DEFAULT_TIMER_START,
         }
@@ -73,6 +81,10 @@ impl Tuning {
                 "rise_drift" => t.rise_drift = parse_i()?,
                 "max_rise_frames" => t.max_rise_frames = parse_i()?,
                 "jump_cut" => t.jump_cut = parse_i()?,
+                "bounce_cut" => t.bounce_cut = parse_i()?,
+                "glide_velocity" => t.glide_velocity = parse_i()?,
+                "glide_cut" => t.glide_cut = parse_i()?,
+                "glide_frames" => t.glide_frames = parse_i()?,
                 "stomp_bounce" => t.stomp_bounce = parse_i()?,
                 "timer_start" => t.timer_start = parse_u()?,
                 other => return Err(format!("line {}: unknown key '{other}'", n + 1)),

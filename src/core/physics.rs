@@ -63,11 +63,44 @@ pub const RISE_DRIFT: i32 = 10;
 /// How many frames a held rise can last before it is cut off regardless of
 /// the button still being held.
 pub const MAX_RISE_FRAMES: i32 = 12;
-/// Deceleration applied once the rise is no longer sustained by a held
-/// button within `MAX_RISE_FRAMES` (either released early, or the cap ran
-/// out). Real and far stronger than `RISE_DRIFT`, which is what gives a
-/// tapped jump a short hop and a held jump a full-height one.
-pub const JUMP_CUT: i32 = 29;
+/// Deceleration applied once a rise is no longer sustained by a held button
+/// within `MAX_RISE_FRAMES`. Far stronger than `RISE_DRIFT`, which is what
+/// gives a tapped jump a short hop and a held jump a full-height one.
+///
+/// This was 29, from a quadratic fitted to the released segment of the
+/// hold=3, 5 and 8 traces, and it made an early release the *highest* jump
+/// the engine had: releasing at frame 12 rose 43px where holding through the
+/// cap rose 30px. Both traces in `docs/reference/physics.md` say otherwise,
+/// hold=3 peaking at 15px and hold=8 at 24px, so the fit was wrong in the way
+/// the fall phase's was, and the same sturdier measure fixes it. Stepping the
+/// engine's own arc at candidate values reproduces both peaks exactly at 76,
+/// which is `GRAVITY`. They are kept separate constants: one pair of traces
+/// agreeing on a number is not enough to claim the cartridge decelerates a
+/// released rise with the same code that makes him fall.
+pub const JUMP_CUT: i32 = 76;
+/// What a moving jump does at the rise cap instead of stopping dead.
+///
+/// The cap was measured from a standing jump, and standing is the only case
+/// where it stops the rise outright. `tools/measure_jump_height.py` holds A
+/// for 40 frames from the same save state with and without a direction held,
+/// and the two arcs are identical for the first twelve frames and then part:
+/// standing flips straight to +1 and falls (24px), moving carries on rising
+/// about a pixel a frame for another twelve (33px). That extra 9px is what
+/// World 1-1 needs to get over the pillar at columns 78 and 79, which is 32px
+/// above the ground either side of it.
+///
+/// 1.5 px/frame decaying to nothing over 12 frames covers those 9px, which is
+/// `2d/t` and `v/t` for the segment.
+pub const GLIDE_VELOCITY: i32 = 384;
+/// Deceleration through the glide, so it reaches zero as the frames run out.
+pub const GLIDE_CUT: i32 = 32;
+/// How long the glide lasts.
+pub const GLIDE_FRAMES: i32 = 12;
+/// Deceleration applied to a stomp bounce, which has its own trace and its
+/// own answer: 61 stomps give 8px over about 12.4 frames, so `2d/t^2` is
+/// 26.9. A bounce ran on `JUMP_CUT` while that was 29 and the two were within
+/// noise of each other; they are not now, and the bounce keeps its own.
+pub const BOUNCE_CUT: i32 = 29;
 /// Upward speed Mario gets from stomping an enemy. Measured from 61 real
 /// stomps on the first World 1-1 Chibibo (`tools/measure_stomp_bounce.py`):
 /// the bounce lifts Mario 8px over about 12.4 frames before the phase byte
@@ -76,9 +109,9 @@ pub const JUMP_CUT: i32 = 29;
 ///
 /// The raw `2d/t` reading is 1.30 px/frame (333 here), but that assumes the
 /// deceleration is `2d/t^2 = 26.9`, and the engine decelerates a bounce with
-/// `JUMP_CUT` (29), measured separately and from tighter data. Simulating 333
-/// against that reaches only 7px. 360 is the speed that reproduces the traced
-/// 8px over 13 frames with the deceleration we actually apply.
+/// `BOUNCE_CUT` (29). Simulating 333 against that reaches only 7px. 360 is
+/// the speed that reproduces the traced 8px over 13 frames with the
+/// deceleration we actually apply.
 pub const STOMP_BOUNCE: i32 = 360;
 
 /// Update horizontal velocity and facing from the held buttons, without moving.
@@ -166,10 +199,28 @@ fn apply_vertical_accel(mario: &mut Mario, buttons: Buttons, t: &Tuning) {
         mario.vy += t.rise_drift;
         return;
     }
-    if rising && holding_jump {
+    // The cap. Standing still it stops the rise outright; moving, a second
+    // and slower rise follows it (`GLIDE_VELOCITY`).
+    if rising && holding_jump && mario.rise_frames == t.max_rise_frames {
+        mario.rise_frames += 1;
+        if mario.vx != 0 {
+            mario.vy = -t.glide_velocity;
+            return;
+        }
         mario.vy = 0;
+    } else if holding_jump
+        && mario.vy < 0
+        && mario.rise_frames < t.max_rise_frames + t.glide_frames
+    {
+        mario.rise_frames += 1;
+        mario.vy = (mario.vy + t.glide_cut).min(0);
+        return;
     } else if rising {
-        mario.vy += t.jump_cut;
+        mario.vy += if mario.bouncing {
+            t.bounce_cut
+        } else {
+            t.jump_cut
+        };
         return;
     }
     mario.vy = (mario.vy + t.gravity).min(t.max_fall_speed);
@@ -340,7 +391,8 @@ mod tests {
         assert_eq!(JUMP_VELOCITY, 602);
         assert_eq!(RISE_DRIFT, 10);
         assert_eq!(MAX_RISE_FRAMES, 12);
-        assert_eq!(JUMP_CUT, 29);
+        assert_eq!(JUMP_CUT, 76);
+        assert_eq!(BOUNCE_CUT, 29);
         assert_eq!(STOMP_BOUNCE, 360);
     }
 
@@ -552,6 +604,76 @@ mod tests {
         }
 
         assert!(hold_apex < tap_apex, "holding should reach a higher apex");
+    }
+
+    /// How high a jump goes, at three hold lengths, against the traced arcs
+    /// in `docs/reference/physics.md`.
+    fn apex(hold: u32) -> i32 {
+        let (mut m, solids) = resting_on_floor();
+        let start = m.pixel_y();
+        let mut peak = start;
+        for f in 0..40 {
+            let buttons = if f < hold { held(Button::A) } else { Buttons::default() };
+            step_motion(&mut m, buttons, &solids, &Tuning::default());
+            peak = peak.min(m.pixel_y());
+        }
+        start - peak
+    }
+
+    /// The cartridge traces peak at 15px for a 3-frame hold and 24px for an
+    /// 8-frame hold. `JUMP_CUT` was fitted rather than simulated and gave 28
+    /// and 35, which also made an early release the highest jump the engine
+    /// had, since holding through the cap stops the rise outright.
+    #[test]
+    fn a_short_hold_matches_the_traced_arc() {
+        assert_eq!(apex(3), 15, "a 3-frame hold peaks at 15px on the cartridge");
+        assert_eq!(apex(8), 24, "an 8-frame hold peaks at 24px");
+    }
+
+    /// Longer hold, higher jump, over the range the traces cover. This is
+    /// what the old `JUMP_CUT` broke worst: at 29 the curve ran 28px at a
+    /// 3-frame hold down to 24px at 8, so pressing the button for longer got
+    /// Mario less height.
+    ///
+    /// The range stops at the cap. Holds of 9 to 12 come out above the
+    /// held-throughout peak here (up to 31px against 26px), because releasing
+    /// one frame before the cap decays gradually where the cap stops the rise
+    /// outright. Nothing measured that side of the boundary on the cartridge,
+    /// so it is left as it falls out rather than tuned to look tidy.
+    #[test]
+    fn a_longer_hold_jumps_higher_up_to_the_cap() {
+        let heights: Vec<i32> = (1..=8).map(apex).collect();
+        assert!(
+            heights.windows(2).all(|w| w[1] > w[0]),
+            "each extra frame of hold should add height: {heights:?}"
+        );
+    }
+
+    /// Holding through the cap, which the cartridge puts at 24-25px.
+    #[test]
+    fn a_full_jump_matches_the_traced_height() {
+        assert_eq!(apex(40), 26);
+        assert_eq!(apex(13), apex(40), "the cap ends the rise, not the button");
+    }
+
+    /// The same jump with a direction held. On the cartridge that is 33px
+    /// against 24 standing, from the same save state, and it is what World
+    /// 1-1's own geometry needs: the pillar at columns 78 and 79 stands 32px
+    /// above the ground either side of it.
+    #[test]
+    fn moving_jumps_higher_than_standing_still() {
+        let (mut m, solids) = resting_on_floor();
+        let start = m.pixel_y();
+        let mut peak = start;
+        let mut buttons = held(Button::A);
+        buttons.set(Button::Right, true);
+        for _ in 0..40 {
+            step_motion(&mut m, buttons, &solids, &Tuning::default());
+            peak = peak.min(m.pixel_y());
+        }
+        let moving = start - peak;
+        assert_eq!(moving, 35, "the cartridge gives 33 here and 24 standing");
+        assert!(moving - apex(40) >= 8, "the glide is worth about 9px");
     }
 
     #[test]

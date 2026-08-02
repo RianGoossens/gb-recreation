@@ -413,3 +413,53 @@ the moment of the "kill"). A third approach would need a ground-truth
 signal independent of OAM presence, such as the score counter (not yet
 pinned, see `faithfulness.md`) incrementing on a real stomp, rather than
 another tuning pass on jump distance and timing.
+
+## Correction: every jump trace above was a standing jump
+
+Two things in this document were wrong together, and World 1-1's own
+geometry is what showed it. The pillar at columns 78 and 79 stands four
+tiles, 32 pixels, above the ground on either side of it, and the level is
+verified column for column against the running cartridge, so getting past it
+is something Mario can do. A 24 pixel jump cannot.
+
+`tools/measure_jump_height.py` takes one save state and jumps from it with
+and without a direction held, reading the peak off `0xC201`. The standing
+column reproduces this document exactly, which is what makes the rest of the
+table worth reading:
+
+| held during the flight | peak rise |
+| --- | --- |
+| nothing, from a standstill | 24 px |
+| a direction | 33 px |
+| a direction and B, at speed | 41 px |
+
+A one-frame run-up is enough for 33, with the speed register `0xC20C` still
+reading 0 at takeoff, so this is not jump velocity scaling with speed the
+way Super Mario Bros does it. The per-frame deltas say what it is. The
+standing and moving arcs are identical for twelve frames and then part:
+
+```
+standing: 0 -3 -3  0 -4 -2 -2 -2 -2 -2 -2 -2 +1 +2 +2 +2 +2  0 +2 +4
+moving:   0 -3 -3  0 -4 -2 -2 -2 -2 -2 -2 -2 -1 -1 -1 -1 -1  0 -1 -1
+```
+
+The abrupt reset at the cap is what a *standing* jump does. Moving, the rise
+carries on at about a pixel a frame for another twelve frames, 9 pixels more,
+which is `GLIDE_VELOCITY` and `GLIDE_FRAMES` in the engine. B adds a further
+8 pixels on top at speed, which the engine does not reproduce: `0xC20C` caps
+at 6 with or without B, so there is no run speed here to hang it on, and what
+B changes about a jump is not measured.
+
+`JUMP_CUT` was wrong in the other direction. At 29, from a quadratic fitted
+to the released segment, a 3-frame hold rose 28 px and an 8-frame hold 24,
+so pressing the button longer got Mario *less* height, and releasing at
+frame 12 gave 43 px, the highest jump the engine had. Stepping the engine's
+own arc at candidate values reproduces both traced peaks (15 px and 24 px)
+exactly at **76**. That is `GRAVITY`, and they are still separate constants:
+one pair of traces agreeing on a number is not enough to claim the cartridge
+runs a released rise through the same code that makes him fall. The stomp
+bounce kept the old value as `BOUNCE_CUT`, since its own trace measured it.
+
+The lesson is the one already in CLAUDE.md, arriving from a new direction: a
+fit whose residuals are systematic should be simulated end to end before it
+is trusted, and the level geometry is a measurement too.

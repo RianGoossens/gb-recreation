@@ -14,6 +14,12 @@ use sml::input::{Button, Buttons};
 const PATH: &str = "assets/extracted/level_1_1.txt";
 const COLUMNS: usize = 300;
 const ROWS: i32 = 16;
+/// How long a walker holds A. The rise runs for `MAX_RISE_FRAMES` and then,
+/// while he is moving, glides upward for `GLIDE_FRAMES` more, so releasing at
+/// the cap gives up the top third of the jump. World 1-1's pillar at columns
+/// 78 and 79 is 32px above the ground and needs the glide.
+const FULL_JUMP: u32 =
+    (sml::core::physics::MAX_RISE_FRAMES + sml::core::physics::GLIDE_FRAMES) as u32;
 
 fn extracted() -> Option<Level> {
     if std::path::Path::new(PATH).exists() {
@@ -159,7 +165,7 @@ fn extracted_level_can_be_walked_from_spawn_to_the_end() {
         }
         let gap = !ground_ahead(&game, x, game.mario.pixel_y());
         if (stalled > 6 || gap) && game.mario.on_ground {
-            hold_jump = 12;
+            hold_jump = FULL_JUMP;
         }
 
         let mut buttons = Buttons::default();
@@ -478,13 +484,18 @@ fn mario_can_stand_at_every_spawn_outside_the_vehicle_stage() {
 /// seals them shut moves the number.
 #[test]
 fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
+    // Every one of these moved when the jump was measured properly. The
+    // walker had been jumping 43px, from a `JUMP_CUT` that made releasing the
+    // button at frame 12 the highest jump the engine had; the cartridge gives
+    // 24px standing and 33 moving, and the engine now gives 26 and 35. A
+    // shorter jump reaches less far, so these numbers went down: 2-1 from 69,
+    // 2-2 from 69, 3-1 from 98, 4-1 from 66. 3-3 went the other way, 12 to 23,
+    // because the glide that replaced the old cliff-edge cap climbs a step it
+    // could not.
     for (name, expected) in [
-        ("2_1", 69), ("2_2", 69), ("2_3", 178),
-        // 3-1 was 53 until its drop blocks went in. One of them bridges the
-        // gap the walker used to stop at: he is across the eight pixels well
-        // inside the nine frames it stays up.
-        ("3_1", 98), ("3_2", 34), ("3_3", 12),
-        ("4_1", 66), ("4_2", 106), ("4_3", 7),
+        ("2_1", 19), ("2_2", 38), ("2_3", 178),
+        ("3_1", 90), ("3_2", 34), ("3_3", 23),
+        ("4_1", 65), ("4_2", 106), ("4_3", 7),
     ] {
         let path = format!("assets/extracted/level_{name}.txt");
         if !std::path::Path::new(&path).exists() {
@@ -513,7 +524,7 @@ fn the_geometry_of_worlds_2_to_4_is_walkable_as_far_as_it_is_recorded() {
             reached = reached.max(furthest / 8);
             let gap = !ground_ahead(&game, x, game.mario.pixel_y());
             if (stalled > 6 || gap) && game.mario.on_ground {
-                hold_jump = 12;
+                hold_jump = FULL_JUMP;
             }
             let mut buttons = Buttons::default();
             buttons.set(Button::Right, true);
@@ -1233,11 +1244,11 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
                     }
                     waited = 0;
                     decisions += 1;
-                    hold_jump = 14;
+                    hold_jump = FULL_JUMP;
                 }
             }
             if (stalled > 6 || !ground_ahead) && game.mario.on_ground && hold_jump == 0 {
-                hold_jump = 12;
+                hold_jump = FULL_JUMP;
             }
             buttons.set(Button::Right, true);
             if hold_jump > 0 {

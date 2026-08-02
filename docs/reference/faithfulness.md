@@ -78,6 +78,16 @@ playing it faithfully.
   peak, landing around frame 25, versus the real 24-25px over ~24 frames),
   not derived and shipped untested. See `docs/reference/physics.md` for the
   fitted values, traces, and the correction made while implementing it.
+  Every one of those traces was a standing jump, which
+  `tools/measure_jump_height.py` later showed is the shortest of three: the
+  cartridge gives 24px standing, 33 with a direction held, and 41 with B on
+  top at speed. The engine reproduces the first two (26 and 35) through a
+  glide that replaces the cap's abrupt stop while Mario is moving.
+- **The extra 8px B adds to a jump**: **not reproduced**. B held during the
+  flight takes a moving jump from 33px to 41 on the cartridge, and the engine
+  gives 35 either way. `0xC20C` caps at 6 with or without B, so there is no
+  measured run speed to hang it on, and what else B changes about a jump has
+  not been measured. Nothing in World 1 has needed it so far.
 - **Stomp bounce**: canonical, measured and implemented. 61 real stomps on
   the first World 1-1 Chibibo (`tools/measure_stomp_bounce.py`) give an 8px
   rise over about 12.4 frames, or 9px over 13.5 with the jump button held.

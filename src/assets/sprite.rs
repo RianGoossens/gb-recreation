@@ -197,6 +197,15 @@ pub const FLY: &[Piece] = &[
     piece(8, -8, 0xB1),
 ];
 
+/// Bunbun (kind `0x42`), a 2x2 block like the Fly's, measured in World 1-2
+/// (`tools/measure_object_sprites.py`).
+pub const BUNBUN: &[Piece] = &[
+    piece(0, -16, 0xC2),
+    piece(8, -16, 0xC3),
+    piece(0, -8, 0xD2),
+    piece(8, -8, 0xD3),
+];
+
 /// The Falling Slab (kind `0x0C`), two tiles side by side.
 pub const FALLING_SLAB: &[Piece] = &[piece(0, -8, 0xDD), piece(8, -8, 0xDE)];
 

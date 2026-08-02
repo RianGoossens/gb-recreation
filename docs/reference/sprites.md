@@ -112,8 +112,18 @@ The game runs in 8x8 sprite mode, so an OAM tile id is an atlas id directly.
 | `0x0C` | Falling Slab | `0xDD` `0xDE` | 16x8 |
 | `0x0E` | Fly | `0xA0` `0xA1` / `0xB0` `0xB1` | 16x16 |
 | `0x10` | Honen | `0xC1` over `0xD1` | 8x16 |
+| `0x1E` | fire breath | `0xD4` `0xD5` | 16x8 |
+| `0x23` | fireball | `0xE2` | 8x8 |
 | `0x24` | Yurarin Boo | `0xA6` `0xA7` / `0xB6` `0xB7` | 16x16 |
+| `0x27` | explosion | `0xCD` `0xCE` / `0xCA` `0xCB` `0xCC` / `0xDA` `0xDB` `0xDC` | 24x24 |
 | `0x36` | drop block | `0xEE` | 8x8 |
+| `0x3F` | Gao | `0xA4` `0xA5` / `0xB4` `0xB5` | 16x16 |
+| `0x42` | Bunbun | `0xC2` `0xC3` / `0xD2` `0xD3` | 16x16 |
+| `0x45` | arrow | `0xAC` over `0xBC` | 8x16 |
+
+Every kind the table gives at 16x16 uses the same four ids relative to its
+first: `n`, `n + 1`, `n + 16`, `n + 17`. The Fly is `0xA0`, Yurarin Boo `0xA6`,
+Gao `0xA4`, Bunbun `0xC2`.
 
 The Fly's four ids are `n`, `n + 1`, `n + 16`, `n + 17`, the same 2x2 block
 Mario's frames are, which confirms the sheet's 16-tile width from the running
@@ -126,8 +136,8 @@ object's position is the bottom left corner of what it draws.
 
 ### Two kinds are drawn behind the background
 
-The OAM attribute byte came back as `0x80` for exactly two of the sixteen
-kinds measured, `0x02`, `0x10` and `0x36`, and clear for every other one. Bit 7 is the
+The OAM attribute byte came back as `0x80` for three of the sixteen kinds
+measured, `0x02`, `0x10` and `0x36`, and clear for every other one. Bit 7 is the
 hardware's priority bit: a sprite with it set is covered by any background
 pixel that is not colour 0, so the object is hidden wherever the level's own
 tiles are drawn and visible only where they are empty.

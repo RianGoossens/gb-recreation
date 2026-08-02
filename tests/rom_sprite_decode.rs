@@ -127,8 +127,9 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
             .count()
     };
 
-    let tables: [(&str, &[Piece]); 6] = [
+    let tables: [(&str, &[Piece]); 7] = [
         ("Chibibo", sprite::CHIBIBO),
+        ("Bunbun", sprite::BUNBUN),
         ("Nokobon", sprite::NOKOBON),
         ("Fly", sprite::FLY),
         ("Falling Slab", sprite::FALLING_SLAB),
@@ -162,6 +163,20 @@ fn every_object_sprite_names_a_tile_that_draws_something() {
         (0..=255u8).any(|id| ink(id) == 0),
         "control: no tile in the atlas is blank, so a blank one cannot be caught"
     );
+}
+
+/// Every 16x16 kind is four ids of one 2x2 block: `n`, `n + 1`, `n + 16`,
+/// `n + 17`. Reading them as four consecutive ids draws a scramble, which is
+/// what makes the arithmetic worth pinning rather than the ids alone.
+#[test]
+fn the_sixteen_by_sixteen_kinds_are_all_one_block() {
+    for (name, pieces) in [("Fly", sprite::FLY), ("Bunbun", sprite::BUNBUN)] {
+        let ids: Vec<u8> = pieces.iter().map(|p| p.tile).collect();
+        let n = ids[0];
+        assert_eq!(ids, vec![n, n + 1, n + 16, n + 17], "{name}");
+        let offsets: Vec<(i32, i32)> = pieces.iter().map(|p| (p.dx, p.dy)).collect();
+        assert_eq!(offsets, vec![(0, -16), (8, -16), (0, -8), (8, -8)], "{name}");
+    }
 }
 
 /// The Fly is drawn from the per-world band, so it looks different in each

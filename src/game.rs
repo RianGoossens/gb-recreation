@@ -246,7 +246,8 @@ fn enemy_pieces(kind: crate::core::enemy::EnemyKind) -> Option<&'static [crate::
         EnemyKind::LedgeTurner => sprite::NOKOBON,
         EnemyKind::Fly => sprite::FLY,
         EnemyKind::Faller => sprite::FALLING_SLAB,
-        EnemyKind::Bouncer | EnemyKind::Bunbun => return None,
+        EnemyKind::Bunbun => sprite::BUNBUN,
+        EnemyKind::Bouncer => return None,
     })
 }
 

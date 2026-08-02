@@ -733,6 +733,33 @@ the control for camera drift in the same run: its x moved 2 pixels in 400
 frames after the release, so the horizontal one's 105 frames of leftward
 travel are not the camera.
 
+### Kind 0x42, Bunbun, flies left in bursts
+
+World 1-2 carries 19 of them, more than any other kind in any World 1 level,
+and every one was dropped at extraction. `tools/measure_flyer.py` traces it the
+way `measure_lift_phase.py` traces a lift: catch the slot on the frame the game
+fills it, release right so the camera stops, then read the slot every frame.
+
+It flies **left, on a fixed height, in bursts**. One pixel a frame for 41
+frames, then 33 frames holding still, and repeat: a 74 frame cycle covering 41
+pixels, which averages a little over half a pixel a frame. It never reverses,
+and it never gains or loses a pixel of height in 319 frames, which is four full
+cycles. It leaves the screen on the left and its slot empties.
+
+```
+per frame  -1x41  +0x33  -1x41  +0x33  -1x41  +0x33 ...
+```
+
+Three controls, all in the same run. Mario pinned high (Y 24) and Mario pinned
+low (Y 96) give traces that agree frame for frame, so the flight does not track
+his height. Putting him back on the flyer's right once it has gone past does
+not turn it. And two later instances, one of them created 24 pixels higher up,
+repeat the same cadence, which is what says the 41 and the 33 belong to the
+kind rather than to the phase one object happened to be created at.
+
+Nothing solid sits on the rows it crossed, so whether terrain stops it is not
+settled by this run.
+
 ## What is not decoded yet
 
 - Which kind is which enemy. Five kinds spawn in World 1-1: `0x00` (nine
@@ -771,6 +798,7 @@ travel are not the camera.
 | `tools/trace_jumper.py` | the raw arc of a hopping kind, frame by frame |
 | `tools/measure_level_kind.py` | how a kind moves, in 1-2 and 1-3 as well as 1-1 |
 | `tools/measure_lift_phase.py` | which way a lift sets off, and from where in its cycle |
+| `tools/measure_flyer.py` | how a flying kind moves, and whether it tracks Mario |
 | `tools/probe_object_contact.py` | whether touching a kind costs Mario a life |
 | `tools/probe_faller_trigger.py` | whether a fall is on a timer or on Mario |
 | `tools/find_skip_flag.py` | which byte of memory releases the skipped records |

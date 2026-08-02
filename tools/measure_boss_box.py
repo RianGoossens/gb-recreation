@@ -6,42 +6,46 @@
 
 `measure_enemy_box.py` does this in World 1-1 and reboots the game for every
 offset, which is fine there and hopeless for a boss: reaching World 1-3 means
-playing through two levels first, so 37 offsets would be 37 playthroughs.
+playing through two levels first, so 41 offsets would be 41 playthroughs.
 This reaches the level once, snapshots the moment the object is on screen,
 and restores that snapshot for each trial.
 
-The probe it replaces (`tools/probe_boss_contact.py`) tested a single offset
-and found the boss harmless, and found an ordinary enemy in the same room
-harmless too, which is what said the offset was the problem rather than the
-boss: the slot's anchor and Mario's are not the same point, so a difference of
-zero between them need not be an overlap at all.
+Three earlier versions of this measured nothing, and what was wrong is
+recorded in `docs/reference/objects.md` and in `tools/probe_death_state.py`.
+The short version: crossing two levels by pinning Mario's y and phase bytes
+leaves him unstepped, so nothing can hurt him and nothing can kill him, and
+the pit control that should have caught it was clearing the wrong tilemap
+columns. `thaw` puts three bytes of his block back and hands him to the game
+again; `dig` clears all 32 columns of the map.
 
-The control kind is swept first and has to produce a window with both edges
-inside the swept range. Without that, "the boss never hurt him" says nothing.
+Two controls, in this order, and both have to pass before any number here
+means anything:
 
-Result: **still unmeasured, and the tie-breaker has now been run.** Sweeping
-the whole range in World 1-3 left the positive control with no window at all:
-kind `0x3F`, an ordinary enemy, cost Mario no life at any of the 41 offsets.
-So the offset was never the problem, and something about the state these
-trials run in leaves him unable to be hurt.
+1. The pit. If taking the floor away does not cost him a life, nothing
+   measured from this state would.
+2. An ordinary enemy in the same room, swept the same way, which has to give
+   a window with both edges inside the swept range.
 
-The control that settles that uses no enemy: take the floor out of the tilemap
-under him, write nothing else at all, and see whether the game's own fall
-costs him a life. It does not. So the state is the problem, and no contact
-probe from here can work whatever it points at. (Pinning his Y byte below the
-screen is not a fall and answers "unharmed" from any state, which is why the
-first version of this control was worthless.)
+**Result: the pit control now passes and the enemy control still does not.**
+From a restored, thawed World 1-3, a dug pit costs him a life, and an
+ordinary enemy laid exactly on top of him for 300 frames costs him nothing,
+at every one of the 41 offsets. Two things that could have explained that are
+ruled out. Writing the object rather than Mario is not it: the same rig run
+in World 1-1 (`uv run tools/measure_boss_box.py 1-1 0x00 0x00 x`) hurts him
+at every offset in the sweep. And his screen position is not it either, since
+the object is placed from his own bytes each frame.
 
-Two suspects, and the second is the better one. The fly loop pins his Y byte
-for thousands of frames to carry him across two levels, and `settle` is here
-to undo that: it lets go for 90 frames so he lands, which is what
-`tools/probe_ceiling_cap.py` does before walking him, and there he collides
-with terrain normally. That leaves the snapshot. Every trial here begins with
-`restore`, and `tools/measure_lift.py` already recorded that restoring a save
-state per trial silently breaks a placement experiment: it dropped Mario
-through a lift at every offset, including ones a continuous run held him at.
-The next thing to try is the pit control with no restore in front of it,
-inside one continuous approach.
+What is left is a difference in the bytes. Byte 1 of the slot record holds 1
+for World 1-1's walker while it is hurting him, and 0 for every object in
+World 1-3 reached by flying. Writing 1 into it every frame does not stick:
+the game puts it back to 0 on the same frame. Mario also stands at y 22 in
+mid air here against y 134 on the floor in World 1-1, and `land` cannot fix
+that without losing the object. So the named next step is to find out what
+byte 1 of a slot record is (`tools/watch_object_slot.py` follows one slot
+through a plain walk with the terrain intact and can say when it turns 1).
+If it means the object has been woken by Mario arriving, the
+flatten-and-fly walkthrough can never measure contact and the route has to be
+a real playthrough.
 
 Usage: uv run tools/measure_boss_box.py [level] [kind] [control-kind] [axis]
 """
@@ -51,6 +55,7 @@ import sys
 sys.path.insert(0, "tools")
 
 from dump_object_slots import SLOTS, SLOT_BASE, SLOT_SIZE, slot
+from probe_death_state import dig, thaw, watch_for_death
 from run_through_levels import FLY_Y, LIVES, MARIO_Y, PHASE, SCREEN_X, SPAWN_X
 from sml_boot import restore, snapshot
 from trace_level_objects import NAMES, reach_level
@@ -59,55 +64,10 @@ APPROACH = 5000
 # A death is not instant: forcing Mario into World 1-1's first walker costs a
 # life on frame 212, after an animation the counter does not move during.
 WATCH = 300
-# Frames of letting go before a trial, so he lands and the fly loop's state
-# is behind him.
-SETTLE = 90
 # Mario's box, measured on the cartridge by walling him into corridors.
 MARIO_WIDTH = 11
 MARIO_HEIGHT = 12
 SPAN = range(-20, 21)
-TILEMAP = 0x9800
-
-
-def settle(pb):
-    """Stop writing to him and let him land.
-
-    Two earlier runs of this failed with the positive control finding no
-    window anywhere, which said the state Mario was left in by the fly loop
-    was the problem rather than the offset. The loop pins his Y byte every
-    frame for thousands of frames to carry him over the level, and whatever
-    that leaves him in, nothing collides with it. Letting go for a while and
-    letting him fall to the floor is what `tools/probe_ceiling_cap.py` does
-    before it walks him, and there he collides with terrain normally.
-    """
-    pb.button_release("right")
-    for _ in range(SETTLE):
-        pb.tick()
-
-
-def pit_control(pb, state_bytes):
-    """Does anything at all cost him a life from this state?
-
-    A control that uses no enemy. If a pit does not cost a life either, no
-    contact probe run from here can mean anything, and that is a fact about
-    the state rather than about the boss.
-
-    The pit is a real one: the floor is taken out of the tilemap under him and
-    then nothing is written at all, so what follows is the game's own falling
-    and its own death. Pinning his Y byte below the screen instead is not a
-    fall, and it answers "unharmed" whatever the state is.
-    """
-    restore(pb, state_bytes)
-    column = pb.memory[SCREEN_X] // 8
-    for row in range(2, 18):
-        for c in range(max(0, column - 2), column + 3):
-            pb.memory[TILEMAP + (row % 32) * 32 + (c % 32)] = 0x00
-    lives = pb.memory[LIVES]
-    for _ in range(WATCH):
-        pb.tick()
-        if pb.memory[LIVES] < lives:
-            return True
-    return False
 
 
 def approach(pb, kind):
@@ -128,42 +88,105 @@ def approach(pb, kind):
     return None
 
 
-def trial(pb, state_bytes, s, ox, oy, axis, offset):
-    """Hold Mario at an offset from the object and report whether it hurt."""
+def pit_control(pb, state_bytes):
+    """Does anything at all cost him a life from this state?
+
+    A control that uses no enemy, run from a restored snapshot exactly as the
+    trials are, so it tests the state the trials actually run in.
+    """
     restore(pb, state_bytes)
-    mx = ox + offset if axis == "x" else ox
-    my = oy if axis == "x" else oy + offset
+    dig(pb)
+    return watch_for_death(pb, WATCH) is not None
+
+
+def trial(pb, state_bytes, s, axis, offset):
+    """Hold the object at an offset from Mario and report whether it hurt.
+
+    Mario is not written at all. The earlier version moved him instead, by
+    writing `0xC202`, and that is his position on screen rather than his
+    position in the level: at the start of World 1-1 the two are the same
+    number, which is where every sweep that worked was run, and by World 1-3
+    they are not. The object's slot holds a screen position too, so putting
+    the object where Mario is measures the same thing with nothing but the
+    object being written.
+    """
+    restore(pb, state_bytes)
     lives = pb.memory[LIVES]
     for _ in range(WATCH):
-        # The object too, every frame. A boss that leaps 20 pixels would carry
-        # itself out of the offset being tested otherwise.
-        pb.memory[SLOT_BASE + s * SLOT_SIZE + 3] = ox
-        pb.memory[SLOT_BASE + s * SLOT_SIZE + 2] = oy
-        pb.memory[SCREEN_X] = max(min(mx, 250), 8)
-        pb.memory[MARIO_Y] = max(min(my, 250), 8)
+        mx, my = pb.memory[SCREEN_X], pb.memory[MARIO_Y]
+        x = mx - offset if axis == "x" else mx
+        y = my if axis == "x" else my - offset
+        pb.memory[SLOT_BASE + s * SLOT_SIZE + 3] = max(min(x, 250), 8)
+        pb.memory[SLOT_BASE + s * SLOT_SIZE + 2] = max(min(y, 250), 8)
         pb.tick()
         if pb.memory[LIVES] < lives:
             return True
     return False
 
 
-def sweep(pb, kind, axis):
+def land(pb):
+    """Thaw him and try to put him on the level's own floor.
+
+    Thawing alone leaves him standing in mid air at the height the fly loop
+    left him. Right lands him, at y 38 from y 22, and 240 frames of it scroll
+    the object out of every slot; left does not land him at all, which is
+    what this does now, so a sweep still runs with him in the air.
+    """
+    thaw(pb, frames=0)
+    pb.button_press("left")
+    for _ in range(30):
+        pb.tick()
+    pb.button_release("left")
+    for _ in range(150):
+        pb.tick()
+    print(f"  standing at y {pb.memory[MARIO_Y]}, phase {pb.memory[PHASE]}")
+
+
+def watch(pb, state_bytes, s, axis, offset):
+    """Print what one trial actually does, frame by frame."""
+    restore(pb, state_bytes)
+    for frame in range(WATCH):
+        mx, my = pb.memory[SCREEN_X], pb.memory[MARIO_Y]
+        x = mx - offset if axis == "x" else mx
+        y = my if axis == "x" else my - offset
+        pb.memory[SLOT_BASE + s * SLOT_SIZE + 3] = max(min(x, 250), 8)
+        pb.memory[SLOT_BASE + s * SLOT_SIZE + 2] = max(min(y, 250), 8)
+        pb.tick()
+        if frame % 60 == 0:
+            state = slot(pb, s)
+            record = " ".join(f"{b:02X}" for b in state)
+            him = " ".join(f"{pb.memory[a]:02X}" for a in range(0xC200, 0xC210))
+            print(f"    frame {frame}: lives {pb.memory[LIVES]}\n"
+                  f"      slot   {record}\n"
+                  f"      Mario  {him}")
+
+
+def sweep(pb, kind, axis, check_pit, verbose=False):
     """Sweep one kind and report its window, or None if it never hurt."""
     s = approach(pb, kind)
     if s is None:
         print(f"  kind 0x{kind:02X} never came on screen")
         return None
-    settle(pb)
+    land(pb)
+    # Landing takes 300 frames, and the object can change slots in that time,
+    # so ask which slot holds the kind now rather than trusting the old one.
+    held = [i for i in range(SLOTS) if slot(pb, i)[0] == kind]
+    if not held:
+        print(f"  kind 0x{kind:02X} left every slot while he was landing")
+        return None
+    s = held[0]
     state = slot(pb, s)
     ox, oy = state[3], state[2]
     here = snapshot(pb)
     print(f"  kind 0x{kind:02X} in slot {s} at x {ox}, y {oy}")
 
-    if not pit_control(pb, here):
-        print("  a pit does not cost him a life from this state either, so "
-              "nothing measured from here would mean anything")
+    if check_pit and not pit_control(pb, here):
+        print("  a pit does not cost him a life from this state, so nothing "
+              "measured from here would mean anything")
         return None
-    hits = [o for o in SPAN if trial(pb, here, s, ox, oy, axis, o)]
+    if verbose:
+        watch(pb, here, s, axis, 0)
+    hits = [o for o in SPAN if trial(pb, here, s, axis, o)]
     if not hits:
         print("  nothing hurt him anywhere in the sweep")
         return None
@@ -191,7 +214,7 @@ def main():
         return 1
 
     print(f"positive control, kind 0x{control:02X}, sweeping {axis}")
-    ok = sweep(pb, control, axis)
+    ok = sweep(pb, control, axis, check_pit=True, verbose=True)
     if ok is None:
         print("\nthe control found no window, so this instrument cannot "
               "detect a death and any result below would be meaningless")
@@ -199,7 +222,7 @@ def main():
         return 1
 
     print(f"\nthe boss, kind 0x{kind:02X}, sweeping {axis}")
-    sweep(pb, kind, axis)
+    sweep(pb, kind, axis, check_pit=False)
     pb.stop()
     return 0
 

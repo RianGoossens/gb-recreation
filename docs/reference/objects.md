@@ -930,4 +930,39 @@ Clearing all 32 columns needs no scroll and cannot miss.
 With both fixed, a pit costs Mario a life on frame 197 partway through World
 1-3, reached by flying. The instrument works, and its positive control (the
 same pit in World 1-1 from a cold boot, a life on frame 188) still passes.
-The contact sweep can now be rebuilt on top of it.
+
+### Contact still does not register, and the difference is one byte
+
+The sweep was rebuilt on that state (`tools/measure_boss_box.py`) and the
+pit control passes there too, from the same restored snapshot the trials run
+from. The enemy control still finds nothing: kind `0x3F`, an ordinary enemy,
+laid exactly on top of Mario for 300 frames, costs him nothing at any of the
+41 offsets.
+
+Two explanations are ruled out. The sweep now writes the object rather than
+Mario, since his `0xC202` is a screen position and not a level position and
+the two stop being the same number once a level has scrolled; that changed
+nothing, and the same rig run in World 1-1 (`uv run tools/measure_boss_box.py
+1-1 0x00 0x00 x`) hurts him at every offset it sweeps. So the rig registers
+contact, and only in World 1-3 does it not.
+
+What differs is in the bytes, and it is byte 1 of the slot record:
+
+| | World 1-1 walker | World 1-3 objects |
+|---|---|---|
+| slot record | `00 01 86 3A ...` | `3F 00 16 3B ...` |
+| Mario's y | `0x86`, on the floor | `0x16`, in mid air |
+
+Byte 1 is 1 for the walker that is hurting him and 0 for everything reached
+by flying, and it cannot be written: putting 1 there every frame leaves it 0
+after the tick, so the game owns it. Mario's footing differs too, and
+`land` cannot fix that without losing the object, since holding right for the
+240 frames it takes to drop him from y 22 to y 38 scrolls the object out of
+every slot, and holding left does not drop him at all.
+
+Named next step: find what byte 1 of a slot record means.
+`tools/watch_object_slot.py` follows one slot through a plain World 1-1 walk
+with the terrain intact, so it can say when the byte turns 1 and what that
+tracks. If it means the object has been woken by Mario actually arriving,
+then no flatten-and-fly walkthrough can ever measure contact and the route
+has to be a real playthrough.

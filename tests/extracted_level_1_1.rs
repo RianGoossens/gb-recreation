@@ -1381,10 +1381,13 @@ fn world_1_can_be_walked_from_its_first_level_to_its_last() {
 /// The route the level means him to take is over the block rather than under
 /// it, which the walker has no rule for.
 ///
-/// Ours is the only collision model this has ever been checked against. The
-/// rise is capped because *any* part of his 11 pixel width is under the block,
-/// and he is only under it by one column here; a cartridge that tests a
-/// narrower head would let him through. Nothing has measured that.
+/// The cartridge is not stuck here. `tools/probe_ceiling_cap.py` does the same
+/// thing in the running game: holding right at x 88 and tapping A takes
+/// Mario's Y byte from 134 to 101, a rise of 33 that puts his feet above the
+/// block's own top. A standing jump from that spot is capped the way ours is,
+/// so what differs is a jump held with a direction against one held without,
+/// and the cause is not established (`docs/reference/physics.md`). This pins
+/// our side of the gap.
 #[test]
 fn world_1_3s_pocket_at_column_11_is_a_dead_end_for_this_collision_model() {
     let Ok(mut level) = sml::assets::level::extracted_level("1-3") else {

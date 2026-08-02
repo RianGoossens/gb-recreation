@@ -463,3 +463,46 @@ bounce kept the old value as `BOUNCE_CUT`, since its own trace measured it.
 The lesson is the one already in CLAUDE.md, arriving from a new direction: a
 fit whose residuals are systematic should be simulated end to end before it
 is trusted, and the level geometry is a measurement too.
+
+## Ceilings, and what a jump under one hits
+
+Our jump is capped when any part of Mario's 11 pixel width is under a solid
+tile. Nothing had measured that, and World 1-3's opening is where it bites:
+a block at row 10 spans columns 7 to 11, a two-tile wall stands at columns 13
+and 14, and walking the floor at row 14 takes Mario under the block and up
+against the wall with our engine capping his rise 4 pixels short of the
+wall's top. The pocket is a dead end for us.
+
+`tools/probe_ceiling_cap.py` reaches World 1-3, stops the flatten-and-fly the
+frame the level opens, and runs the same thing on the cartridge. It prints the
+tilemap it reads back, so a flattened opening screen would be visible rather
+than silent; this one matches the decode column for column. Two controls: walking right without jumping stays at x 88 forever,
+and a free jump at column 3 rises 33 pixels.
+
+**The cartridge gets him out.** Holding right at x 88 and tapping A, his Y byte
+runs 134 to 101, a rise of 33 with his feet ending at 95, above the block's own
+top at 96. He does not land on it; he comes back down through it.
+
+That does not settle it as "the ceiling test is narrower than he is". A
+standing jump from the same spot is capped. Sweeping a
+standing jump a pixel at a time across the block, from x 40 to 111:
+
+```
+x   40..61  62..69  70..77  78..85  86..93  94..105  106..109
+rise    33      16      12      16      12       16        33
+```
+
+The block is columns 7 to 11, x 56 to 95. The free rise is 33 either side of
+it, so the sweep is wide enough to hold the whole window and both edges are
+inside it. Under the block the rise alternates between 12 and 16 on an 8 pixel
+cadence offset by 6, and the 16s carry on 10 pixels past the block's right
+edge. Neither number is 33, so a standing jump at x 88 is stopped at the same
+place ours is.
+
+So the difference between the cartridge and the engine here is a jump held
+with a direction against one held without, at the same position under the same
+tile, and it is not explained. The plausible readings are a head test that
+follows his leading edge, and a rise fast enough to cross the tile in one
+frame without the check catching it. Both are testable and neither is tested.
+What is settled is that the pocket is not a dead end on the cartridge and is
+one for us.

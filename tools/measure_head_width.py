@@ -73,38 +73,49 @@ def jump(pb, state, x, direction, ceiling, tiles, row, tile):
         pb.tick()
     highest = pb.memory[MARIO_Y]
     pb.button_press("a")
+    # How far the pin actually holds. Writing the byte before the tick does
+    # not stop the game moving him during it, and a Mario who drifts out from
+    # under the ceiling would read as a ceiling that does not stop him.
+    drift = 0
     for frame in range(AIRBORNE):
         pb.memory[SCREEN_X] = x
         if frame == HOLD:
             pb.button_release("a")
         pb.tick()
+        drift = max(drift, abs(pb.memory[SCREEN_X] - x))
         highest = min(highest, pb.memory[MARIO_Y])
     pb.button_release("a")
     if direction:
         pb.button_release(direction)
-    return start - highest
+    return start - highest, drift
 
 
-def sweep(pb, state, ceiling, tiles, row, tile, direction):
+def sweep(pb, state, ceiling, tiles, row, tile, direction, margin=20):
     """Rises across the ceiling, and the window where they are cut short."""
-    left = ceiling * 8 - 20
-    rises = [
+    left = max(8, ceiling * 8 - margin)
+    trials = [
         (x, jump(pb, state, x, direction, ceiling, tiles, row, tile))
-        for x in range(left, ceiling * 8 + tiles * 8 + 20)
+        for x in range(left, ceiling * 8 + tiles * 8 + margin)
     ]
+    drift = max(d for _, (_, d) in trials)
+    rises = [(x, r) for x, (r, _) in trials]
     free = max(r for _, r in rises)
     capped = [x for x, r in rises if r < free]
     label = direction or "still"
     if not capped:
-        print(f"  {label:5}: nothing capped the jump, free rise {free}")
+        print(f"  {label:5}: nothing capped the jump, free rise {free}, "
+              f"and he drifted at most {drift} px off the pinned x")
         return None
     if rises[0][1] != free or rises[-1][1] != free:
-        print(f"  {label:5}: the sweep does not start and end in free air, "
-              f"so its edges say nothing ({rises[0][1]} .. {rises[-1][1]})")
+        # Still worth saying where it capped: an edge that is not free air
+        # invalidates the window's width, not the fact that something capped.
+        print(f"  {label:5}: the sweep does not start and end in free air, so "
+              f"its edges say nothing ({rises[0][1]} .. {rises[-1][1]}); it "
+              f"capped at x {capped[0]} to {capped[-1]}")
         return None
     window = capped[-1] - capped[0] + 1
     holes = window != len(capped)
-    print(f"  {label:5}: free {free}, capped from x {capped[0]} to "
+    print(f"  {label:5}: drift {drift} px; free {free}, capped from x {capped[0]} to "
           f"{capped[-1]}, a window of {window}"
           + (" with holes in it" if holes else "")
           + f", so a head of {window - tiles * 8 + 1}")
@@ -124,13 +135,20 @@ def main():
     print(f"floor tile 0x{tile:02X}, ceiling at level row {row}")
 
     # The control that says a written ceiling caps anything at all.
-    free = jump(pb, here, 60, None, None, 0, row, tile)
+    free, _ = jump(pb, here, 60, None, None, 0, row, tile)
     print(f"  free jump with nothing written: {free} px")
 
     for tiles in widths:
         print(f"a ceiling {tiles} tile(s) wide at column 10:")
         for direction in (None, "left", "right"):
             sweep(pb, here, 10, tiles, row, tile, direction)
+    # Pressing right caps nothing in a 20 pixel margin, and the pin holds to
+    # within a pixel, so a Mario drifting out from under the ceiling is not
+    # the explanation. The other one is a tested point far enough ahead of him
+    # to be outside that margin, which a wider sweep would find.
+    print("pressing right again, with a 70 px margin either side:")
+    sweep(pb, here, 10, widths[-1], row, tile, "right", margin=70)
+    sweep(pb, here, 10, widths[-1], row, tile, "right", margin=60)
     pb.stop()
     return 0
 

@@ -560,6 +560,17 @@ World 1-3 and does not match his box sitting where his position byte says.
 
 Pressing right during the sweep caps nothing anywhere, at either ceiling
 width, which is the same direction dependence World 1-3 showed. Pressing left
-caps exactly as standing still does. Whether that is a real rule or an
-artefact of pinning his x while the game moves him is untested: the pin writes
-one byte per frame and the game may be testing a position it keeps elsewhere.
+caps exactly as standing still does.
+
+The obvious explanation is dead. If pressing right walked him out from under
+the ceiling, the pin would be failing, and the sweep reports how far his
+position byte ever gets from the pinned value: 0 pixels standing, 1 pressing
+either direction. He is under the ceiling for the whole jump and it does not
+stop him.
+
+The other explanation is a tested point far enough ahead of him to be outside
+the swept range, and this cannot rule that out. Widening the margin to 70
+pixels either side puts the trials near the screen edges, where they come back
+with a rise of 0 and are measuring something else, so the honest statement is
+bounded: over x 60 to 127, with a 24 pixel ceiling at x 80 to 103 and free air
+at both ends of the sweep, pressing right caps nothing.

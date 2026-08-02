@@ -120,6 +120,45 @@ def standing_jump(pb, state, x):
     return start - highest
 
 
+def pinned_jump(pb, state, x, direction):
+    """A jump from `x` with a direction held, with x pinned so he stays put.
+
+    Two readings fit the standing-versus-moving result and this separates
+    them. If the head test follows Mario's leading edge, the direction decides
+    which column is checked, so the same spot gives opposite answers pressing
+    left and pressing right, and the block's two edges give opposite answers
+    again. If instead a fast enough rise crosses the tile between checks, the
+    direction cannot matter and both edges behave the same way.
+
+    Pinning his x keeps him under the tile being tested for the whole jump.
+    Nothing about the pin touches the direction he is pressing, which is the
+    variable.
+    """
+    restore(pb, state)
+    pb.memory[SCREEN_X] = x
+    pb.memory[PHASE] = 0
+    start = pb.memory[MARIO_Y]
+    highest = start
+    if direction:
+        pb.button_press(direction)
+    # Let him build up whatever the run gives before the jump: the moving jump
+    # that clears the block came several taps into a run, not on the first.
+    for _ in range(40):
+        pb.memory[SCREEN_X] = x
+        pb.tick()
+    pb.button_press("a")
+    for frame in range(80):
+        pb.memory[SCREEN_X] = x
+        if frame == 20:
+            pb.button_release("a")
+        pb.tick()
+        highest = min(highest, pb.memory[MARIO_Y])
+    pb.button_release("a")
+    if direction:
+        pb.button_release(direction)
+    return start - highest
+
+
 def main():
     level = sys.argv[1] if len(sys.argv) > 1 else "1-3"
     column = int(sys.argv[2]) if len(sys.argv) > 2 else 11
@@ -163,6 +202,17 @@ def main():
     else:
         print(f"  free rise {free}, cut short from x {capped[0]} to "
               f"{capped[-1]}, which is {capped[-1] - capped[0] + 1} px")
+
+    # The block's two edges, each pressed both ways, with his x pinned. The
+    # open-sky column is the control that says a pinned jump can still rise.
+    print("\nthe same jump with a direction held and x pinned:")
+    for label, at in (("open sky (control), x 40", 40),
+                      ("right edge, x 88 (columns 11 and 12)", 88),
+                      ("left edge, x 48 (columns 6 and 7)", 48)):
+        rises = {d or "still": pinned_jump(pb, here, at, d)
+                 for d in (None, "left", "right")}
+        print(f"  {label:38} -> " +
+              ", ".join(f"{k} {v}" for k, v in rises.items()))
     pb.stop()
     return 0
 

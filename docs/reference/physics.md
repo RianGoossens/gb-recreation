@@ -499,10 +499,28 @@ cadence offset by 6, and the 16s carry on 10 pixels past the block's right
 edge. Neither number is 33, so a standing jump at x 88 is stopped at the same
 place ours is.
 
-So the difference between the cartridge and the engine here is a jump held
-with a direction against one held without, at the same position under the same
-tile, and it is not explained. The plausible readings are a head test that
-follows his leading edge, and a rise fast enough to cross the tile in one
-frame without the check catching it. Both are testable and neither is tested.
-What is settled is that the pocket is not a dead end on the cartridge and is
-one for us.
+Two readings fitted that: a head test that follows Mario's leading edge, and a
+rise fast enough to cross the tile between checks. Pressing each direction at
+the same spot with his x pinned separates them, since only the first can care
+which way he is pressing:
+
+```
+                                     still  left  right
+open sky at x 40 (control)              33    33     33
+x 88, under the block's right end       12    12     33
+x 48, under the block's left end        33    33     33
+```
+
+Left and right give the same speed and opposite answers, so speed is not what
+does it and the rise is not crossing the tile between checks. Which direction
+he is pressing is.
+
+What the direction selects is still open, because no single tested point fits
+both rows. At x 88 the right-pressed point has to be past the block's right
+edge at x 95, so at least 8 pixels ahead of him; the same offset at x 48 would
+land on the block's left column and cap him there, and it does not. The
+standing sweep does not fit a single point either: it starts capping 6 pixels
+into the block, alternates 12 and 16 on an 8 pixel cadence, and carries on 10
+pixels past the far edge. Something about this is being read wrong, and the
+part that is settled is that the pocket is a dead end for us and not for the
+cartridge, and that direction is the variable.
